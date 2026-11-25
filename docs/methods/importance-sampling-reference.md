@@ -1,10 +1,10 @@
 # WP06 — Mode and curvature construction of a Gaussian importance proposal
 
-**Method ID:** `importance-sampling-reference`. **Scope:** bounded independent
-mathematical proposal construction (#47) and the separately implemented sampler
-(#45/#46); the full model-binding/fitting workflow (#9/#11/#40) is incomplete.
-Neither the proposal nor the resulting weighted estimates establish native
-Flike 5.0.306.0 compatibility (#39/#12).
+**Method ID:** `importance-sampling-reference`. **Scope:** independent
+local curvature proposal construction and explicit covariance scaling, with
+the separately implemented sampler. Full model binding and installed Bayesian
+fitting are separate development requirements. Neither the proposal nor the
+weighted estimates establish native Flike compatibility.
 
 ## Mathematical basis and coordinates
 
@@ -23,9 +23,10 @@ Primary reference: [ARR3](https://www.arr-software.org/pdfs/ARR_190514_Book3_V4.
 © Commonwealth of Australia (Geoscience Australia), 2019, CC BY 4.0 unless
 otherwise marked. Kuczera (1999), Water Resources Research 35(5), pp. 1551–1557,
 [DOI 10.1029/1999WR900012](https://doi.org/10.1029/1999WR900012), establishes
-the FFA application; the publisher abstract was accessible, full text was
-not retrieved. No uninspected detail of that paper is used to choose numerical
-controls. These sources and their evidence limits are in `ffa references`.
+the FFA application. Equations (16)–(17), p. 1554, define the inverse negative
+log-posterior Hessian and a multiplier on proposal standard deviation.
+These equations support the explicit scaling implemented here, not a native
+default or a general convergence guarantee. See `ffa references`.
 
 Let theta be the **ordered, named source coordinates** declared by the caller.
 The likelihood and prior callbacks define log t(theta) = log L(D|theta) +
@@ -39,11 +40,19 @@ expansion gives
 
     log t(m + d) ~= log t(m) - d^T H d / 2,
     H = - Hessian_theta log t(m),
-    proposal = N(m, H^-1).
+    unscaled proposal = N(m, H^-1),
+    scaled proposal = N(m, gamma^2 H^-1).
 
-Only for a quadratic log target is this an exact posterior density. The local
-proposal is an efficient sampling device when it resembles the posterior,
-not itself an uncertainty calculation. All correlations are retained.
+Equation (17) of Kuczera (1999) scales standard deviations by gamma, not
+variances by gamma. The unscaled approximation is the exact posterior only
+for a quadratic log target with full real support. Widening or narrowing
+the proposal does not modify the target, prior or Jacobian. All correlations
+are retained (including signed off-diagonal covariance entries). The paper
+discusses widening to improve coverage and gives a typical range 1.5–2.5;
+neither this range nor its suggested value establishes a mandatory domain,
+native default or guarantee of coverage. Choose a positive finite gamma
+explicitly for new configured workflows; the historical unscaled builder
+uses gamma=1 when omitted.
 
 ## Explicit inputs and numerical method
 
@@ -109,11 +118,24 @@ Report the local numerical mode, not a global optimum or unique mode.
 Convert the verified scaled Hessian K and inverse back using
 H = S^-1 K S^-1 and covariance = S K^-1 S. Finite source covariance
 must also pass the sampler's full SPD and marginal resolution checks.
+After the unscaled proposal is admitted, the keyword-only `gamma` setting
+multiplies every entry of its covariance by gamma squared. The raw Hessian,
+mode, convergence diagnostics and numerical preconditioners are unchanged.
+The implementation combines binary mantissas/exponents instead of first
+forming gamma squared, which can overflow or underflow even when the final
+matrix is representable. Reject nonfinite or vanished nonzero entries and
+relative mantissa rounding errors exceeding 1e-12 (a binary64 representation
+check, not a paper constraint). Re-admit the resulting matrix through the
+existing Normal proposal constructor, including its SPD and marginal
+coordinate-resolution checks. Draw generation and log-density evaluation use
+the same factorization. Gamma=1 preserves the unscaled numerical result,
+including same-seed draws; the derivation text now records the applied gamma.
 There is no jitter, eigenvalue clipping, hidden rescaling of the posterior,
 correlation removal or fallback proposal.
 
 The result retains actual start, settings, mode, source-coordinate Hessian,
-proposal covariance and derivation, log target at mode, scaled gradient norm,
+proposal covariance, applied `gamma` and derivation (also propagated to
+sampler particle provenance), log target at mode, scaled gradient norm,
 gradient and curvature resolution indicators, condition number, last
 difference step, iteration/evaluation counts and termination description.
 The caller owns the source data, model and prior provenance. Callback or
@@ -164,16 +186,24 @@ result = build_curvature_proposal(
     target=target,
     starting_point=(("a", 0.0), ("b", 0.0)),
     controls=controls,
+    gamma=2.0,
 )
 print(result.proposal.means, result.negative_log_hessian, result.proposal.covariance)
 ```
 
+Here gamma=2 is an illustrative explicit setting, so the proposal covariance
+is [[8,-4],[-4,16]]/7 while the posterior covariance remains [[2,-1],[-1,4]]/7.
+For a point (a,b), set da=a-2 and db=b+1. The independent proposal log density
+is -log(2*pi) + log(7)/2 - 2*log(gamma)
+- (4*da^2 + 2*da*db + 2*db^2)/(2*gamma^2).
+
 The focused tests use independent exact precision/covariance formulas, a
 reordered affine coordinate case (including the density Jacobian), a
 nonquadratic two-mode target, failures and actual generated draws.
-The sampler test passes this constructed proposal to the existing
-`independent_importance_sample` with seed 47 and 16,000 draws, uses its
-existing weighted moments and weighted empirical quantile calculation,
+The sampler test passes both gamma=1 and gamma=2 constructed proposals to
+the existing `independent_importance_sample` with seed 47 and 16,000 draws
+each, checks independent proposal log densities, and uses its existing
+weighted moments and weighted empirical quantile calculation,
 and checks them against the analytic posterior, including the 95th
 percentile of a+b, whose distribution is N(1,4/7). The numerical
 tolerances are for these smooth test cases, not universal engineering
@@ -200,9 +230,9 @@ extreme-quantile precision. Posterior probability limits describe flood
 uncertainty conditional on the data/model, not numerical integration
 precision. See `ffa explain quantile-estimands --format markdown`.
 
-Source/observation/model binding, transformations, estimand-specific tail
-precision and installed Bayesian fit orchestration remain #9/#11/#40.
-Native optimizer, prior/defaults and settings-matched comparisons remain
-#39/#12. No native runs, new dependencies or third-party code/data are
-introduced by this original component. Sustainable Use License 1.0 is
-unchanged.
+Source/observation/model binding, transformations, output-specific precision
+and installed Bayesian fit orchestration are separate Toolkit requirements.
+Native optimizer, prior/defaults and settings-matched comparisons require
+separate qualification. No native runs, new dependencies or third-party
+code/data are introduced by this component. Sustainable Use License 1.0
+is unchanged.

@@ -48,7 +48,7 @@ The same edited volume series, [Book 1 Scope and Philosophy, Version 4.2](https:
 
 Kuczera, G. (1999). *Comprehensive at-site flood frequency analysis using Monte Carlo Bayesian inference*. Water Resources Research, 35(5), 1551â€“1557. [DOI 10.1029/1999WR900012](https://doi.org/10.1029/1999WR900012).
 
-**Role:** Bayesian flood likelihood, gauged and censored data, expected probability and importance sampling. Publisher abstract inspected; the detailed ARR presentation supplies an accessible mathematical foundation. Exact legacy priors, defaults and numerical controls need separate target evidence for WP05/WP06. Acquire the full paper before implementing any detail not established by the inspected guidance.
+**Role:** Bayesian flood likelihood, gauged and censored data, expected probability and importance sampling. Equations (16)-(17), p. 1554, specify the inverse negative log-posterior Hessian and explicit proposal SD scaling. The ARR presentation supplies an additional mathematical foundation. Exact native priors, defaults and numerical controls require separate qualification evidence; no other detail is admitted by this scaling review.
 
 ### KUCZERA1996
 

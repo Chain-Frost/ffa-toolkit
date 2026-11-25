@@ -1,7 +1,8 @@
 """Independent analytic curvature and real builder-to-sampler acceptance cases."""
 
 from dataclasses import replace
-from math import isclose, log, sqrt
+from math import isclose, log, pi, sqrt
+from random import Random
 
 import pytest
 
@@ -133,15 +134,105 @@ def test_negligible_newton_component_may_round_to_zero() -> None:
     _assert_vector_close(result.proposal.covariance[1], (0.0, 0.5), atol=1e-4)
 
 
-def test_generated_proposal_drives_real_sampler_and_weighted_outputs() -> None:
+def _analytic_proposal_logpdf(point: tuple[float, ...], gamma: float) -> float:
+    # Exact 2x2 precision H = [[4,1],[1,2]], det(H) = 7, mode = (2,-1).
+    a, b = point
+    da, db = a - 2, b + 1
+    quadratic = 4 * da**2 + 2 * da * db + 2 * db**2
+    return -log(2 * pi) + 0.5 * log(7) - 2 * log(gamma) - quadratic / (2 * gamma**2)
+
+
+@pytest.mark.parametrize("gamma", [0.5, 1.0, 2.0])
+def test_explicit_correlated_covariance_scaling(gamma: float) -> None:
     target = _target()
-    result = build_curvature_proposal(target=target, starting_point=(("a", 0.0), ("b", 0.0)), controls=_controls())
+    start = (("a", 0.0), ("b", 0.0))
+    baseline = build_curvature_proposal(target=target, starting_point=start, controls=_controls())
+    scaled = build_curvature_proposal(target=target, starting_point=start, controls=_controls(), gamma=gamma)
+    assert baseline.gamma == 1.0
+    assert scaled.gamma == gamma
+    assert f"gamma={gamma!r}" in scaled.proposal.source
+    assert replace(scaled, proposal=baseline.proposal, gamma=1.0) == baseline
+    assert scaled.proposal.coordinates == baseline.proposal.coordinates
+    assert scaled.proposal.means == baseline.proposal.means
+    assert scaled.proposal.covariance[0][1] == scaled.proposal.covariance[1][0]
+    expected = ((2 * gamma**2 / 7, -gamma**2 / 7), (-gamma**2 / 7, 4 * gamma**2 / 7))
+    for actual, reference in zip(scaled.proposal.covariance, expected, strict=True):
+        _assert_vector_close(actual, reference, rtol=1e-7)
+    point = (2.25, -1.5)
+    assert isclose(scaled.proposal.logpdf(point), _analytic_proposal_logpdf(point, gamma), abs_tol=1e-7)
+    original_draw = baseline.proposal.draw(Random(47))  # noqa: S311 - reproducible statistical test
+    scaled_draw = scaled.proposal.draw(Random(47))  # noqa: S311 - reproducible statistical test
+    expected_draw = tuple(
+        mean + gamma * (draw - mean) for mean, draw in zip(baseline.proposal.means, original_draw, strict=True)
+    )
+    _assert_vector_close(scaled_draw, expected_draw, atol=1e-12)
+    if gamma == 1.0:
+        assert scaled == baseline
+        assert scaled_draw == original_draw
+        assert scaled.proposal.logpdf(point) == baseline.proposal.logpdf(point)
+
+
+@pytest.mark.parametrize("gamma", [0.0, -1.0, float("inf"), -float("inf"), float("nan"), True])
+def test_invalid_gamma_rejected_before_target_evaluation(gamma: float) -> None:
+    def unexpected(_: tuple[float, ...]) -> float:
+        pytest.fail("invalid gamma must not evaluate the target")
+
+    with pytest.raises(ProposalConstructionError, match="gamma must be a positive finite"):
+        build_curvature_proposal(
+            target=_one_dimensional(unexpected),
+            starting_point=(("x", 0.0),),
+            controls=_controls((1.0,)),
+            gamma=gamma,
+        )
+
+
+@pytest.mark.parametrize("gamma", [1e200, 1e-200, 1e-161])
+def test_unrepresentable_scaled_covariance_rejected(gamma: float) -> None:
+    with pytest.raises(ProposalConstructionError, match="scaled covariance"):
+        build_curvature_proposal(
+            target=_target(), starting_point=(("a", 0.0), ("b", 0.0)), controls=_controls(), gamma=gamma
+        )
+
+
+def test_scaled_proposal_rechecks_mean_resolution() -> None:
+    with pytest.raises(ProposalConstructionError, match="coordinate resolution"):
+        build_curvature_proposal(
+            target=_one_dimensional(lambda t: -(t[0] - 1) ** 2 / 2),
+            starting_point=(("x", 1.0),),
+            controls=_controls((1.0,)),
+            gamma=1e-17,
+        )
+
+
+@pytest.mark.parametrize(("gamma", "scale"), [(1e155, 1e-12), (1e-165, 1e12)])
+def test_gamma_squared_need_not_be_representable_if_covariance_is(gamma: float, scale: float) -> None:
+    # The unscaled covariance is scale**2. Directly forming gamma**2 would
+    # overflow or underflow, but the final covariance is a normal finite float.
+    result = build_curvature_proposal(
+        target=_one_dimensional(lambda t: -(t[0] / scale) ** 2 / 2),
+        starting_point=(("x", 0.0),),
+        controls=_controls((scale,)),
+        gamma=gamma,
+    )
+    assert isclose(result.proposal.covariance[0][0], (gamma * scale) ** 2, rel_tol=1e-7)
+    assert isclose(result.proposal.logpdf((0.0,)), -0.5 * log(2 * pi) - log(gamma * scale), abs_tol=1e-7)
+
+
+@pytest.mark.parametrize("gamma", [1.0, 2.0])
+def test_generated_proposal_drives_real_sampler_and_weighted_outputs(gamma: float) -> None:
+    target = _target()
+    result = build_curvature_proposal(
+        target=target, starting_point=(("a", 0.0), ("b", 0.0)), controls=_controls(), gamma=gamma
+    )
     count = 16000
     run = independent_importance_sample(
         target=target,
         proposal=result.proposal,
         controls=ExplicitSamplingControls(
-            draw_count=count, random_seed=47, minimum_effective_size=count * 0.99, maximum_single_weight=0.0001
+            draw_count=count,
+            random_seed=47,
+            minimum_effective_size=count * (0.99 if gamma == 1.0 else 0.3),
+            maximum_single_weight=0.0001 if gamma == 1.0 else 0.001,
         ),
         provenance=RunProvenance(
             compatibility_profile="tuflow-bmt-flike-5.0.306.0-file3.10",
@@ -152,11 +243,22 @@ def test_generated_proposal_drives_real_sampler_and_weighted_outputs() -> None:
         ),
     )
     assert len(run.particles.draws) == count
-    assert run.moments.effective_sample_size > count * 0.999
-    # Five independent Normal standard errors of the mean; separately test covariance
-    # with approximately six Gaussian covariance standard errors.
+    assert run.moments.effective_sample_size > count * (0.999 if gamma == 1.0 else 0.3)
+    for point, likelihood, prior, proposal in zip(
+        run.particles.draws[:20],
+        run.particles.log_likelihood[:20],
+        run.particles.log_prior[:20],
+        run.particles.log_proposal[:20],
+        strict=True,
+    ):
+        assert likelihood == _likelihood(point)
+        assert prior == _prior(point)
+        assert isclose(proposal, _analytic_proposal_logpdf(point, gamma), abs_tol=1e-7)
+    # Preserve the unscaled test tolerance. The non-unit case uses its
+    # sampled ESS as a synthetic-case diagnostic, not a general MCSE bound.
+    size = count if gamma == 1.0 else run.moments.effective_sample_size
     for moment, expected, variance in zip(run.moments.parameters, (2.0, -1.0), (2 / 7, 4 / 7), strict=True):
-        assert isclose(moment.mean, expected, abs_tol=5 * sqrt(variance / count), rel_tol=0.0)
+        assert isclose(moment.mean, expected, abs_tol=5 * sqrt(variance / size), rel_tol=0.0)
     for actual, expected in zip(run.moments.covariance, ((2 / 7, -1 / 7), (-1 / 7, 4 / 7)), strict=True):
         _assert_vector_close(actual, expected, atol=0.04)
     # a + b is exactly N(1, 4/7); independent known 95th percentile.
