@@ -34,6 +34,7 @@ from ffa_methods.estimators.ordinary_lmoments import (
     fit_lognormal_lmoments,
     fit_lp3_lmoments,
 )
+from ffa_methods.gev_support import GEVFittedSupport, GEVSupportObservation, diagnose_gev_support
 from ffa_methods.legacy.models import ObservationKind
 from ffa_methods.legacy.project import parse_ams_csv
 
@@ -158,10 +159,10 @@ def _fixed_gev_settings(values: dict[str, object]) -> FixedGEVSettings:
     )
 
 
-def _positive_exact_ams(data: bytes) -> tuple[float, ...]:
+def _positive_exact_ams_records(data: bytes) -> tuple[GEVSupportObservation, ...]:
     """Refuse non-exact, zero, missing or unrepresentable records; never drop rows."""
     observations = parse_ams_csv(data)
-    values: list[float] = []
+    values: list[GEVSupportObservation] = []
     for record in observations:
         if record.kind != ObservationKind.EXACT or record.value is None or record.value <= 0:
             msg = f"year {record.year} is {record.kind}; only complete exact strictly positive maxima are supported"
@@ -174,8 +175,13 @@ def _positive_exact_ams(data: bytes) -> tuple[float, ...]:
         if not isfinite(flow) or flow <= 0:
             msg = f"year {record.year} has a nonfinite/underflowed flow"
             raise ValueError(msg)
-        values.append(flow)
+        values.append(GEVSupportObservation(record.year, flow))
     return tuple(values)
+
+
+def _positive_exact_ams(data: bytes) -> tuple[float, ...]:
+    """Reuse the source-preserving admission boundary for ordinary-family values."""
+    return tuple(record.discharge for record in _positive_exact_ams_records(data))
 
 
 def _fit_diagnostics(fit: GEVLHFit, n: int, unit: str) -> tuple[RunDiagnostic, ...]:
@@ -196,6 +202,22 @@ def _fit_diagnostics(fit: GEVLHFit, n: int, unit: str) -> tuple[RunDiagnostic, .
     return tuple(points)
 
 
+def _support_warnings(support: GEVFittedSupport) -> tuple[str, ...]:
+    warnings: list[str] = []
+    if support.outside:
+        warnings.append(
+            f"{len(support.outside)} exact annual maxima outside fitted GEV support: "
+            "the algebraic fit is retained, but the fitted distribution cannot describe the full sample. "
+            "Outside observations have zero exact continuous likelihood density."
+        )
+    if support.at_endpoint:
+        warnings.append(
+            f"{len(support.at_endpoint)} exact annual maxima at the fitted GEV endpoint: "
+            "not strictly outside; boundary density/admissibility is separate from the LH fit."
+        )
+    return tuple(warnings)
+
+
 def calculate_fixed_gev_from_files(
     ams_path: Path, settings_path: Path
 ) -> tuple[AnalysisResult, dict[str, str | int | float | bool | None]]:
@@ -208,8 +230,12 @@ def calculate_fixed_gev_from_files(
 def _calculate_fixed_gev(
     raw_ams: bytes, raw_settings: bytes, config: FixedGEVSettings
 ) -> tuple[AnalysisResult, dict[str, str | int | float | bool | None]]:
-    values = _positive_exact_ams(raw_ams)
+    records = _positive_exact_ams_records(raw_ams)
+    values = tuple(record.discharge for record in records)
     fitted = fit_gev_lh(values, shift=config.lh_shift)
+    support = diagnose_gev_support(
+        records, location=fitted.location, scale=fitted.scale, shape=fitted.shape, unit=config.discharge_unit
+    )
     points = tuple(
         ResultPoint(
             meaning=ResultMeaning.DETERMINISTIC_FITTED_QUANTILE,
@@ -241,10 +267,12 @@ def _calculate_fixed_gev(
         parameters=parameters,
         values=points,
         diagnostics=_fit_diagnostics(fitted, len(values), config.discharge_unit),
+        fitted_gev_support=support,
         warnings=(
             "Mathematical fixed-H GEV L/LH fit only: NOT Flike-native, Bayesian, bootstrap or optimized-H.",
             "Source classification, year definition and discharge units are caller assertions, not independently verified.",
             "The fourth LH ratio residual is unstandardized and is NOT the Wang optimized-H goodness-of-fit statistic.",
+            *_support_warnings(support),
         ),
     )
     settings: dict[str, str | int | float | bool | None] = {

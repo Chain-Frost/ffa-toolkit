@@ -111,3 +111,22 @@ a standardized z statistic. Native settings and comparisons remain a separate qu
 - Hosking, J. R. M. (1990), *L-moments: Analysis and estimation of distributions using linear combinations of order statistics*, https://doi.org/10.1111/j.2517-6161.1990.tb01775.x
 - Wang, Q. J. (1997), *LH moments for statistical analysis of extreme events*, https://doi.org/10.1029/97WR02134
 - Wang, Q. J. (1998), *Approximate goodness-of-fit tests of fitted generalized extreme value distributions using LH moments*, https://doi.org/10.1029/98WR02364
+
+## Fitted support reporting
+
+The installed fixed-H CLI retains the algebraic L/LH estimate and reports
+strict outside and exact endpoint observations separately. The comparison
+uses the exact rational endpoint of the fitted ARR binary64 coordinates,
+not a tolerance or a rounded endpoint. See the [installed method guidance
+and synthetic examples](methods/lh-moments-gev.md). Wang (1998), p.3497,
+distinguishes limitations of fitted-distribution tests beyond a bound;
+no goodness-of-fit statistic, H-selection rule, likelihood admission,
+or bootstrap rule is changed.
+
+Independent synthetic checks cover finite upper/lower support, equality,
+unbounded support, adjacent floating-point values, exactly representable
+unit scaling and a finite endpoint beyond binary64 range. End-to-end
+synthetic Year/AMS fits exercise all three reports and retain observations,
+source hashes and fitted quantiles. External-record comparison remains
+optional, outside the ordinary public test suite; no external dataset or
+native qualification is required or asserted by this diagnostic.

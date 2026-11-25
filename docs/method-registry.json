@@ -378,10 +378,11 @@
         "LEGACY_SAMPLES",
         "NUMPY"
       ],
-      "source_location": "ARR Book 3 Chapter 2 section 2.6.3.6 equations 3.2.52 to 3.2.54; legacy report importance-sampling summaries; exact proposal and solver controls still to pin",
+      "source_location": "ARR Book 3 Chapter 2 section 2.6.3.6 equations 3.2.52 to 3.2.54; Kuczera (1999) p. 1554 equations (16)-(17) explicit SD scaling; legacy report summaries; exact native proposal and solver controls remain unqualified",
       "purpose": "Replicate the legacy production importance-sampling calculation and verified controls for the specified likelihood and prior",
       "key_assumptions": [
         "Exact target density in legacy coordinates",
+        "Explicit positive finite proposal SD multiplier gamma; full covariance gamma squared times inverse curvature, not a change to the target or a native default",
         "Adequate proposal coverage and target-specific numerical precision",
         "Random controls and repeatability recorded where available",
         "Independent MCMC or quadrature may verify the result but do not silently replace the production algorithm"
@@ -393,11 +394,13 @@
         "Repeat-run stability and printed precision",
         "Independent posterior reference calculations",
         "Deterministic conjugate Normal weighted-coordinate moments and empirical interval refinement",
-        "Independent correlated modal curvature, affine coordinate changes, rejection and actual builder-to-sampler weighted outputs"
+        "Independent correlated modal curvature, affine coordinate changes, rejection and actual builder-to-sampler weighted outputs",
+        "Explicit gamma scaling: correlated covariance and Normal log-density identities, gamma=1 equivalence, representability and scaled builder-to-sampler posterior checks",
+        "Exact CSV lognormal execution against analytic predictive probability; estimated-scale censored execution against independent quadrature, seeded replay, and independent censor, unit and prior checks"
       ],
       "evidence_gaps": [
-        "Independent local Newton/adaptive Hessian proposal construction and stage-3 Normal importance draws are bounded components; supported source integration and full CLI fitting remain active WP06 #9.",
-        "Actual native Flike optimizer/proposal, random controls, stopping and output interpolation are not established and remain deferred in #39.",
+        "Independent local curvature, explicit full covariance scaling, Normal importance draws and explicitly classified lognormal source/prior binding are bounded components; broader family/exposure binding, output-specific precision and installed Bayesian fitting remain outstanding.",
+        "Actual native Flike optimizer/proposal, random controls, stopping and output interpolation are not established; external native qualification remains separate.",
         "ESS, approximate mean Monte Carlo standard error, and independent seeds do not by themselves validate extreme-tail flood estimates or native equivalence."
       ],
       "scope": "mvp",
@@ -509,7 +512,7 @@
       "implementation_status": "partial_independent_core_with_explicit_fixed_h_cli",
       "qualification_status": "not_started",
       "implementation_evidence": "wp04-fixed-h-gev-evidence.md",
-      "remaining_work": "Reviewed explicit fixed-H GEV H=0..4 mathematical CLI and complete positive Year/AMS validation are available. Active #7/#40: independently verify Wang conditional LH variance and implement standardized diagnostics/explicit mathematical H-selection; extend supported deterministic workflows. Deferred #39: exact native Flike selection/uncertainty controls, matched runs and source-specific variants. See wp04-optimized-h-specification.md."
+      "remaining_work": "Explicit fixed-H GEV H=0..4 mathematical CLI and complete positive Year/AMS validation include fitted support and distinct endpoint/outside observations in all report formats. Active: independently verify Wang conditional LH variance and implement standardized diagnostics/explicit mathematical H-selection; extend supported deterministic workflows. Deferred native qualification: exact native Flike selection/uncertainty controls, matched runs and source-specific variants. See wp04-optimized-h-specification.md."
     },
     {
       "method_id": "correlated-rating-error",

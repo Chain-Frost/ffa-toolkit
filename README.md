@@ -21,7 +21,9 @@ The example uses generated annual maxima. The installed calculation path support
 complete positive annual maxima, fixed-H GEV L/LH fitting and ordinary Gumbel, LN2, LP3 and fixed/free-location GP L-moment fits. See [ordinary L-moment guidance](docs/methods/l-moments.md). Other mathematical components include five
 distribution kernels, ordinary L-moment estimators, likelihoods, priors, shared rating errors, low-flow
 screening, importance proposals and sampling, and weighted Bayesian outputs. Internal components are
-not all available through the CLI. Unsupported workflows fail explicitly.
+not all available through the CLI. Unsupported workflows fail explicitly. See the
+[supported-calculation matrix](docs/initial-delivery-matrix.md) for the installed boundary,
+remaining workflow requirements and independent acceptance criteria.
 
 Mathematical verification and native Flike qualification are separate. No native equivalence is claimed.
 The reference compatibility profile is Flike 5.0.306.0 / file3.10; it is not a certification.
