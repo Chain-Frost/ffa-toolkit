@@ -41,8 +41,7 @@ def test_rounded_endpoint_is_not_mathematical_equality() -> None:
 
 def test_adjacent_values_and_exact_binary_unit_scaling() -> None:
     records = tuple(
-        GEVSupportObservation(2000 + i, q)
-        for i, q in enumerate((nextafter(14.0, -inf), 14.0, nextafter(14.0, inf)))
+        GEVSupportObservation(2000 + i, q) for i, q in enumerate((nextafter(14.0, -inf), 14.0, nextafter(14.0, inf)))
     )
     for factor in (2.0**-100, 1.0, 2.0**100):
         scaled = tuple(GEVSupportObservation(row.year, row.discharge * factor) for row in records)
