@@ -400,8 +400,10 @@ def _fitted_support_text(support: GEVFittedSupport | None) -> list[str]:
         f"  Kind: {support.kind}",
         f"  Exact endpoint (rational): {support.endpoint_exact} {support.unit}",
         f"  Approximate endpoint (binary64; None if unavailable): {support.endpoint_approximate} {support.unit}",
-        f"  Observations: {support.observation_count}; outside: {len(support.outside)}; "
-        f"at endpoint: {len(support.at_endpoint)}",
+        (
+            f"  Observations: {support.observation_count}; outside: {len(support.outside)}; "
+            f"at endpoint: {len(support.at_endpoint)}"
+        ),
     ]
     for status, rows in (("outside", support.outside), ("at_endpoint", support.at_endpoint)):
         lines.extend(f"  {status}: year={row.year}, discharge={row.discharge!r} {support.unit}" for row in rows)
