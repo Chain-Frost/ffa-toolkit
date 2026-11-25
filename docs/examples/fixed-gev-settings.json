@@ -1,0 +1,14 @@
+{
+  "schema_version": "ffa-gev-fixed-h/1",
+  "estimator": "gev_lh_fixed_h",
+  "lh_shift": 0,
+  "discharge_unit": "m3/s",
+  "year_definition": "synthetic_calendar_year",
+  "source_classification": "caller_asserted_complete_exact_positive_annual_maxima",
+  "non_exceedance_probabilities": [
+    0.5,
+    0.8,
+    0.9,
+    0.99
+  ]
+}

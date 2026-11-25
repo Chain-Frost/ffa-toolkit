@@ -1,0 +1,95 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ffa-methods"
+version = "0.0.0.dev0"
+description = "FFA Toolkit: independent flood frequency analysis CLI"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "LicenseRef-SUL-1.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Chain-Frost" }]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Hydrology",
+    "Typing :: Typed",
+]
+dependencies = ["scipy==1.17.0; python_version >= '3.12'", "scipy>=1.16,<1.17; python_version < '3.12'"]
+
+[project.urls]
+Repository = "https://github.com/Chain-Frost/ffa-toolkit"
+Issues = "https://github.com/Chain-Frost/ffa-toolkit/issues"
+
+[project.scripts]
+ffa = "ffa_methods.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "build==1.3.0",
+    "hatchling==1.27.0",
+    "pyright==1.1.414",
+    "pytest==9.0.2",
+    "scipy-stubs==1.17.0.2; python_version >= '3.12'",
+    "scipy-stubs>=1.16,<1.17; python_version < '3.12'",
+    "ruff==0.16.6",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ffa_methods"]
+
+# A single authoritative documentation register is kept under docs/.
+# Hatchling embeds these exact files inside the wheel; it does NOT include reference/.
+[tool.hatch.build.targets.wheel.force-include]
+"docs/method-registry.json" = "ffa_methods/resources/method-registry.json"
+"docs/references.md" = "ffa_methods/resources/references.md"
+"docs/compatibility-contract.md" = "ffa_methods/resources/compatibility-contract.md"
+"docs/distribution-kernels.md" = "ffa_methods/resources/distribution-kernels.md"
+"docs/methods/mgb-low-flow-screen.md" = "ffa_methods/resources/methods/mgb-low-flow-screen.md"
+"docs/methods/legacy-zero-threshold.md" = "ffa_methods/resources/methods/legacy-zero-threshold.md"
+"docs/methods/censored-historical-likelihood.md" = "ffa_methods/resources/methods/censored-historical-likelihood.md"
+"docs/methods/quantile-estimands.md" = "ffa_methods/resources/methods/quantile-estimands.md"
+"docs/methods/importance-sampling-reference.md" = "ffa_methods/resources/methods/importance-sampling-reference.md"
+"docs/methods/lh-moments-gev.md" = "ffa_methods/resources/methods/lh-moments-gev.md"
+"docs/examples/fixed-gev-ams.csv" = "ffa_methods/resources/examples/fixed-gev-ams.csv"
+"docs/examples/fixed-gev-settings.json" = "ffa_methods/resources/examples/fixed-gev-settings.json"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src/ffa_methods",
+    "/docs/compatibility-contract.md",
+    "/docs/distribution-kernels.md",
+    "/docs/methods/mgb-low-flow-screen.md",
+    "/docs/methods/legacy-zero-threshold.md",
+    "/docs/methods/censored-historical-likelihood.md",
+    "/docs/methods/quantile-estimands.md",
+    "/docs/methods/importance-sampling-reference.md",
+    "/docs/methods/lh-moments-gev.md",
+    "/docs/examples/fixed-gev-ams.csv",
+    "/docs/examples/fixed-gev-settings.json",
+    "/docs/method-registry.json",
+    "/docs/references.md",
+    "/README.md",
+    "/LICENSE",
+    "/pyproject.toml",
+]
+exclude = ["/reference", "/reference/**"]
+
+[tool.pyright]
+include = ["src", "tests", "scripts"]
+exclude = [".venv", ".local", "build", "dist", "reference"]
+pythonVersion = "3.11"
+typeCheckingMode = "strict"
+reportUnnecessaryTypeIgnoreComment = "error"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"

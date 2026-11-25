@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "admission_status": "public_candidate",
+  "flike_qualified": false,
+  "purpose": "Independent mathematical handoff candidates for WP05 likelihood primitives and WP06 posterior-summary verification; no runtime implementation or inference algorithm selection.",
+  "runtime": {
+    "python": "3.12.14",
+    "mpmath": "1.3.0",
+    "decimal_precision": 100,
+    "upstream_code_executed": false,
+    "scipy_or_numpy_used": false
+  },
+  "normal_interval_log_probabilities": {
+    "distribution": {
+      "family": "Normal",
+      "mean": 0,
+      "standard_deviation": 1
+    },
+    "source": {
+      "repository": "USACE-RMC/Numerics",
+      "commit": "7e8e8d1c5f26e045a35ec9fc09367de95ed05b02",
+      "path": "Test_Numerics/Distributions/Univariate/Test_DistributionLikelihoodRegression.cs",
+      "test_method": "NormalTailIntervalRemainsFinite",
+      "git_blob_sha": "b70773a577a3f20f56f8c852071cf617e981ada4",
+      "display_url": "https://github.com/USACE-RMC/Numerics/blob/7e8e8d1c5f26e045a35ec9fc09367de95ed05b02/Test_Numerics/Distributions/Univariate/Test_DistributionLikelihoodRegression.cs",
+      "content_sha256": "1f6fc32b7af7d4013689f111c990d3dde261839e8450f21f47f09a87433feb9c",
+      "source_bytes": 2399,
+      "hash_encoding": "Exact bytes decoded from GitHub base64 contents response, with no newline or encoding transformation.",
+      "code_license": "0BSD",
+      "license_url": "https://github.com/USACE-RMC/Numerics/blob/7e8e8d1c5f26e045a35ec9fc09367de95ed05b02/LICENSE",
+      "upstream_reference": "Source test attributes its oracle to R 4.4.3 pnorm(log.p=TRUE); R was not executed for this candidate calculation."
+    },
+    "mathematical_basis": "P(a < Z <= b) = integral_a^b exp(-x^2/2)/sqrt(2*pi) dx. A continuous Normal law gives the same probability for any inclusion choice at the finite endpoints.",
+    "independent_calculation": "P=(b-a)*quad_t[0,1] exp(-(a+(b-a)*t)^2/2)/sqrt(2*pi); log_probability=ln(P), with mpmath at 100 decimal digits. This integrates density directly and never subtracts CDF or survival probabilities.",
+    "input_precision_note": "The independent calculation interprets input decimal strings exactly. The C# 1E-20 literal is rounded to binary64; the retained 2e-13 log-probability tolerance safely covers this input-rounding difference.",
+    "cases": [
+      {
+        "case_id": "standard_normal_interval_9_10",
+        "lower_bound_decimal": "9",
+        "upper_bound_decimal": "10",
+        "probability": {
+          "decimal": "0.000000000000000000112851220742359904247484234253623126489640686048538537928157",
+          "float64": 1.1285122074235991e-19
+        },
+        "log_probability": {
+          "decimal": "-43.6282166322808224687367953853114357807255079009888455279372",
+          "float64": -43.628216632280825
+        },
+        "source_assertion": {
+          "expected_log_probability_literal": "-43.628216632280818",
+          "expected_log_probability_float64": -43.62821663228082,
+          "absolute_tolerance": 2e-13
+        }
+      },
+      {
+        "case_id": "standard_normal_interval_-10_-9",
+        "lower_bound_decimal": "-10",
+        "upper_bound_decimal": "-9",
+        "probability": {
+          "decimal": "0.000000000000000000112851220742359904247484234253623126489640686048538537928157",
+          "float64": 1.1285122074235991e-19
+        },
+        "log_probability": {
+          "decimal": "-43.6282166322808224687367953853114357807255079009888455279372",
+          "float64": -43.628216632280825
+        },
+        "source_assertion": {
+          "expected_log_probability_literal": "-43.628216632280818",
+          "expected_log_probability_float64": -43.62821663228082,
+          "absolute_tolerance": 2e-13
+        }
+      },
+      {
+        "case_id": "standard_normal_interval_0_1e-20",
+        "lower_bound_decimal": "0",
+        "upper_bound_decimal": "1e-20",
+        "probability": {
+          "decimal": "3.98942280401432677939946059934381868475851982126927967121293e-21",
+          "float64": 3.989422804014327e-21
+        },
+        "log_probability": {
+          "decimal": "-46.9706403930855864221401588300929017918834439128799096001504",
+          "float64": -46.97064039308559
+        },
+        "source_assertion": {
+          "expected_log_probability_literal": "-46.970640393085588",
+          "expected_log_probability_float64": -46.97064039308559,
+          "absolute_tolerance": 2e-13
+        }
+      }
+    ],
+    "scope_limit": "Validates Normal interval probability and numerical stability. Does not specify historical-count combinatorics, record pairing, rating uncertainty, Flike likelihood conventions or other family kernels."
+  },
+  "normal_known_variance_conjugate_posterior": {
+    "case_id": "synthetic_normal_mean_y_1_2_3",
+    "data_provenance": "Newly specified deterministic synthetic observations [1,2,3]. No observations, random seed sequence, expected numerical values or Monte Carlo tolerance copied from the RMC C# test.",
+    "model": {
+      "observations": [
+        1,
+        2,
+        3
+      ],
+      "sampling_assumption": "Conditionally independent y_i given mu, each Normal(mu, sigma=2).",
+      "likelihood_standard_deviation": 2,
+      "likelihood_variance": 4,
+      "prior": {
+        "family": "Normal",
+        "mean": 0,
+        "standard_deviation": 1,
+        "variance": 1
+      },
+      "fitted_coordinate": "mu"
+    },
+    "methodology_reference": {
+      "repository": "USACE-RMC/RMC-BestFit",
+      "commit": "bfce2ddbebb8d75e6cf6e21c4fef8ecfb5058269",
+      "path": "src/RMC.BestFit.Verification/ModelEstimation/BayesianConjugateOracleVerificationTests.cs",
+      "test_method": "InformativePrior_NormalNormalConjugatePosterior_MatchesClosedForm",
+      "git_blob_sha": "a6f4268a73b8a3532b6422499b4b80331290f886",
+      "display_url": "https://github.com/USACE-RMC/RMC-BestFit/blob/bfce2ddbebb8d75e6cf6e21c4fef8ecfb5058269/src/RMC.BestFit.Verification/ModelEstimation/BayesianConjugateOracleVerificationTests.cs",
+      "content_sha256": "851705fd494140636b34af901271277256406ce28318b76ea68f86e62d4b26e1",
+      "source_bytes": 7418,
+      "hash_encoding": "Exact bytes decoded from GitHub base64 contents response, with no newline or encoding transformation.",
+      "code_license": "0BSD",
+      "license_url": "https://github.com/USACE-RMC/RMC-BestFit/blob/bfce2ddbebb8d75e6cf6e21c4fef8ecfb5058269/LICENSE",
+      "role": "Methodological example: compare posterior mean, SD and central interval with the conjugate solution. Its N=1000 seeded sample, prior, numerical results and stochastic assertion tolerances are not reused."
+    },
+    "mathematical_basis": {
+      "derivation": "Complete the square in the product of the Normal prior density and n Normal likelihood densities for mu.",
+      "posterior_variance": "v_n = 1/(1/v_0+n/sigma^2) = 1/(1+3/4) = 4/7",
+      "posterior_mean": "m_n = v_n*(m_0/v_0+sum(y_i)/sigma^2) = (4/7)*(0+6/4) = 6/7",
+      "posterior_standard_deviation": "sqrt(v_n)=2/sqrt(7)",
+      "equal_tail_limits": "m_n+sqrt(v_n)*Phi_inverse(p), for p in {0.025,0.975}; Phi_inverse(p)=sqrt(2)*erfinv(2*p-1)."
+    },
+    "expected_posterior": {
+      "family": "Normal",
+      "mean": {
+        "exact_fraction": "6/7",
+        "decimal": "0.857142857142857142857142857142857142857142857142857142857143",
+        "float64": 0.8571428571428571
+      },
+      "variance": {
+        "exact_fraction": "4/7",
+        "decimal": "0.571428571428571428571428571428571428571428571428571428571429",
+        "float64": 0.5714285714285714
+      },
+      "standard_deviation": {
+        "exact_expression": "2/sqrt(7)",
+        "decimal": "0.755928946018454454429033072468360121631502623737842908676667",
+        "float64": 0.7559289460184545
+      },
+      "equal_tail_interval": {
+        "mass": 0.95,
+        "lower_probability": 0.025,
+        "upper_probability": 0.975,
+        "lower": {
+          "decimal": "-0.624450651924636416221040080059556344701955972144479469134448",
+          "float64": -0.6244506519246364
+        },
+        "upper": {
+          "decimal": "2.33873636621035070193532579434527063041624168643019375484873",
+          "float64": 2.338736366210351
+        },
+        "independently_integrated_interval_mass": {
+          "decimal": "0.95",
+          "float64": 0.95
+        }
+      }
+    },
+    "tolerance_policy": "Deterministic expected quantities are recorded at high precision. No stochastic pass/fail tolerance is prescribed; the WP06 owner must choose diagnostics and uncertainty-aware acceptance criteria for the implemented sampler.",
+    "scope_limits": [
+      "Posterior for the mean parameter mu, not a posterior predictive interval for a new observation.",
+      "Analytic benchmark does not select or implement MCMC; the legacy production importance-sampling requirement remains unchanged.",
+      "Does not establish legacy Flike prior coordinates, supplied-prior behavior, distribution-family inference or output-estimand compatibility."
+    ]
+  }
+}

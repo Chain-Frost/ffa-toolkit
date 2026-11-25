@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "scope": "Independent generated and analytic mathematical vectors only",
+  "native_reference_admitted": false,
+  "entries": [
+    {
+      "id": "numerics-vectors",
+      "local_evidence": "numerics-vectors/README.md",
+      "license": "0BSD upstream; independent calculations",
+      "limitations": [
+        "No gauge records",
+        "No native conformance admission"
+      ]
+    }
+  ]
+}

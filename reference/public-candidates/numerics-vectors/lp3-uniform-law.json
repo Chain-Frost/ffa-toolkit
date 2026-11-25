@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "admission_status": "public_candidate",
+  "flike_qualified": false,
+  "purpose": "Independent mathematical verification and upstream algorithm comparison; not a Flike regression fixture.",
+  "runtime": {
+    "python": "3.12.14",
+    "mpmath": "1.3.0",
+    "mpmath_decimal_precision": 80,
+    "ordinary_l_moment_arithmetic": "fractions.Fraction with math.comb; exact integer numerator and denominator",
+    "scipy_or_numpy_used": false,
+    "upstream_numerics_or_bestfit_code_executed": false
+  },
+  "upstream": {
+    "commit": "7e8e8d1c5f26e045a35ec9fc09367de95ed05b02",
+    "test_url": "https://github.com/USACE-RMC/Numerics/blob/7e8e8d1c5f26e045a35ec9fc09367de95ed05b02/Test_Numerics/Distributions/Univariate/Test_NormalPearsonRobustness.cs",
+    "test_method": "LogPearson_UniformCase_AndTransformedEndpoints",
+    "source_parameters": {
+      "meanOfLog": 0,
+      "standardDeviationOfLog": 1,
+      "skewOfLog": -2,
+      "Base": "e",
+      "meaning": "Constructor arguments for the transformed variable; not the flow-domain Mean or StandardDeviation properties."
+    },
+    "retained_source_assertions": [
+      {
+        "quantity": "logpdf(1)",
+        "expected": -1,
+        "absolute_tolerance": 1e-14
+      },
+      {
+        "quantity": "ppf(F=1e-20)",
+        "expected_formula": "e*1e-20",
+        "absolute_tolerance": 2e-31
+      }
+    ]
+  },
+  "ffa_parameter_mapping": {
+    "mean_log_flow": 0,
+    "log_standard_deviation_log_flow": 0,
+    "standard_deviation_log_flow": 1,
+    "skew_log_flow": -2,
+    "log_base": "e",
+    "reference_discharge": 1
+  },
+  "analytic_derivation": "If E follows Exp(rate=1), then Y=1-E has mean 0, SD 1 and skew -2. Q=exp(Y) therefore has F_Q(q)=q/e for 0<q<e. Thus Q is Uniform(0,e), logpdf(q)=-1 and ppf(F)=e*F.",
+  "cases": [
+    {
+      "nonexceedance_probability": {
+        "input_decimal": "1e-20",
+        "decimal": "1.0e-20",
+        "float64": 1e-20
+      },
+      "quantile": {
+        "decimal": "2.71828182845904523536028747135266249775724709369995957496697e-20",
+        "float64": 2.718281828459045e-20
+      },
+      "cdf_at_quantile": {
+        "decimal": "1.0e-20",
+        "float64": 1e-20
+      },
+      "logpdf_at_quantile": {
+        "decimal": "-1.0",
+        "float64": -1.0
+      },
+      "logcdf_at_quantile": {
+        "decimal": "-46.0517018598809136803598290936872841520220297725754595206666",
+        "float64": -46.051701859880914
+      }
+    },
+    {
+      "nonexceedance_probability": {
+        "input_decimal": "0.25",
+        "decimal": "0.25",
+        "float64": 0.25
+      },
+      "quantile": {
+        "decimal": "0.679570457114761308840071867838165624439311773424989893741742",
+        "float64": 0.6795704571147613
+      },
+      "cdf_at_quantile": {
+        "decimal": "0.25",
+        "float64": 0.25
+      },
+      "logpdf_at_quantile": {
+        "decimal": "-1.0",
+        "float64": -1.0
+      },
+      "logcdf_at_quantile": {
+        "decimal": "-1.38629436111989061883446424291635313615100026872051050824136",
+        "float64": -1.3862943611198906
+      }
+    },
+    {
+      "nonexceedance_probability": {
+        "input_decimal": "0.5",
+        "decimal": "0.5",
+        "float64": 0.5
+      },
+      "quantile": {
+        "decimal": "1.35914091422952261768014373567633124887862354684997978748348",
+        "float64": 1.3591409142295225
+      },
+      "cdf_at_quantile": {
+        "decimal": "0.5",
+        "float64": 0.5
+      },
+      "logpdf_at_quantile": {
+        "decimal": "-1.0",
+        "float64": -1.0
+      },
+      "logcdf_at_quantile": {
+        "decimal": "-0.69314718055994530941723212145817656807550013436025525412068",
+        "float64": -0.6931471805599453
+      }
+    },
+    {
+      "nonexceedance_probability": {
+        "input_decimal": "0.9",
+        "decimal": "0.9",
+        "float64": 0.9
+      },
+      "quantile": {
+        "decimal": "2.44645364561314071182425872421739624798152238432996361747027",
+        "float64": 2.4464536456131407
+      },
+      "cdf_at_quantile": {
+        "decimal": "0.9",
+        "float64": 0.9
+      },
+      "logpdf_at_quantile": {
+        "decimal": "-1.0",
+        "float64": -1.0
+      },
+      "logcdf_at_quantile": {
+        "decimal": "-0.105360515657826301227500980839312798306120372983274072563939",
+        "float64": -0.1053605156578263
+      }
+    }
+  ],
+  "additional_interior_point": {
+    "q": 1,
+    "cdf": {
+      "decimal": "0.367879441171442321595523770161460867445811131031767834507837",
+      "float64": 0.36787944117144233
+    },
+    "logcdf": -1,
+    "logpdf": -1
+  },
+  "scope_exclusions": [
+    "No assertion about the selected density value exactly at q=0 or q=e; these pointwise endpoint conventions do not determine the continuous law.",
+    "No request to add distribution mean, variance, skewness or kurtosis APIs to FFA.",
+    "No literal-zero atom, zero-threshold likelihood, prior, inference or Flike compatibility assertion."
+  ],
+  "test_adoption_note": "Retain the explicit upstream tolerances for the two retained source assertions. The added interior identities are analytic candidate vectors; test tolerances for them belong to the WP03 owner. F=1e-20 exercises the lower tail, not an exceedance probability."
+}

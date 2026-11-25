@@ -1,0 +1,55 @@
+name: Independent Australian flood evidence audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pyflood2022-audit-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  audit:
+    # A skipped draft job must not emit the normal audit validation context.
+    name: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && 'Draft audit (not validation)' || github.event_name == 'workflow_dispatch' && 'Manual audit' || 'audit' }}
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          lfs: false
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ github.event_name == 'pull_request' && '3.11' || '3.14' }}
+          # Cache installed-package downloads only; external evidence stays in RUNNER_TEMP.
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install existing mathematical package
+        run: python -m pip install -e .
+      - name: Fetch pinned public input files outside the checkout
+        id: pinned_inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pyflood2022"
+          base=https://raw.githubusercontent.com/jlerat/pyflood2022/d603936ae642feef94228b39c33b7307dc236b8e/data
+          for file in flood_data_v5.zip flood_data_censored_v5.zip; do
+            curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location --max-time 60 --max-filesize 2000000 "$base/floods/$file" --output "$RUNNER_TEMP/pyflood2022/$file"
+          done
+          curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location --max-time 60 --max-filesize 200000 "$base/sites_info.csv" --output "$RUNNER_TEMP/pyflood2022/sites_info.csv"
+      - name: Verify source bytes and print aggregate independent audit receipt
+        run: python scripts/audit_pyflood2022.py "$RUNNER_TEMP/pyflood2022"
+      - name: Run all-eligible-station deterministic family stress matrix
+        # Preserve preliminary audit failure while still collecting independent matrix evidence.
+        if: ${{ !cancelled() && steps.pinned_inputs.outcome == 'success' }}
+        run: python -m scripts.validate_pyflood2022_fits "$RUNNER_TEMP/pyflood2022"
+      - name: Remove external source inputs
+        if: always()
+        shell: bash
+        run: |
+          rm -rf -- "$RUNNER_TEMP/pyflood2022"

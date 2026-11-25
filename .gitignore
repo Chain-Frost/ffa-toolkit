@@ -1,0 +1,29 @@
+# Python tooling and editable installation
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.pyright/
+.pyrightconfig.json
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+.local/
+*.log
+
+# IDEs and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Unpublished/private input and output custody (do not ignore legitimate reference extensions)
+local-evidence/
+private-evidence/
+native-runs/
+scratch/

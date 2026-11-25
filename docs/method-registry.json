@@ -1,0 +1,873 @@
+{
+  "schema_version": "planning-0.2",
+  "research_date": "2026-11-24",
+  "purpose": "Method and qualification register for independent FFA Toolkit mathematics and CLI workflows",
+  "compatibility_profile": "tuflow-bmt-flike-5.0.306.0-file3.10",
+  "compatibility_target": {
+    "product": "TUFLOW/BMT Flike",
+    "program_version": "5.0.306.0",
+    "file_version": "3.10",
+    "version_source_key": "LEGACY_SAMPLES",
+    "version_evidence": "Unqualified compatibility target; native executable/settings custody is not established by this register.",
+    "contract": "compatibility-contract.md"
+  },
+  "guidance_profile": "ARR-Book3-v4.2-foundations",
+  "delivery_profile": "cli-only",
+  "excluded_interfaces": [
+    "GUI",
+    "TUI",
+    "QGIS plugin",
+    "browser application",
+    "separately supported public API"
+  ],
+  "reference_register": "references.md",
+  "implementation_status": "not_implemented",
+  "qualification_status": "not_started",
+  "status_applies_to": "Global not_implemented denotes the incomplete full programme, not absence of calculation. The installed CLI supports explicit-settings fixed-H GEV fitting. Per-method entries distinguish implemented kernels, estimators, likelihood/prior/rating/low-flow/sampling components and reporting from outstanding workflows. No method is native-qualified.",
+  "progress_tracker": "https://github.com/Chain-Frost/ffa-toolkit/issues",
+  "work_package_issues": {},
+  "schema_change_notes": [
+    "Split the former lognormal/Gumbel comparator entry into separate required kernels and added the GP kernel",
+    "Replaced the draft literal-zero-mixture entry with legacy-zero-threshold; the prior independent mixture is not an MVP commitment",
+    "LH-moments and rating-error behavior remain required MVP capabilities",
+    "Imported regional priors are MVP; regional model fitting and complete POT workflows are separate future entries"
+  ],
+  "methods": [
+    {
+      "method_id": "annual-maxima-observations",
+      "title": "Stationary annual maxima observation model",
+      "kind": "observation_model",
+      "work_packages": [
+        "WP02"
+      ],
+      "source_keys": [
+        "ARR3",
+        "LEGACY_SAMPLES"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 sections 2.2 and 2.3; supplied file3.10 project and AMS CSV observations",
+      "purpose": "Preserve annual peaks, coverage, units and legacy observation flags without inventing missing or zero-flow years",
+      "key_assumptions": [
+        "Declared year and instantaneous-discharge convention",
+        "Reviewed independence and stationarity",
+        "Unknown project controls remain explicit"
+      ],
+      "documentation": "statistical-methods.md",
+      "validation_required": [
+        "Annual coverage ledger",
+        "Duplicate and overlap rejection",
+        "Missing versus known non-exceedance",
+        "CSV/project/report pairing evidence"
+      ],
+      "scope": "mvp",
+      "implementation_status": "not_implemented",
+      "qualification_status": "not_started"
+    },
+    {
+      "method_id": "lognormal",
+      "title": "Lognormal distribution",
+      "kind": "distribution",
+      "scope": "mvp",
+      "implementation_status": "mathematical_kernel_implemented",
+      "qualification_status": "not_started",
+      "work_packages": [
+        "WP03"
+      ],
+      "source_keys": [
+        "ARR3",
+        "SCIPY"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 section 2.4.2; SciPy lognorm documentation; target parameter mapping to be verified",
+      "purpose": "Implement the legacy lognormal probability and quantile kernel",
+      "key_assumptions": [
+        "Positive-flow kernel with explicit natural-log coordinates",
+        "Legacy zero-threshold behavior belongs to the separate qualified treatment",
+        "Location and scale conventions must match the target"
+      ],
+      "documentation": "distribution-kernels.md",
+      "validation_required": [
+        "Analytic normal/lognormal transformations",
+        "Support and inverse probabilities",
+        "Density Jacobian",
+        "Legacy coordinate mapping"
+      ],
+      "validation_status": "Independent mathematical tests and Python 3.14 CI evidence tracked in PR #15; no native Flike qualification",
+      "evidence_gaps": [
+        "Full FLIKE 5.0.306.0 parameter mapping and matched reference cases unavailable"
+      ]
+    },
+    {
+      "method_id": "lp3",
+      "title": "Log Pearson type III distribution",
+      "kind": "distribution",
+      "work_packages": [
+        "WP03"
+      ],
+      "source_keys": [
+        "ARR3",
+        "SCIPY",
+        "LEGACY_SAMPLES"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 section 2.4.2; SciPy pearson3; LP3 labels in legacy5.0.306.0 reports",
+      "purpose": "Implement the legacy LP3 probability and quantile kernel with explicit source-to-library parameter conversion",
+      "key_assumptions": [
+        "Positive-flow kernel",
+        "Observed source coordinates: mean(loge flow), loge[Std dev(loge flow)], skew(loge flow)",
+        "Preserve the joint density and any reference-discharge conversion",
+        "Threshold probability is separately specified"
+      ],
+      "documentation": "distribution-kernels.md",
+      "validation_required": [
+        "Both skew signs",
+        "Zero-skew lognormal limit",
+        "Jacobian and exact log-SD mapping",
+        "Support and inverse probabilities",
+        "Parameter-summary coordinate fidelity"
+      ],
+      "scope": "mvp",
+      "implementation_status": "mathematical_kernel_implemented",
+      "qualification_status": "not_started",
+      "validation_status": "PR #15 mathematical kernels and independent CI; additional report-internal consistency checked against excluded source-custodied candidate evidence (reference/legacy-candidates/lp3-report-internal-replay.md); no native Flike qualification"
+    },
+    {
+      "method_id": "gumbel",
+      "title": "Gumbel distribution",
+      "kind": "distribution",
+      "scope": "mvp",
+      "implementation_status": "mathematical_kernel_implemented",
+      "qualification_status": "not_started",
+      "work_packages": [
+        "WP03"
+      ],
+      "source_keys": [
+        "ARR3",
+        "SCIPY"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 section 2.4.2; SciPy Gumbel and GEV documentation; target parameter mapping to be verified",
+      "purpose": "Implement the legacy Gumbel probability and quantile kernel",
+      "key_assumptions": [
+        "Declared location and scale coordinates",
+        "GEV limiting convention agrees with the legacy mapping",
+        "No silent truncation of the support"
+      ],
+      "documentation": "distribution-kernels.md",
+      "validation_required": [
+        "Analytic probabilities and quantiles",
+        "GEV zero-shape limit",
+        "Stable tails",
+        "Legacy coordinate mapping"
+      ],
+      "validation_status": "Independent mathematical tests and Python 3.14 CI evidence tracked in PR #15; no native Flike qualification",
+      "evidence_gaps": [
+        "Full FLIKE 5.0.306.0 parameter mapping and matched reference cases unavailable"
+      ]
+    },
+    {
+      "method_id": "gev",
+      "title": "Generalised extreme value distribution",
+      "kind": "distribution",
+      "work_packages": [
+        "WP03"
+      ],
+      "source_keys": [
+        "ARR3",
+        "SCIPY",
+        "LEGACY_SAMPLES"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 section 2.4.2; SciPy genextreme; observed legacy GEV report labels",
+      "purpose": "Implement the legacy GEV probability and quantile kernel",
+      "key_assumptions": [
+        "Observed source labels: location u, loge(scale a), shape k",
+        "Shape-sign mapping requires explicit verification",
+        "Physical-support appraisal and no silent truncation"
+      ],
+      "documentation": "distribution-kernels.md",
+      "validation_required": [
+        "Bounded and unbounded tails",
+        "Gumbel limit",
+        "Impossible observations distinguished from valid predictive points outside a component support",
+        "Quantile monotonicity",
+        "Legacy coordinate mapping"
+      ],
+      "scope": "mvp",
+      "implementation_status": "mathematical_kernel_implemented",
+      "qualification_status": "not_started",
+      "validation_status": "Independent mathematical tests and Python 3.14 CI evidence tracked in PR #15; no native Flike qualification",
+      "evidence_gaps": [
+        "FLIKE report shape k sign relative to EVT xi is unverified"
+      ]
+    },
+    {
+      "method_id": "generalised-pareto",
+      "title": "Generalised Pareto distribution",
+      "kind": "distribution",
+      "scope": "mvp",
+      "implementation_status": "mathematical_kernel_implemented",
+      "qualification_status": "not_started",
+      "work_packages": [
+        "WP03"
+      ],
+      "source_keys": [
+        "ARR3",
+        "SCIPY"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 distribution and POT guidance; SciPy genpareto; legacy family mapping and supported combinations to be pinned",
+      "purpose": "Implement the GP probability and quantile kernel required by the legacy family matrix",
+      "key_assumptions": [
+        "Explicit legacy shape, scale, location and support conventions",
+        "Kernel support does not constitute a complete POT event and exposure workflow"
+      ],
+      "documentation": "distribution-kernels.md",
+      "validation_required": [
+        "Both shape signs and supported endpoints",
+        "Exponential limit",
+        "Support and inverse probabilities",
+        "Stable tails",
+        "Matched legacy kernel examples"
+      ],
+      "evidence_gaps": [
+        "The uploaded reports do not exercise this family",
+        "Exact target-build parameterization and fitting combinations need reference evidence",
+        "POT exposure/event conversion is outside the GP probability kernel"
+      ],
+      "validation_status": "Independent mathematical tests and Python 3.14 CI evidence tracked in PR #15; no native Flike qualification"
+    },
+    {
+      "method_id": "censored-historical-likelihood",
+      "title": "Censored annual records and historical threshold counts",
+      "kind": "likelihood",
+      "work_packages": [
+        "WP02",
+        "WP05"
+      ],
+      "source_keys": [
+        "ARR3",
+        "KUCZERA1999",
+        "SCIPY",
+        "LEGACY_SAMPLES"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 sections 2.6.3.1 to 2.6.3.3; distinct censored-row and grouped-threshold records in supplied samples",
+      "purpose": "Reproduce legacy exact, historical and censored likelihood contributions with their observation exposure",
+      "key_assumptions": [
+        "Justified detection threshold and interval endpoints",
+        "Disjoint evidence or an explicitly derived joint likelihood",
+        "Excluded rows and grouped threshold counts are separate representations",
+        "Preserve legacy multiplicity constants where applicable"
+      ],
+      "documentation": "methods/censored-historical-likelihood.md",
+      "validation_required": [
+        "Hand-calculated likelihoods",
+        "Historical multiplicity constants",
+        "No double counting",
+        "Stable tail intervals",
+        "Verified project/report censoring correspondence"
+      ],
+      "scope": "mvp",
+      "implementation_status": "partial",
+      "qualification_status": "not_started",
+      "implementation_documentation": "wp05-likelihood-priors-rating.md",
+      "implementation_evidence": [
+        "Partial internal mathematical implementation in src/ffa_methods/likelihood.py; synthetic and pinned Normal interval tests in tests/test_likelihood.py",
+        "Exact/censored rows, specified count-only historical groups with multiplicity and year-labelled measured exceedances; exposure-overlap checks",
+        "Numerical interval fallback requires demonstrated convergence; not evidence of Flike 5.0.306.0 target semantics"
+      ],
+      "evidence_gaps": [
+        "No verified file3.10 classification, actual target censor/threshold rule or matched native Flike likelihood run",
+        "Independent explicit-classification WP02/WP03/WP05 and paired WP07 censor integration are implemented; authoritative native flag/control interpretation remains deferred to issue #39",
+        "Native source-to-kernel mapping, real Flike flags/history/zero rules, default priors and rating laws are still unverified"
+      ],
+      "integration_documentation": "wp05-integration.md",
+      "integration_scope": "independent_synthetic_mathematics_only",
+      "integration_evidence": [
+        "src/ffa_methods/likelihood_integration.py",
+        "tests/test_wp05_integration.py",
+        "WP05 #30 synthetic WP02/WP03/WP05 interoperability; not a legacy Flike reference"
+      ]
+    },
+    {
+      "method_id": "regional-parameter-prior",
+      "title": "Legacy supplied or imported regional parameter prior",
+      "kind": "prior",
+      "work_packages": [
+        "WP05"
+      ],
+      "source_keys": [
+        "ARR3",
+        "MICEVSKI2009",
+        "LEGACY_SAMPLES"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 section 2.6.3.5 and Chapter 3 section 3.9; file3.10 prior controls require decoding",
+      "purpose": "Reproduce the target supplied-prior mode, including an imported regional prior, in the exact source coordinates",
+      "key_assumptions": [
+        "Regional applicability and provenance where regional evidence is supplied",
+        "Source parameter order, coordinates, covariance and joint density preserved",
+        "Assessed dependence on the target gauge",
+        "Importing a prior does not implement regional model fitting"
+      ],
+      "documentation": "wp05-likelihood-priors-rating.md",
+      "validation_required": [
+        "Prior block decoding against controlled legacy runs",
+        "Covariance and coordinate validation",
+        "Density-preserving transformations including log-SD",
+        "Matched supplied-prior cases and sensitivity"
+      ],
+      "evidence_gaps": [
+        "Numerical values in an unlabeled saved-project block do not establish prior semantics",
+        "File3.10 imported prior values, source coordinate mapping and regional training-gauge inclusion are not target verified",
+        "Legacy no-prior/default controls, bounds and densities intentionally unavailable pending matched native evidence",
+        "Native source-to-kernel mapping, real Flike flags/history/zero rules, default priors and rating laws are still unverified"
+      ],
+      "scope": "mvp",
+      "implementation_status": "partial",
+      "qualification_status": "not_started",
+      "implementation_documentation": "wp05-likelihood-priors-rating.md",
+      "implementation_evidence": [
+        "Partial internally callable Gaussian source-coordinate supplied/regional prior in src/ffa_methods/priors.py, tested in tests/test_priors.py",
+        "Full covariance, positive-definite normalization, named-coordinate transforms and log-SD/logit Jacobians covered by independent synthetic tests"
+      ],
+      "integration_documentation": "wp05-integration.md",
+      "integration_scope": "independent_synthetic_mathematics_only",
+      "integration_evidence": [
+        "src/ffa_methods/likelihood_integration.py",
+        "tests/test_wp05_integration.py",
+        "WP05 #30 synthetic WP02/WP03/WP05 interoperability; not a legacy Flike reference"
+      ]
+    },
+    {
+      "method_id": "legacy-no-prior-mode",
+      "title": "Legacy no-prior and default-prior behavior",
+      "kind": "prior",
+      "scope": "mvp",
+      "implementation_status": "not_implemented",
+      "qualification_status": "not_started",
+      "work_packages": [
+        "WP05"
+      ],
+      "source_keys": [
+        "ARR3",
+        "KUCZERA1999",
+        "LEGACY_SAMPLES"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 section 2.6.3; target no-prior/default controls and saved blocks require explicit reference confirmation",
+      "purpose": "Reproduce the exact legacy meaning of no-prior and default-prior modes",
+      "key_assumptions": [
+        "Do not equate an interface label with a new uniform, empirical or beta prior",
+        "Parameter coordinates, bounds, normalizing terms and transformations require evidence",
+        "Posterior validity must be checked for the specified target"
+      ],
+      "documentation": "statistical-methods.md",
+      "validation_required": [
+        "Controlled legacy default and no-prior runs",
+        "Source-coordinate density checks",
+        "Bounds and constants recorded",
+        "Sensitivity and posterior validity"
+      ],
+      "evidence_gaps": [
+        "The supplied reports do not fully specify target default priors or every saved prior control"
+      ]
+    },
+    {
+      "method_id": "importance-sampling-reference",
+      "title": "Legacy Bayesian importance-sampling engine",
+      "kind": "inference",
+      "work_packages": [
+        "WP06"
+      ],
+      "source_keys": [
+        "ARR3",
+        "KUCZERA1999",
+        "LEGACY_SAMPLES",
+        "NUMPY"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 section 2.6.3.6 equations 3.2.52 to 3.2.54; legacy report importance-sampling summaries; exact proposal and solver controls still to pin",
+      "purpose": "Replicate the legacy production importance-sampling calculation and verified controls for the specified likelihood and prior",
+      "key_assumptions": [
+        "Exact target density in legacy coordinates",
+        "Adequate proposal coverage and target-specific numerical precision",
+        "Random controls and repeatability recorded where available",
+        "Independent MCMC or quadrature may verify the result but do not silently replace the production algorithm"
+      ],
+      "documentation": "methods/importance-sampling-reference.md",
+      "validation_required": [
+        "Matched legacy run controls and output comparisons",
+        "Weight-tail and integration diagnostics",
+        "Repeat-run stability and printed precision",
+        "Independent posterior reference calculations",
+        "Deterministic conjugate Normal weighted-coordinate moments and empirical interval refinement",
+        "Independent correlated modal curvature, affine coordinate changes, rejection and actual builder-to-sampler weighted outputs"
+      ],
+      "evidence_gaps": [
+        "Independent local Newton/adaptive Hessian proposal construction and stage-3 Normal importance draws are bounded components; supported source integration and full CLI fitting remain active WP06 #9.",
+        "Actual native Flike optimizer/proposal, random controls, stopping and output interpolation are not established and remain deferred in #39.",
+        "ESS, approximate mean Monte Carlo standard error, and independent seeds do not by themselves validate extreme-tail flood estimates or native equivalence."
+      ],
+      "scope": "mvp",
+      "implementation_status": "partially_implemented",
+      "qualification_status": "not_started",
+      "implementation_documentation": "wp06-importance-execution.md"
+    },
+    {
+      "method_id": "quantile-estimands",
+      "title": "Legacy quantile, probability-limit and expected-probability outputs",
+      "kind": "output",
+      "work_packages": [
+        "WP06",
+        "WP08"
+      ],
+      "source_keys": [
+        "ARR3",
+        "KUCZERA1999",
+        "LEGACY_SAMPLES"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 sections 2.5 and 2.6.3.7; supplied expected-parameter, 90% limit and expected-probability/AEP-at-flow tables",
+      "purpose": "Reproduce the distinct legacy output quantities and explain their mathematical meanings",
+      "key_assumptions": [
+        "Expected-parameter output uses the original parameter coordinates",
+        "Reported labels are mapped to equations without silently redefining quantities",
+        "Non-exceedance probability and AEP are distinguished",
+        "Threshold behavior and probability limits follow the qualified legacy model",
+        "Preserve raw source labels separately from validated non-exceedance F and AEP meanings, including the legacy AEP plot position heading"
+      ],
+      "documentation": "methods/quantile-estimands.md",
+      "validation_required": [
+        "Distinct nonlinear estimands",
+        "Weighted quantities and interval construction",
+        "Natural-log parameter versus base-10 output-moment conventions",
+        "Expected-probability/return-period correspondence",
+        "Grid, interval level and bounds checked against each report",
+        "Plot-position label/equation checks, including the candidate F=0.96875 paired with a 32-year return period",
+        "Predictive generalized-inverse regression at extreme mixed scales and discrete jumps"
+      ],
+      "scope": "mvp",
+      "implementation_status": "partially_implemented",
+      "qualification_status": "not_started",
+      "evidence_gaps": [
+        "Weighted estimands use an explicitly defined empirical interpolation; FLIKE reporting rules and the zero-threshold log10 calculation require native evidence.",
+        "Binary64 generalized inverse is independently tested; the native interpolation, printed tail limits and solver precision remain unqualified."
+      ]
+    },
+    {
+      "method_id": "l-moments",
+      "title": "Legacy L-moment fitting",
+      "kind": "estimator",
+      "work_packages": [
+        "WP04"
+      ],
+      "source_keys": [
+        "ARR3",
+        "HOSKING1990",
+        "SCIPY",
+        "LMOMENT_LIBRARIES"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 section 2.6.4 and legacy examples; family-specific target cases to be acquired",
+      "purpose": "Reproduce L-moment fitting and applicable uncertainty for every legacy-supported family combination",
+      "key_assumptions": [
+        "Family-specific inversion and parameter mapping",
+        "Target sample treatment and initialization preserved",
+        "Priors, censoring and bootstrap behavior require explicit capability evidence"
+      ],
+      "documentation": "statistical-methods.md",
+      "validation_required": [
+        "Sample L-moments",
+        "Family-specific inversion and failure cases",
+        "Published and native legacy examples",
+        "Bootstrap definitions and defaults where supported"
+      ],
+      "scope": "mvp",
+      "implementation_status": "partial_independent_core",
+      "qualification_status": "not_started",
+      "implementation_evidence": "wp04-ordinary-lmoments-evidence.md",
+      "remaining_work": "Mathematical H=0 Gumbel, LN2 raw-flow, LP3 log-flow and GP fixed/free-location inversions and independent tests are added alongside GEV. Active #7/#40: final mathematical review, supported data adaptation, declared uncertainty and CLI integration. Deferred #39: native variants/coordinates, vendor bootstrap/default rules and matched family references."
+    },
+    {
+      "method_id": "lh-moments-gev",
+      "title": "Legacy GEV LH-moments",
+      "kind": "estimator",
+      "work_packages": [
+        "WP04"
+      ],
+      "source_keys": [
+        "ARR3",
+        "WANG1997",
+        "WANG1998"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 sections 2.6.4.5 and 2.8.10.3; Wang 1997 and 1998; target-build numerical cases still required",
+      "purpose": "Reproduce fixed H=1 to 4 and optimized-H GEV fits supported by the legacy workflow",
+      "key_assumptions": [
+        "GEV family restriction",
+        "Exact fixed-H and optimized-H selection rules",
+        "Initialization, uncertainty and failure behavior require target evidence"
+      ],
+      "documentation": "methods/lh-moments-gev.md",
+      "validation_required": [
+        "Full formula review",
+        "Fixed H=1 to 4 native examples",
+        "Optimized-H selection and tie rules",
+        "Applicable uncertainty and failure behavior"
+      ],
+      "scope": "mvp",
+      "implementation_status": "partial_independent_core_with_explicit_fixed_h_cli",
+      "qualification_status": "not_started",
+      "implementation_evidence": "wp04-fixed-h-gev-evidence.md",
+      "remaining_work": "Reviewed explicit fixed-H GEV H=0..4 mathematical CLI and complete positive Year/AMS validation are available. Active #7/#40: independently verify Wang conditional LH variance and implement standardized diagnostics/explicit mathematical H-selection; extend supported deterministic workflows. Deferred #39: exact native Flike selection/uncertainty controls, matched runs and source-specific variants. See wp04-optimized-h-specification.md."
+    },
+    {
+      "method_id": "correlated-rating-error",
+      "title": "Legacy rating-error treatment and dependence",
+      "kind": "measurement_model",
+      "work_packages": [
+        "WP05"
+      ],
+      "source_keys": [
+        "ARR3",
+        "KUCZERA1996",
+        "KUCZERA1999"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 sections 2.3.7 and 2.6.3.4; Kuczera 1996 and 1999; exact target controls and cases still required",
+      "purpose": "Reproduce the legacy rating-error options and shared-error dependence structure",
+      "key_assumptions": [
+        "Defensible rating epochs, groups and error model",
+        "Preserve dependencies rather than replacing shared error with independent jitter",
+        "Admit only combinations supported by the pinned target"
+      ],
+      "documentation": "wp05-likelihood-priors-rating.md",
+      "validation_required": [
+        "Full source and control review",
+        "Shared-error likelihood and recovery checks",
+        "Matched legacy rating-error cases",
+        "Posterior geometry and sensitivity"
+      ],
+      "scope": "mvp",
+      "implementation_status": "partial",
+      "qualification_status": "not_started",
+      "implementation_documentation": "wp05-likelihood-priors-rating.md",
+      "implementation_evidence": [
+        "Partial joint shared log-discharge-error scenario integration in src/ffa_methods/rating_errors.py, tested in tests/test_rating_errors.py",
+        "Shared-versus-independent test, full scenario weights, exact-density Jacobian and mixed-unit rejection are mathematical checks only"
+      ],
+      "evidence_gaps": [
+        "Actual legacy error law, epoch controls, covariance and default behaviour not established",
+        "No matched rating-enabled/disabled native Flike cases; observations must use a common recorded discharge unit",
+        "Native source-to-kernel mapping, real Flike flags/history/zero rules, default priors and rating laws are still unverified"
+      ],
+      "integration_documentation": "wp05-integration.md",
+      "integration_scope": "independent_synthetic_mathematics_only",
+      "integration_evidence": [
+        "src/ffa_methods/likelihood_integration.py",
+        "tests/test_wp05_integration.py",
+        "WP05 #30 synthetic WP02/WP03/WP05 interoperability; not a legacy Flike reference"
+      ]
+    },
+    {
+      "method_id": "mgb-low-flow-screen",
+      "title": "Legacy multiple Grubbs-Beck low-flow treatment",
+      "kind": "screening",
+      "work_packages": [
+        "WP07"
+      ],
+      "source_keys": [
+        "ARR3",
+        "COHN2013",
+        "LEGACY_SAMPLES"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 section 2.6.3.9; Cohn 2013; sample row flags and grouped counts do not identify every screening option",
+      "purpose": "Reproduce the target MGB variant and its effects on low-flow classification and retained evidence",
+      "key_assumptions": [
+        "Pinned target variant and settings",
+        "Ties, zeros and excluded rows handled explicitly",
+        "Visual and hydrological appraisal remains documented",
+        "Exclusion and grouped censoring are not conflated"
+      ],
+      "documentation": "methods/mgb-low-flow-screen.md",
+      "validation_required": [
+        "Reference classifications",
+        "Ties and zeros",
+        "Retained counts and exposure",
+        "Likelihood effects and full-workflow comparison"
+      ],
+      "evidence_gaps": [
+        "No complete controlled MGB configuration/output fixture is yet admitted",
+        "External USGS MGBT 1.0.7 comparison components now include source-identified W(r) statistics, deterministic conditional rank p-value quadrature, verified source sweep decisions, source-preserving annual audit and a separately approved ARR-style exclusion/count proposal. The comparator is mathematical evidence only; see docs/wp07-conditional-mgbt-spec.md, src/ffa_methods/mgbt_pvalues.py and tests/test_wp07_mgbt_pvalues.py.",
+        "Actual Flike 5.0.306.0 MGBT variant, p-value integration/defaults, controlled classifications, source flags, threshold rounding, censor likelihood and corresponding outputs remain unqualified."
+      ],
+      "scope": "mvp",
+      "implementation_status": "not_implemented",
+      "qualification_status": "not_started"
+    },
+    {
+      "method_id": "legacy-zero-threshold",
+      "title": "Legacy LN/LP3 zero-threshold treatment",
+      "kind": "observation_distribution_treatment",
+      "scope": "mvp",
+      "implementation_status": "not_implemented",
+      "qualification_status": "not_started",
+      "work_packages": [
+        "WP07"
+      ],
+      "source_keys": [
+        "ARR3",
+        "LEGACY_SAMPLES"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 section 2.4.2.4; LP3 sample report descriptions of logit P(flow <= zero threshold)",
+      "purpose": "Reproduce the target LN/LP3 treatment of flows at or below the declared zero threshold",
+      "key_assumptions": [
+        "Observed additional LP3 coordinate is logit P(flow <= threshold)",
+        "Threshold, counts, fixed/fitted status, prior contribution and uncertainty need exact legacy definitions",
+        "Do not substitute the earlier independently chosen literal-zero mixture or choose a new empirical/beta prior",
+        "Use atom and interval mathematics only as warranted by the established target model"
+      ],
+      "documentation": "methods/legacy-zero-threshold.md",
+      "validation_required": [
+        "Matched threshold and zero-count cases",
+        "Coordinate and prior checks",
+        "Likelihood and exposure effects",
+        "Reported threshold-probability uncertainty",
+        "Behavior at and near threshold boundaries"
+      ],
+      "evidence_gaps": [
+        "The samples establish an LP3 report coordinate, not the entire LN/LP3 zero-threshold likelihood or default prior",
+        "Only the reported logit/probability coordinate conversion is implemented; target LN/LP3 likelihood, prior, threshold endpoints, posterior uncertainty and native parameter reporting remain unqualified."
+      ]
+    },
+    {
+      "method_id": "legacy-report-and-method-guidance",
+      "title": "Legacy reports and accessible method explanations",
+      "kind": "output_documentation",
+      "scope": "mvp",
+      "implementation_status": "partial",
+      "qualification_status": "not_started",
+      "work_packages": [
+        "WP08"
+      ],
+      "source_keys": [
+        "ARR3",
+        "LEGACY_SAMPLES"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 probability plots and worked examples; supplied report tables; project documentation contract",
+      "purpose": "Expose qualified legacy numerical meanings, assumptions, settings and references through the installed CLI and generated static reports",
+      "key_assumptions": [
+        "CLI is the supported user interface",
+        "Original explanations distinguish scientific foundations from observed target behavior",
+        "Formatting may change while numerical meaning and conventions remain faithful",
+        "Explain misleading legacy probability labels while retaining their source wording and numeric meaning in provenance"
+      ],
+      "documentation": "user-documentation-contract.md",
+      "validation_required": [
+        "Installed offline method explanations",
+        "Structured/report consistency",
+        "Plotting-position and axis conventions",
+        "Replay metadata and reference keys",
+        "No unsupported qualification claims"
+      ]
+    },
+    {
+      "method_id": "legacy-conformance-verification",
+      "title": "Independent verification and legacy conformance",
+      "kind": "verification",
+      "scope": "mvp",
+      "implementation_status": "not_implemented",
+      "qualification_status": "not_started",
+      "work_packages": [
+        "WP09"
+      ],
+      "source_keys": [
+        "ARR3",
+        "LEGACY_SAMPLES",
+        "SBC",
+        "NUMPY",
+        "RMC_VERIFICATION",
+        "RMC_SOFTWARE"
+      ],
+      "source_location": "Project compatibility contract; ARR worked examples; source-specific verification references",
+      "purpose": "Establish implementation correctness and compatibility for every required legacy capability",
+      "key_assumptions": [
+        "Candidate pairs are not qualified references",
+        "Deterministic, printed-rounding and stochastic criteria differ",
+        "Reference applicability and exact settings must be checked",
+        "Verification must not silently change the target production method"
+      ],
+      "documentation": "architecture-and-validation.md",
+      "validation_required": [
+        "Independent mathematical checks",
+        "Qualified legacy case comparisons",
+        "Synthetic inference checks where justified",
+        "Repeatability and quantity-specific tolerances",
+        "Installed-package and complete capability matrix checks"
+      ]
+    },
+    {
+      "method_id": "peaks-over-threshold",
+      "title": "Complete peaks-over-threshold workflow",
+      "kind": "advanced_series_model",
+      "work_packages": [
+        "WP10"
+      ],
+      "source_keys": [
+        "ARR3",
+        "SCIPY"
+      ],
+      "source_location": "Book 3 Chapter 2 section 2.7",
+      "purpose": "Develop an independently qualified event, threshold, declustering, exposure and annualisation workflow if approved",
+      "key_assumptions": [
+        "A GP kernel alone does not qualify this workflow",
+        "Qualified threshold and declustering",
+        "Known exposure",
+        "Explicit event-rate to AEP conversion",
+        "Future scope unless evidence establishes a workflow inside the pinned legacy target"
+      ],
+      "documentation": "statistical-methods.md",
+      "validation_required": [
+        "Event extraction",
+        "Rate uncertainty",
+        "Threshold stability",
+        "Annualisation"
+      ],
+      "scope": "future",
+      "implementation_status": "not_implemented",
+      "qualification_status": "not_started"
+    },
+    {
+      "method_id": "regional-model-fitting",
+      "title": "Regional model fitting and prior construction",
+      "kind": "regional_model",
+      "scope": "future",
+      "implementation_status": "not_implemented",
+      "qualification_status": "not_started",
+      "work_packages": [
+        "WP10"
+      ],
+      "source_keys": [
+        "ARR3",
+        "MICEVSKI2009"
+      ],
+      "source_location": "ARR Book 3 Chapter 3 section 3.9; Micevski and Kuczera 2009 full details to acquire",
+      "purpose": "Develop regional fitting or prior-construction capabilities beyond importing the legacy supplied-prior inputs",
+      "key_assumptions": [
+        "Distinct from the MVP supplied/regional-prior mode",
+        "Regional dataset provenance and applicability",
+        "Dependence between regional training data and target site addressed"
+      ],
+      "documentation": "statistical-methods.md",
+      "validation_required": [
+        "Full mathematical source acquisition",
+        "Regional fit and covariance checks",
+        "Target-site dependence checks",
+        "Independent external cases"
+      ]
+    },
+    {
+      "method_id": "nonstationary-climate",
+      "title": "Nonstationary and climate-aware extension",
+      "kind": "research_extension",
+      "work_packages": [
+        "WP10"
+      ],
+      "source_keys": [
+        "ARR1",
+        "ARR3"
+      ],
+      "source_location": "Book 1 Chapter 6 section 6.3; Book 3 Chapter 2 section 2.4.2.6",
+      "purpose": "Investigate changing flood drivers with explicit reference conditions and future assumptions",
+      "key_assumptions": [
+        "Causal justification",
+        "Covariate and scenario provenance",
+        "Conditional and marginal risk distinguished"
+      ],
+      "documentation": "statistical-methods.md",
+      "validation_required": [
+        "Additional source acquisition",
+        "No automatic rainfall-factor scaling",
+        "Synthetic and predictive validation"
+      ],
+      "scope": "future",
+      "implementation_status": "not_implemented",
+      "qualification_status": "not_started"
+    },
+    {
+      "method_id": "bulletin17c-ema",
+      "title": "Optional Bulletin 17C EMA profile",
+      "kind": "advanced_international_profile",
+      "work_packages": [
+        "WP10"
+      ],
+      "source_keys": [
+        "BULLETIN17C"
+      ],
+      "source_location": "Version 1.1 full specification and Appendix 10 examples to be acquired",
+      "purpose": "Provide a separately qualified US flood-frequency method if required",
+      "key_assumptions": [
+        "EMA is a separate estimator",
+        "Requires a distinct US method profile",
+        "No presumption that a legacy MGB implementation establishes Bulletin 17C conformance"
+      ],
+      "documentation": "statistical-methods.md",
+      "validation_required": [
+        "Full source and fixture acquisition",
+        "Matched PeakFQ comparisons",
+        "Profile-specific outputs"
+      ],
+      "scope": "future",
+      "implementation_status": "not_implemented",
+      "qualification_status": "not_started"
+    },
+    {
+      "method_id": "new-production-bayesian-methods",
+      "title": "New production sampling, prior or uncertainty procedures",
+      "kind": "research_extension",
+      "scope": "future",
+      "implementation_status": "not_implemented",
+      "qualification_status": "not_started",
+      "work_packages": [
+        "WP10"
+      ],
+      "source_keys": [
+        "ARR3",
+        "BAYES_LIBRARIES",
+        "RHAT",
+        "PSIS"
+      ],
+      "source_location": "Separate future method specifications required; cited sources support candidate numerical approaches, not a selected production algorithm",
+      "purpose": "Evaluate approved alternatives without changing the qualified legacy importance-sampling profile",
+      "key_assumptions": [
+        "Independent MCMC or quadrature can already serve as MVP verification tools",
+        "A production alternative needs a distinct method version and qualified defaults",
+        "New priors or smoothing must not be introduced into legacy results silently"
+      ],
+      "documentation": "statistical-methods.md",
+      "validation_required": [
+        "Specific algorithm and prior admission",
+        "Independent numerical qualification",
+        "Method-specific diagnostics",
+        "Comparative outputs with changed semantics clearly identified"
+      ]
+    },
+    {
+      "method_id": "wmawater-extensions",
+      "title": "WMAwater additions beyond the pinned legacy target",
+      "kind": "future_product_extensions",
+      "scope": "future",
+      "implementation_status": "not_implemented",
+      "qualification_status": "not_started",
+      "work_packages": [
+        "WP10"
+      ],
+      "source_keys": [
+        "FLIKE_STATUS"
+      ],
+      "source_location": "Dated product routing and WMAwater roadmap observations; full specifications and release evidence required per selected addition",
+      "purpose": "Track potential WMAwater additions, including announced TCEV, covariate, uncertainty and solver capabilities, as separately scoped future work",
+      "key_assumptions": [
+        "A roadmap is not an algorithm specification or proof of public release",
+        "Each selected addition needs primary mathematical sources and a distinct qualified profile",
+        "No GUI, TUI, QGIS or browser-application scope at any phase"
+      ],
+      "documentation": "statistical-methods.md",
+      "validation_required": [
+        "Per-feature scope approval",
+        "Primary specification and source admission",
+        "Versioned reference cases",
+        "Independent and comparative qualification"
+      ]
+    }
+  ],
+  "wp03_validation": "https://github.com/Chain-Frost/ffa-toolkit/blob/main/docs/development.md"
+}

@@ -1,0 +1,33 @@
+name: Defect report
+description: Reproducible CLI, input, distribution or statistical defect
+title: "Bug: "
+labels: []
+body:
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behaviour
+      description: Include CLI command, exit code and relevant output (redacted).
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour and evidence
+      description: Distinguish independent maths, legacy report, and qualified reference.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions and profile
+      description: Package, Python, Flike and file versions where available.
+    validations:
+      required: true
+  - type: textarea
+    id: provenance
+    attributes:
+      label: Reproduction and data custody
+      description: Use public/synthetic fixtures or hashes; never attach private source data by default.
+    validations:
+      required: true

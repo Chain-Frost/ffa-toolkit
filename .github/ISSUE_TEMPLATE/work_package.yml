@@ -1,0 +1,24 @@
+name: Work package
+description: Bounded, issue-linked development with source and qualification gates
+title: "WP: "
+labels: []
+body:
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and excluded behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and file ownership
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance and evidence
+      description: Include Ruff/Pyright/tests plus any numerical/native qualification required.
+    validations:
+      required: true

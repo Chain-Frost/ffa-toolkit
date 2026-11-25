@@ -1,0 +1,82 @@
+name: Python quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "release: both OS/Python endpoints; pr: Ubuntu 3.11, including draft development"
+        type: choice
+        options: [release, pr]
+        default: release
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    # Skipped drafts and manual runs must not emit the required PR validation name.
+    name: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && 'Draft quality (not validation)' || format('{0} ({1}, Python {2})', github.event_name == 'workflow_dispatch' && 'Manual quality' || 'Quality', matrix.os, matrix.python-version) }}
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: ${{ github.event_name != 'workflow_dispatch' }}
+      matrix:
+        include: ${{ fromJSON((github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.scope == 'pr')) && '[{"os":"ubuntu-latest","python-version":"3.11"}]' || github.event_name == 'push' && '[{"os":"ubuntu-latest","python-version":"3.11"},{"os":"ubuntu-latest","python-version":"3.14"},{"os":"windows-latest","python-version":"3.14"}]' || '[{"os":"ubuntu-latest","python-version":"3.11"},{"os":"ubuntu-latest","python-version":"3.14"},{"os":"windows-latest","python-version":"3.11"},{"os":"windows-latest","python-version":"3.14"}]') }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          # PR merge checkout: depth 2 contains its base parent and the complete PR diff.
+          # Only the main primary lane needs history for the entire before..after push.
+          fetch-depth: ${{ github.event_name == 'push' && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11' && '0' || '2' }}
+          lfs: false
+          persist-credentials: false
+      - name: Check patch and classify documentation
+        id: scope
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11' }}
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BEFORE_SHA: ${{ github.event.before }}
+        # Ubuntu's system Python runs the stdlib-only preflight before dependency setup.
+        run: python3 scripts/ci_changes.py
+      - name: Set up Python ${{ matrix.python-version }}
+        if: ${{ steps.scope.outputs.full != 'false' }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install development requirements
+        if: ${{ steps.scope.outputs.full != 'false' }}
+        run: python -m pip install -e ".[dev]"
+      - name: Ruff lint
+        if: ${{ steps.scope.outputs.full != 'false' && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11' }}
+        run: python -m ruff check .
+      - name: Ruff format check
+        if: ${{ steps.scope.outputs.full != 'false' && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11' }}
+        run: python -m ruff format --check .
+      - name: Strict Pyright
+        if: ${{ steps.scope.outputs.full != 'false' && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11' }}
+        run: python -m pyright
+      - name: Pytest
+        if: ${{ steps.scope.outputs.full != 'false' }}
+        run: python -m pytest
+      - name: Build wheel and sdist
+        if: ${{ steps.scope.outputs.full != 'false' }}
+        run: python -m build --no-isolation
+      - name: Verify distribution content and source guidance
+        if: ${{ steps.scope.outputs.full != 'false' && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11' }}
+        run: python scripts/verify_distribution.py dist
+      - name: Smoke-test clean wheel outside checkout
+        if: ${{ steps.scope.outputs.full != 'false' }}
+        run: python scripts/smoke_installed.py dist

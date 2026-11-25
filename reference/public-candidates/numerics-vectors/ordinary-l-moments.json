@@ -1,0 +1,282 @@
+{
+  "schema_version": 1,
+  "admission_status": "public_candidate",
+  "flike_qualified": false,
+  "purpose": "Independent mathematical verification and upstream algorithm comparison; not a Flike regression fixture.",
+  "upstream": {
+    "repository": "USACE-RMC/Numerics",
+    "commit": "7e8e8d1c5f26e045a35ec9fc09367de95ed05b02",
+    "release_tag": "v2.2.0",
+    "code_license": "0BSD",
+    "test_url": "https://github.com/USACE-RMC/Numerics/blob/7e8e8d1c5f26e045a35ec9fc09367de95ed05b02/Test_Numerics/Data/Statistics/Test_Statistics.cs",
+    "implementation_url": "https://github.com/USACE-RMC/Numerics/blob/7e8e8d1c5f26e045a35ec9fc09367de95ed05b02/Numerics/Data/Statistics/Statistics.cs",
+    "license_url": "https://github.com/USACE-RMC/Numerics/blob/7e8e8d1c5f26e045a35ec9fc09367de95ed05b02/LICENSE"
+  },
+  "calculation": {
+    "runtime": {
+      "python": "3.12.14",
+      "mpmath": "1.3.0",
+      "mpmath_decimal_precision": 80,
+      "ordinary_l_moment_arithmetic": "fractions.Fraction with math.comb; exact integer numerator and denominator",
+      "scipy_or_numpy_used": false,
+      "upstream_numerics_or_bestfit_code_executed": false
+    },
+    "definition": "For sorted zero-based x_i: b_r = sum(comb(i,r)*x_i)/(n*comb(n-1,r)); lambda_1=b_0; lambda_2=2*b_1-b_0; lambda_3=6*b_2-6*b_1+b_0; lambda_4=20*b_3-30*b_2+12*b_1-b_0; tau_r=lambda_r/lambda_2 for r>=3.",
+    "h": 0,
+    "scope_limit": "Ordinary L-moments only. These cases do not verify h>0 LH-moments."
+  },
+  "cases": [
+    {
+      "case_id": "numerics_exact_rational_n_1292",
+      "sample_size": 1292,
+      "sample_generator": {
+        "index_start_inclusive": 1,
+        "index_stop_inclusive": 1292,
+        "integer_k": "(i * 7919) mod 10007",
+        "value": "k**2 / 64",
+        "arithmetic": "integer k and square; exact rational denominator 64; input values exactly representable in binary64"
+      },
+      "sample_sha256": "b4be8dd14ffc675934a6159566d1bc2cab30dd57615ff75d64da5bf203253b17",
+      "sample_hash_encoding": "generator order; each value as IEEE-754 binary64 little endian; concatenated bytes",
+      "source_test": "Test_ComputeLinearMoments_ExactOracle",
+      "raw_l_moments": {
+        "lambda_1": {
+          "numerator": "43205513803",
+          "denominator": "82688",
+          "decimal": "522512.502455011609907120743034055727554179566563467492260062",
+          "float64": 522512.5024550116
+        },
+        "lambda_2": {
+          "numerator": "27870865784293",
+          "denominator": "106750208",
+          "decimal": "261084.885045779020870853947188561918305583067341658013443871",
+          "float64": 261084.88504577902
+        },
+        "lambda_3": {
+          "numerator": "1195728401294253",
+          "denominator": "22951294720",
+          "decimal": "52098.5162659378285391997266810401535377957100278131934510752",
+          "float64": 52098.516265937826
+        },
+        "lambda_4": {
+          "numerator": "-34060402643539",
+          "denominator": "5916843778816",
+          "decimal": "-5.75651545262780527491150382298841436141791842337923199542054",
+          "float64": -5.756515452627805
+        }
+      },
+      "l_moments_and_ratios": {
+        "lambda_1": {
+          "numerator": "43205513803",
+          "denominator": "82688",
+          "decimal": "522512.502455011609907120743034055727554179566563467492260062",
+          "float64": 522512.5024550116
+        },
+        "lambda_2": {
+          "numerator": "27870865784293",
+          "denominator": "106750208",
+          "decimal": "261084.885045779020870853947188561918305583067341658013443871",
+          "float64": 261084.88504577902
+        },
+        "tau_3": {
+          "numerator": "1195728401294253",
+          "denominator": "5992236143622995",
+          "decimal": "0.199546274985634635463218017287606165576960940685741800005275",
+          "float64": 0.19954627498563463
+        },
+        "tau_4": {
+          "numerator": "-34060402643539",
+          "denominator": "1544798477826008111",
+          "decimal": "-0.0000220484439442691180663980396391461374437681927861757377657016",
+          "float64": -2.204844394426912e-05
+        }
+      },
+      "upstream_assertion": {
+        "quantity_order": [
+          "lambda_1",
+          "lambda_2",
+          "tau_3",
+          "tau_4"
+        ],
+        "expected": [
+          522512.5024550116,
+          261084.88504577902,
+          0.19954627498563463,
+          -2.204844394426912e-05
+        ],
+        "comparison": "abs(actual - expected) <= max(abs(expected) * relative_tolerance, absolute_floor)",
+        "relative_tolerance": 1e-12,
+        "absolute_floor": 1e-13
+      },
+      "regression_purpose": "Non-degenerate skewed samples surrounding the upstream 32-bit falling-factorial overflow boundary; also guards ratio normalization and cancellation near tau_4=0. Python arbitrary precision integers do not share that overflow, but fixed-width vectorization can reintroduce it."
+    },
+    {
+      "case_id": "numerics_exact_rational_n_1293",
+      "sample_size": 1293,
+      "sample_generator": {
+        "index_start_inclusive": 1,
+        "index_stop_inclusive": 1293,
+        "integer_k": "(i * 7919) mod 10007",
+        "value": "k**2 / 64",
+        "arithmetic": "integer k and square; exact rational denominator 64; input values exactly representable in binary64"
+      },
+      "sample_sha256": "ad2cbc046ccc3598660650bab54039d6c617481555bbf280143f66335e3dffb6",
+      "sample_hash_encoding": "generator order; each value as IEEE-754 binary64 little endian; concatenated bytes",
+      "source_test": "Test_ComputeLinearMoments_ExactOracle",
+      "raw_l_moments": {
+        "lambda_1": {
+          "numerator": "43209949039",
+          "denominator": "82752",
+          "decimal": "522161.990513824439288476411446249033255993812838360402165507",
+          "float64": 522161.99051382445
+        },
+        "lambda_2": {
+          "numerator": "3488742634957",
+          "denominator": "13364448",
+          "decimal": "261046.519463953917138964512413831083782884261287858653047249",
+          "float64": 261046.5194639539
+        },
+        "lambda_3": {
+          "numerator": "1801094017463123",
+          "denominator": "34507004736",
+          "decimal": "52195.0262343141610191593999264231010652967037051847814137675",
+          "float64": 52195.02623431416
+        },
+        "lambda_4": {
+          "numerator": "-14418948453",
+          "denominator": "14547070624",
+          "decimal": "-0.991192579295750313943069229716004711410136892176539968656166",
+          "float64": -0.9911925792957503
+        }
+      },
+      "l_moments_and_ratios": {
+        "lambda_1": {
+          "numerator": "43209949039",
+          "denominator": "82752",
+          "decimal": "522161.990513824439288476411446249033255993812838360402165507",
+          "float64": 522161.99051382445
+        },
+        "lambda_2": {
+          "numerator": "3488742634957",
+          "denominator": "13364448",
+          "decimal": "261046.519463953917138964512413831083782884261287858653047249",
+          "float64": 261046.5194639539
+        },
+        "tau_3": {
+          "numerator": "1801094017463123",
+          "denominator": "9007933483458974",
+          "decimal": "0.199945306076074330076071661910124373977514036176641744498088",
+          "float64": 0.19994530607607433
+        },
+        "tau_4": {
+          "numerator": "-735366371103",
+          "denominator": "193670569894367941",
+          "decimal": "-0.00000379699595815763076999705419773662182561610937141440011495654",
+          "float64": -3.796995958157631e-06
+        }
+      },
+      "upstream_assertion": {
+        "quantity_order": [
+          "lambda_1",
+          "lambda_2",
+          "tau_3",
+          "tau_4"
+        ],
+        "expected": [
+          522161.99051382445,
+          261046.5194639539,
+          0.19994530607607433,
+          -3.796995958157631e-06
+        ],
+        "comparison": "abs(actual - expected) <= max(abs(expected) * relative_tolerance, absolute_floor)",
+        "relative_tolerance": 1e-12,
+        "absolute_floor": 1e-13
+      },
+      "regression_purpose": "Non-degenerate skewed samples surrounding the upstream 32-bit falling-factorial overflow boundary; also guards ratio normalization and cancellation near tau_4=0. Python arbitrary precision integers do not share that overflow, but fixed-width vectorization can reintroduce it."
+    },
+    {
+      "case_id": "numerics_exact_rational_n_1460",
+      "sample_size": 1460,
+      "sample_generator": {
+        "index_start_inclusive": 1,
+        "index_stop_inclusive": 1460,
+        "integer_k": "(i * 7919) mod 10007",
+        "value": "k**2 / 64",
+        "arithmetic": "integer k and square; exact rational denominator 64; input values exactly representable in binary64"
+      },
+      "sample_sha256": "ad60fc261b4f524b82454a9bdad9d51b5ae261bab7dbbff2b088dacbc8c7a8f4",
+      "sample_hash_encoding": "generator order; each value as IEEE-754 binary64 little endian; concatenated bytes",
+      "source_test": "Test_ComputeLinearMoments_ExactOracle",
+      "raw_l_moments": {
+        "lambda_1": {
+          "numerator": "48851982299",
+          "denominator": "93440",
+          "decimal": "522816.591384845890410958904109589041095890410958904109589041",
+          "float64": 522816.5913848459
+        },
+        "lambda_2": {
+          "numerator": "35612256774191",
+          "denominator": "136328960",
+          "decimal": "261222.976938949728656332447632549973241195414385908907395758",
+          "float64": 261222.97693894972
+        },
+        "lambda_3": {
+          "numerator": "1728121802460803",
+          "denominator": "33127937280",
+          "decimal": "52165.0891769861199157643418479691108615863691951544288845019",
+          "float64": 52165.08917698612
+        },
+        "lambda_4": {
+          "numerator": "1767920662089541",
+          "denominator": "48267404616960",
+          "decimal": "36.6276305121310870424190316576618503967800874313140449479422",
+          "float64": 36.627630512131084
+        }
+      },
+      "l_moments_and_ratios": {
+        "lambda_1": {
+          "numerator": "48851982299",
+          "denominator": "93440",
+          "decimal": "522816.591384845890410958904109589041095890410958904109589041",
+          "float64": 522816.5913848459
+        },
+        "lambda_2": {
+          "numerator": "35612256774191",
+          "denominator": "136328960",
+          "decimal": "261222.976938949728656332447632549973241195414385908907395758",
+          "float64": 261222.97693894972
+        },
+        "tau_3": {
+          "numerator": "1728121802460803",
+          "denominator": "8653778396128413",
+          "decimal": "0.199695638524085853419420813570004885882801725789550918607344",
+          "float64": 0.19969563852408587
+        },
+        "tau_4": {
+          "numerator": "1767920662089541",
+          "denominator": "12608555123159097741",
+          "decimal": "0.00014021596010174598635457510886873490929846928269663350563797",
+          "float64": 0.00014021596010174597
+        }
+      },
+      "upstream_assertion": {
+        "quantity_order": [
+          "lambda_1",
+          "lambda_2",
+          "tau_3",
+          "tau_4"
+        ],
+        "expected": [
+          522816.5913848459,
+          261222.97693894972,
+          0.19969563852408587,
+          0.00014021596010174597
+        ],
+        "comparison": "abs(actual - expected) <= max(abs(expected) * relative_tolerance, absolute_floor)",
+        "relative_tolerance": 1e-12,
+        "absolute_floor": 1e-13
+      },
+      "regression_purpose": "Non-degenerate skewed samples surrounding the upstream 32-bit falling-factorial overflow boundary; also guards ratio normalization and cancellation near tau_4=0. Python arbitrary precision integers do not share that overflow, but fixed-width vectorization can reintroduce it."
+    }
+  ]
+}

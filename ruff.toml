@@ -1,0 +1,41 @@
+# WP01: small fresh codebase; retain reviewed pyrorb rule families without legacy exclusions.
+required-version = "==0.16.6"
+target-version = "py311"
+line-length = 120
+preview = false
+fix = false
+unsafe-fixes = false
+
+[format]
+quote-style = "double"
+line-ending = "lf"
+
+[lint]
+select = [
+    "E", "W", "F", "B", "PLE", "PLW", "RUF",
+    "UP", "FURB", "FLY", "SLOT", "ANN",
+    "I", "ICN", "INP",
+    "A", "ARG", "BLE", "C4", "C90", "EM", "ERA", "ISC", "N",
+    "PERF", "PIE", "PLC", "RET", "RSE", "SIM", "SLF", "TRY",
+    "G", "LOG", "S", "EXE", "PTH", "T10", "YTT", "NPY", "PT",
+]
+ignore = [
+    "E111",   # Formatter owns indentation.
+    "E114",   # Formatter owns comment indentation.
+    "E117",   # Formatter owns indentation.
+    "ISC001", # Conflicts with Ruff formatter.
+    "E501",   # Formatter wraps code, not all URLs/long explanatory messages.
+]
+
+[lint.mccabe]
+max-complexity = 10
+
+[lint.per-file-ignores]
+"tests/**/*.py" = [
+    "INP001", # Pytest tests need not be importable packages.
+    "S101",   # Pytest assertions are expected.
+]
+"scripts/**/*.py" = [
+    "INP001", # Maintained development scripts are executed directly.
+    "S603",   # Scripts invoke selected Python interpreters with fixed argv and shell=False.
+]

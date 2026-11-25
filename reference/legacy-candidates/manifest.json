@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "purpose": "Owner-authorized, identity-sanitized legacy input/report evaluation",
+  "baseline": {
+    "program_version": "5.0.306.0",
+    "file_version": "3.10",
+    "status": "Reported by supplied output files; no native rerun performed"
+  },
+  "redistribution_status": "Owner explicitly authorized scenario reuse on 25 November 2026, with identifying project names removed.",
+  "packaging_policy": "Exclude the entire reference directory from wheels and source distributions",
+  "source_custody": "Original archives and exact original-to-sanitized hash mapping are retained privately. For this manifest, original/member means the admitted sanitized bundle, not the pre-redaction archive.",
+  "cases": [
+    {
+      "case_id": "case-a",
+      "distribution": "Log Pearson III",
+      "observations": 19,
+      "zero_threshold": 0.0,
+      "reported_at_or_below_threshold": 0,
+      "observations_match_csv": true,
+      "report_observations_match_at_displayed_rounding": true,
+      "project_observation_flags_all_zero": true,
+      "quantile_rows": 21,
+      "quantile_interval_percent": 90,
+      "pairing_status": "candidate_settings_unverified"
+    },
+    {
+      "case_id": "case-b",
+      "distribution": "Log Pearson III",
+      "observations": 40,
+      "zero_threshold": 0.0,
+      "reported_at_or_below_threshold": 5,
+      "observations_match_csv": true,
+      "report_observations_match_at_displayed_rounding": true,
+      "project_observation_flags_all_zero": true,
+      "quantile_rows": 19,
+      "quantile_interval_percent": 90,
+      "pairing_status": "candidate_settings_unverified"
+    }
+  ],
+  "files": [
+    {
+      "case_id": "case-a",
+      "staged_path": "case-a/case-a.fld",
+      "source_archive": "approved-sanitized-cases.zip",
+      "source_archive_sha256": "6d4a7bbd76d69c6aa09d349c9dd40e1e10ae22fd4b36081c5f46653e21005c66",
+      "source_member": "case-a/case-a.fld",
+      "original_sha256": "e49a5920d411e2cd615eb9bf5cf7ad9d74025d08cb1e2f641ce20330ae58e676",
+      "staged_sha256": "e49a5920d411e2cd615eb9bf5cf7ad9d74025d08cb1e2f641ce20330ae58e676",
+      "original_size_bytes": 1404,
+      "staged_size_bytes": 1404,
+      "transformations": [],
+      "pairing_status": "candidate_settings_unverified"
+    },
+    {
+      "case_id": "case-a",
+      "staged_path": "case-a/case-a_Bayes_Out.txt",
+      "source_archive": "approved-sanitized-cases.zip",
+      "source_archive_sha256": "6d4a7bbd76d69c6aa09d349c9dd40e1e10ae22fd4b36081c5f46653e21005c66",
+      "source_member": "case-a/case-a_Bayes_Out.txt",
+      "original_sha256": "7372edd66bf5d9b919c344841a091c15d6ac9cacb0d637760c9214018b5c796c",
+      "staged_sha256": "7372edd66bf5d9b919c344841a091c15d6ac9cacb0d637760c9214018b5c796c",
+      "original_size_bytes": 6170,
+      "staged_size_bytes": 6170,
+      "transformations": [],
+      "pairing_status": "candidate_settings_unverified"
+    },
+    {
+      "case_id": "case-a",
+      "staged_path": "case-a/AMS_case-a.csv",
+      "source_archive": "approved-sanitized-cases.zip",
+      "source_archive_sha256": "6d4a7bbd76d69c6aa09d349c9dd40e1e10ae22fd4b36081c5f46653e21005c66",
+      "source_member": "case-a/AMS_case-a.csv",
+      "original_sha256": "0b2547872027e97fd864a0a40a20daab6e4bfd17fbe08b355668028d80ef6922",
+      "staged_sha256": "0b2547872027e97fd864a0a40a20daab6e4bfd17fbe08b355668028d80ef6922",
+      "original_size_bytes": 273,
+      "staged_size_bytes": 273,
+      "transformations": [],
+      "pairing_status": "candidate_settings_unverified"
+    },
+    {
+      "case_id": "case-b",
+      "staged_path": "case-b/case-b.fld",
+      "source_archive": "approved-sanitized-cases.zip",
+      "source_archive_sha256": "6d4a7bbd76d69c6aa09d349c9dd40e1e10ae22fd4b36081c5f46653e21005c66",
+      "source_member": "case-b/case-b.fld",
+      "original_sha256": "73f86f90a17c176f7317138d89c186c6812d8aaa9c8fa0af883fbbdecdd97287",
+      "staged_sha256": "73f86f90a17c176f7317138d89c186c6812d8aaa9c8fa0af883fbbdecdd97287",
+      "original_size_bytes": 1947,
+      "staged_size_bytes": 1947,
+      "transformations": [],
+      "pairing_status": "candidate_settings_unverified"
+    },
+    {
+      "case_id": "case-b",
+      "staged_path": "case-b/case-b_Bayes_Out.txt",
+      "source_archive": "approved-sanitized-cases.zip",
+      "source_archive_sha256": "6d4a7bbd76d69c6aa09d349c9dd40e1e10ae22fd4b36081c5f46653e21005c66",
+      "source_member": "case-b/case-b_Bayes_Out.txt",
+      "original_sha256": "af73a8a30b0de9308804001b2507b13c9f688fa0d86f287cc05135d65f653cc1",
+      "staged_sha256": "af73a8a30b0de9308804001b2507b13c9f688fa0d86f287cc05135d65f653cc1",
+      "original_size_bytes": 7085,
+      "staged_size_bytes": 7085,
+      "transformations": [],
+      "pairing_status": "candidate_settings_unverified"
+    },
+    {
+      "case_id": "case-b",
+      "staged_path": "case-b/AMS_case-b.csv",
+      "source_archive": "approved-sanitized-cases.zip",
+      "source_archive_sha256": "6d4a7bbd76d69c6aa09d349c9dd40e1e10ae22fd4b36081c5f46653e21005c66",
+      "source_member": "case-b/AMS_case-b.csv",
+      "original_sha256": "d9da34d473d6f6778b170277e031ff83ce4cd7e19ac7e72a6053e2a06df4df1d",
+      "staged_sha256": "d9da34d473d6f6778b170277e031ff83ce4cd7e19ac7e72a6053e2a06df4df1d",
+      "original_size_bytes": 518,
+      "staged_size_bytes": 518,
+      "transformations": [],
+      "pairing_status": "candidate_settings_unverified"
+    }
+  ],
+  "pre_admission_transformations": [
+    "Replace project/site names and filenames with neutral case identifiers; preserve every numerical table, observation, control, CRLF and embedded NUL. Existing source paths remain redacted."
+  ]
+}

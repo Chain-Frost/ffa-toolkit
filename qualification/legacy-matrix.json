@@ -1,0 +1,934 @@
+{
+  "schema_version": 1,
+  "compatibility_profile": "tuflow-bmt-flike-5.0.306.0-file3.10",
+  "legacy_program_version": "5.0.306.0",
+  "legacy_file_version": "3.10",
+  "matrix_frozen": false,
+  "scope_approval_url": null,
+  "release_source_commit": null,
+  "matrix_policy": "Required rows are minimum known coverage, not a frozen enumeration of all supported combinations. Unresolved rows/questions block release until version-pinned source evidence resolves and expands them.",
+  "unresolved_support": [
+    {
+      "id": "L_SUPPORTED_FAMILIES",
+      "question": "Which of LN, LP3, Gumbel, GEV and GP admit L-moment fitting in the target build?",
+      "status": "open",
+      "evidence_url": null
+    },
+    {
+      "id": "BAYES_SUPPORTED_FAMILIES",
+      "question": "Which families support Bayesian importance sampling and which options are valid per family?",
+      "status": "open",
+      "evidence_url": null
+    },
+    {
+      "id": "OBS_FAMILY_COMBINATIONS",
+      "question": "Which exact/historical/censored/excluded observation modes combine with each fitted family?",
+      "status": "open",
+      "evidence_url": null
+    },
+    {
+      "id": "PRIORS_AND_DEFAULTS",
+      "question": "Which parameter priors, bounds and default/no-prior settings apply per family and mode?",
+      "status": "open",
+      "evidence_url": null
+    },
+    {
+      "id": "RATING_ERROR_OPTIONS",
+      "question": "Which rating-error switches and dependence structures are supported, including zero threshold?",
+      "status": "open",
+      "evidence_url": null
+    },
+    {
+      "id": "NATIVE_RUN_CUSTODY",
+      "question": "Obtain target executable custody, exact controls, matched native runs and stochastic repeatability.",
+      "status": "open",
+      "evidence_url": null
+    },
+    {
+      "id": "OUTPUT_AND_CONFIDENCE_OPTIONS",
+      "question": "Identify supported result grids, probability limits, interpolation and plotting rules.",
+      "status": "open",
+      "evidence_url": null
+    },
+    {
+      "id": "FAILURE_HANDLING",
+      "question": "Document legacy failures and invalid combination behaviour and its acceptance coverage.",
+      "status": "open",
+      "evidence_url": null
+    }
+  ],
+  "rows": [
+    {
+      "id": "KERNEL-LOGNORMAL",
+      "method_id": "lognormal",
+      "family": "lognormal",
+      "estimator": "distribution_only",
+      "observations": "not_applicable",
+      "prior": "not_applicable",
+      "zero_threshold": "not_applicable",
+      "rating_error": "not_applicable",
+      "output": "cdf_pdf_quantile",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review"
+      ],
+      "evidence": {},
+      "qualification_gap": "Legacy parameter/sign mapping and native comparison unqualified"
+    },
+    {
+      "id": "KERNEL-LP3",
+      "method_id": "lp3",
+      "family": "lp3",
+      "estimator": "distribution_only",
+      "observations": "not_applicable",
+      "prior": "not_applicable",
+      "zero_threshold": "not_applicable",
+      "rating_error": "not_applicable",
+      "output": "cdf_pdf_quantile",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review"
+      ],
+      "evidence": {},
+      "qualification_gap": "Legacy parameter/sign mapping and native comparison unqualified"
+    },
+    {
+      "id": "KERNEL-GUMBEL",
+      "method_id": "gumbel",
+      "family": "gumbel",
+      "estimator": "distribution_only",
+      "observations": "not_applicable",
+      "prior": "not_applicable",
+      "zero_threshold": "not_applicable",
+      "rating_error": "not_applicable",
+      "output": "cdf_pdf_quantile",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review"
+      ],
+      "evidence": {},
+      "qualification_gap": "Legacy parameter/sign mapping and native comparison unqualified"
+    },
+    {
+      "id": "KERNEL-GEV",
+      "method_id": "gev",
+      "family": "gev",
+      "estimator": "distribution_only",
+      "observations": "not_applicable",
+      "prior": "not_applicable",
+      "zero_threshold": "not_applicable",
+      "rating_error": "not_applicable",
+      "output": "cdf_pdf_quantile",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review"
+      ],
+      "evidence": {},
+      "qualification_gap": "Legacy parameter/sign mapping and native comparison unqualified"
+    },
+    {
+      "id": "KERNEL-GENERALISED-PARETO",
+      "method_id": "generalised-pareto",
+      "family": "generalised-pareto",
+      "estimator": "distribution_only",
+      "observations": "not_applicable",
+      "prior": "not_applicable",
+      "zero_threshold": "not_applicable",
+      "rating_error": "not_applicable",
+      "output": "cdf_pdf_quantile",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review"
+      ],
+      "evidence": {},
+      "qualification_gap": "Legacy parameter/sign mapping and native comparison unqualified"
+    },
+    {
+      "id": "L-MOMENTS-LOGNORMAL",
+      "method_id": "l-moments",
+      "family": "lognormal",
+      "estimator": "l_moments",
+      "observations": "annual_maxima",
+      "prior": "not_applicable",
+      "zero_threshold": "off",
+      "rating_error": "off",
+      "output": "fitted_parameters",
+      "admission": "unresolved",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review"
+      ],
+      "evidence": {},
+      "qualification_gap": "Obtain target-build evidence that this family supports L-moment fitting before freezing matrix"
+    },
+    {
+      "id": "L-MOMENTS-LP3",
+      "method_id": "l-moments",
+      "family": "lp3",
+      "estimator": "l_moments",
+      "observations": "annual_maxima",
+      "prior": "not_applicable",
+      "zero_threshold": "off",
+      "rating_error": "off",
+      "output": "fitted_parameters",
+      "admission": "unresolved",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review"
+      ],
+      "evidence": {},
+      "qualification_gap": "Obtain target-build evidence that this family supports L-moment fitting before freezing matrix"
+    },
+    {
+      "id": "L-MOMENTS-GUMBEL",
+      "method_id": "l-moments",
+      "family": "gumbel",
+      "estimator": "l_moments",
+      "observations": "annual_maxima",
+      "prior": "not_applicable",
+      "zero_threshold": "off",
+      "rating_error": "off",
+      "output": "fitted_parameters",
+      "admission": "unresolved",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review"
+      ],
+      "evidence": {},
+      "qualification_gap": "Obtain target-build evidence that this family supports L-moment fitting before freezing matrix"
+    },
+    {
+      "id": "L-MOMENTS-GEV",
+      "method_id": "l-moments",
+      "family": "gev",
+      "estimator": "l_moments",
+      "observations": "annual_maxima",
+      "prior": "not_applicable",
+      "zero_threshold": "off",
+      "rating_error": "off",
+      "output": "fitted_parameters",
+      "admission": "unresolved",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review"
+      ],
+      "evidence": {},
+      "qualification_gap": "Obtain target-build evidence that this family supports L-moment fitting before freezing matrix"
+    },
+    {
+      "id": "L-MOMENTS-GENERALISED-PARETO",
+      "method_id": "l-moments",
+      "family": "generalised-pareto",
+      "estimator": "l_moments",
+      "observations": "annual_maxima",
+      "prior": "not_applicable",
+      "zero_threshold": "off",
+      "rating_error": "off",
+      "output": "fitted_parameters",
+      "admission": "unresolved",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review"
+      ],
+      "evidence": {},
+      "qualification_gap": "Obtain target-build evidence that this family supports L-moment fitting before freezing matrix"
+    },
+    {
+      "id": "GEV-LH-1",
+      "method_id": "lh-moments-gev",
+      "family": "gev",
+      "estimator": "lh_moments_h_1",
+      "observations": "annual_maxima",
+      "prior": "not_applicable",
+      "zero_threshold": "off",
+      "rating_error": "off",
+      "output": "fitted_parameters",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review"
+      ],
+      "evidence": {},
+      "qualification_gap": "Fixed/optimised H selection and native controls not established"
+    },
+    {
+      "id": "GEV-LH-2",
+      "method_id": "lh-moments-gev",
+      "family": "gev",
+      "estimator": "lh_moments_h_2",
+      "observations": "annual_maxima",
+      "prior": "not_applicable",
+      "zero_threshold": "off",
+      "rating_error": "off",
+      "output": "fitted_parameters",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review"
+      ],
+      "evidence": {},
+      "qualification_gap": "Fixed/optimised H selection and native controls not established"
+    },
+    {
+      "id": "GEV-LH-3",
+      "method_id": "lh-moments-gev",
+      "family": "gev",
+      "estimator": "lh_moments_h_3",
+      "observations": "annual_maxima",
+      "prior": "not_applicable",
+      "zero_threshold": "off",
+      "rating_error": "off",
+      "output": "fitted_parameters",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review"
+      ],
+      "evidence": {},
+      "qualification_gap": "Fixed/optimised H selection and native controls not established"
+    },
+    {
+      "id": "GEV-LH-4",
+      "method_id": "lh-moments-gev",
+      "family": "gev",
+      "estimator": "lh_moments_h_4",
+      "observations": "annual_maxima",
+      "prior": "not_applicable",
+      "zero_threshold": "off",
+      "rating_error": "off",
+      "output": "fitted_parameters",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review"
+      ],
+      "evidence": {},
+      "qualification_gap": "Fixed/optimised H selection and native controls not established"
+    },
+    {
+      "id": "GEV-LH-OPTIMISED",
+      "method_id": "lh-moments-gev",
+      "family": "gev",
+      "estimator": "lh_moments_h_optimised",
+      "observations": "annual_maxima",
+      "prior": "not_applicable",
+      "zero_threshold": "off",
+      "rating_error": "off",
+      "output": "fitted_parameters",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review"
+      ],
+      "evidence": {},
+      "qualification_gap": "Fixed/optimised H selection and native controls not established"
+    },
+    {
+      "id": "BAYES-LP3-EXACT",
+      "method_id": "importance-sampling-reference",
+      "family": "lp3",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "exact",
+      "prior": "unresolved",
+      "zero_threshold": "off",
+      "rating_error": "unresolved",
+      "output": "expected_parameter_curve",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Observed report; effective prior, settings and matched legacy run not qualified",
+      "candidate_case_ids": [
+        "case-a"
+      ]
+    },
+    {
+      "id": "BAYES-LP3-THRESHOLD",
+      "method_id": "importance-sampling-reference",
+      "family": "lp3",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "at_or_below_threshold",
+      "prior": "unresolved",
+      "zero_threshold": "legacy_threshold",
+      "rating_error": "unresolved",
+      "output": "expected_parameter_curve",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Observed report; effective prior, settings and matched legacy run not qualified",
+      "candidate_case_ids": [
+        "case-b"
+      ]
+    },
+    {
+      "id": "BAYES-GEV-EXACT",
+      "method_id": "importance-sampling-reference",
+      "family": "gev",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "exact",
+      "prior": "unresolved",
+      "zero_threshold": "off",
+      "rating_error": "unresolved",
+      "output": "expected_parameter_curve",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Observed report; effective prior, settings and matched legacy run not qualified"
+    },
+    {
+      "id": "BAYES-LOGNORMAL",
+      "method_id": "importance-sampling-reference",
+      "family": "lognormal",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "annual_maxima",
+      "prior": "unresolved",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "expected_parameter_curve",
+      "admission": "unresolved",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Confirm whether this family/estimator combination is supported by pinned legacy build"
+    },
+    {
+      "id": "BAYES-GUMBEL",
+      "method_id": "importance-sampling-reference",
+      "family": "gumbel",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "annual_maxima",
+      "prior": "unresolved",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "expected_parameter_curve",
+      "admission": "unresolved",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Confirm whether this family/estimator combination is supported by pinned legacy build"
+    },
+    {
+      "id": "BAYES-GENERALISED-PARETO",
+      "method_id": "importance-sampling-reference",
+      "family": "generalised-pareto",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "annual_maxima",
+      "prior": "unresolved",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "expected_parameter_curve",
+      "admission": "unresolved",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Confirm whether this family/estimator combination is supported by pinned legacy build"
+    },
+    {
+      "id": "OBS-EXACT",
+      "method_id": "annual-maxima-observations",
+      "family": "unresolved",
+      "estimator": "read_only",
+      "observations": "exact",
+      "prior": "unresolved",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "year_flow_flags",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review"
+      ],
+      "evidence": {},
+      "qualification_gap": "Includes exposure and missing-year interpretation"
+    },
+    {
+      "id": "LIKELIHOOD-CENSORED",
+      "method_id": "censored-historical-likelihood",
+      "family": "unresolved",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "left_censored",
+      "prior": "unresolved",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "likelihood_contribution",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Censor counts and project control semantics unresolved"
+    },
+    {
+      "id": "LIKELIHOOD-HISTORICAL",
+      "method_id": "censored-historical-likelihood",
+      "family": "unresolved",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "historical_grouped_threshold",
+      "prior": "unresolved",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "likelihood_contribution",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Censor counts and project control semantics unresolved"
+    },
+    {
+      "id": "LIKELIHOOD-EXCLUDED",
+      "method_id": "censored-historical-likelihood",
+      "family": "unresolved",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "excluded_or_mgb_flag",
+      "prior": "unresolved",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "likelihood_contribution",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Censor counts and project control semantics unresolved"
+    },
+    {
+      "id": "PRIOR-SUPPLIED",
+      "method_id": "regional-parameter-prior",
+      "family": "unresolved",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "annual_maxima",
+      "prior": "supplied_joint",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "posterior",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Exact prior density, default and bounds still to identify"
+    },
+    {
+      "id": "PRIOR-REGIONAL",
+      "method_id": "regional-parameter-prior",
+      "family": "unresolved",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "annual_maxima",
+      "prior": "imported_regional",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "posterior",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Exact prior density, default and bounds still to identify"
+    },
+    {
+      "id": "PRIOR-NONE",
+      "method_id": "legacy-no-prior-mode",
+      "family": "unresolved",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "annual_maxima",
+      "prior": "no_prior",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "posterior",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Exact prior density, default and bounds still to identify"
+    },
+    {
+      "id": "PRIOR-DEFAULT",
+      "method_id": "legacy-no-prior-mode",
+      "family": "unresolved",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "annual_maxima",
+      "prior": "legacy_default",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "posterior",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Exact prior density, default and bounds still to identify"
+    },
+    {
+      "id": "RATING-OFF",
+      "method_id": "correlated-rating-error",
+      "family": "unresolved",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "annual_maxima",
+      "prior": "unresolved",
+      "zero_threshold": "unresolved",
+      "rating_error": "off",
+      "output": "posterior",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Unknown target rating controls and within-record dependence"
+    },
+    {
+      "id": "RATING-ON",
+      "method_id": "correlated-rating-error",
+      "family": "unresolved",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "annual_maxima",
+      "prior": "unresolved",
+      "zero_threshold": "unresolved",
+      "rating_error": "on",
+      "output": "posterior",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Unknown target rating controls and within-record dependence"
+    },
+    {
+      "id": "MGB-LOW-FLOW",
+      "method_id": "mgb-low-flow-screen",
+      "family": "unresolved",
+      "estimator": "mgb_legacy",
+      "observations": "annual_maxima_and_flagged_low_flows",
+      "prior": "unresolved",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "classification_and_counts",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review"
+      ],
+      "evidence": {},
+      "qualification_gap": "Ties, zeros, exposure and legacy MGB variant require reference"
+    },
+    {
+      "id": "ZERO-LOGNORMAL",
+      "method_id": "legacy-zero-threshold",
+      "family": "lognormal",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "at_or_below_threshold",
+      "prior": "unresolved",
+      "zero_threshold": "legacy_threshold",
+      "rating_error": "unresolved",
+      "output": "probability_and_uncertainty",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Reproduce legacy logit coordinate and joint likelihood, not new literal-zero mixture"
+    },
+    {
+      "id": "ZERO-LP3",
+      "method_id": "legacy-zero-threshold",
+      "family": "lp3",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "at_or_below_threshold",
+      "prior": "unresolved",
+      "zero_threshold": "legacy_threshold",
+      "rating_error": "unresolved",
+      "output": "probability_and_uncertainty",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Reproduce legacy logit coordinate and joint likelihood, not new literal-zero mixture",
+      "candidate_case_ids": [
+        "case-b"
+      ]
+    },
+    {
+      "id": "OUTPUT-EXPECTED-PARAMETER",
+      "method_id": "quantile-estimands",
+      "family": "unresolved",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "annual_maxima",
+      "prior": "unresolved",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "expected_parameter_curve",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Verify F versus AEP, parameter coordinate, print rounding and interval semantics"
+    },
+    {
+      "id": "OUTPUT-EXPECTED-PROBABILITY",
+      "method_id": "quantile-estimands",
+      "family": "unresolved",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "annual_maxima",
+      "prior": "unresolved",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "expected_probability_at_flow",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Verify F versus AEP, parameter coordinate, print rounding and interval semantics"
+    },
+    {
+      "id": "OUTPUT-INTERVALS",
+      "method_id": "quantile-estimands",
+      "family": "unresolved",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "annual_maxima",
+      "prior": "unresolved",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "mc_90_percent_probability_limits",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Verify F versus AEP, parameter coordinate, print rounding and interval semantics"
+    },
+    {
+      "id": "OUTPUT-PLOT-POSITIONS",
+      "method_id": "quantile-estimands",
+      "family": "unresolved",
+      "estimator": "bayesian_importance_sampling",
+      "observations": "annual_maxima",
+      "prior": "unresolved",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "non_exceedance_plot_positions",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability"
+      ],
+      "evidence": {},
+      "qualification_gap": "Verify F versus AEP, parameter coordinate, print rounding and interval semantics"
+    },
+    {
+      "id": "REPORT-CLI",
+      "method_id": "legacy-report-and-method-guidance",
+      "family": "unresolved",
+      "estimator": "installed_cli",
+      "observations": "from_legacy_project",
+      "prior": "unresolved",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "files_and_static_documentation",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "installed_replay"
+      ],
+      "evidence": {},
+      "qualification_gap": "Installed replay, method explanations and no GUI"
+    },
+    {
+      "id": "WP09-RELEASE-GATE",
+      "method_id": "legacy-conformance-verification",
+      "family": "unresolved",
+      "estimator": "cross_package",
+      "observations": "all_admitted",
+      "prior": "unresolved",
+      "zero_threshold": "unresolved",
+      "rating_error": "unresolved",
+      "output": "release_decision",
+      "admission": "required",
+      "status": "pending",
+      "required_checks": [
+        "independent_math",
+        "legacy_comparison",
+        "method_documentation",
+        "independent_review",
+        "synthetic_repeatability",
+        "installed_replay"
+      ],
+      "evidence": {},
+      "qualification_gap": "Independent scientific verification and complete versioned platform evidence"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+* text=auto eol=lf
+# Maintain line endings on source/configuration and authored documentation.
+*.py text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.sh text eol=lf
+
+# Keep this final: Git attributes use the last matching pattern per attribute.
+# Byte-preserved evidence (including CRLF, embedded NULs and manifest) is immutable.
+/reference/legacy-candidates/** -text
+
+# Fixed-width reference fields and CRLF are immutable numerical evidence, not source whitespace.
+/reference/legacy-candidates/** whitespace=-blank-at-eol,-blank-at-eof,cr-at-eol

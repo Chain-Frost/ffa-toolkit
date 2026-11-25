@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "compatibility_profile": "tuflow-bmt-flike-5.0.306.0-file3.10",
+  "evidence": [
+    {
+      "id": "CANDIDATE-CASE-A",
+      "kind": "legacy_comparison",
+      "status": "candidate",
+      "case_id": "case-a",
+      "pairing_status": "candidate_settings_unverified",
+      "source_manifest": "reference/legacy-candidates/manifest.json",
+      "note": "Source years and values match displayed report precision; no verified run/settings/priors."
+    },
+    {
+      "id": "CANDIDATE-CASE-B",
+      "kind": "legacy_comparison",
+      "status": "candidate",
+      "case_id": "case-b",
+      "pairing_status": "candidate_settings_unverified",
+      "source_manifest": "reference/legacy-candidates/manifest.json",
+      "note": "Five at/below threshold; no verified run/settings/priors."
+    }
+  ],
+  "quality_gates": [
+    {
+      "id": "ruff",
+      "status": "pending",
+      "evidence_id": null
+    },
+    {
+      "id": "ruff_format",
+      "status": "pending",
+      "evidence_id": null
+    },
+    {
+      "id": "strict_pyright",
+      "status": "pending",
+      "evidence_id": null
+    },
+    {
+      "id": "unit_and_integration_tests",
+      "status": "pending",
+      "evidence_id": null
+    },
+    {
+      "id": "wheel_and_sdist",
+      "status": "pending",
+      "evidence_id": null
+    },
+    {
+      "id": "installed_cli_linux_py314",
+      "status": "pending",
+      "evidence_id": null
+    },
+    {
+      "id": "installed_cli_windows_py314",
+      "status": "pending",
+      "evidence_id": null
+    },
+    {
+      "id": "legacy_cli_replay",
+      "status": "pending",
+      "evidence_id": null
+    },
+    {
+      "id": "offline_method_documentation",
+      "status": "pending",
+      "evidence_id": null
+    },
+    {
+      "id": "independent_statistical_review",
+      "status": "pending",
+      "evidence_id": null
+    },
+    {
+      "id": "no_unresolved_correctness_defects",
+      "status": "pending",
+      "evidence_id": null
+    },
+    {
+      "id": "owner_release_authorisation",
+      "status": "pending",
+      "evidence_id": null
+    }
+  ],
+  "qualified_reference_cases": []
+}
