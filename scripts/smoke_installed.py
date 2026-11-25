@@ -119,9 +119,7 @@ def _check_ordinary_result(
             parameter["summary_kind"] != "point_estimate"
             or parameter["mean"] is not None
             or parameter["standard_deviation"] is not None
-            or not isclose(
-                parameter["point_estimate"], expected[parameter["coordinate"]], rel_tol=2e-11, abs_tol=2e-12
-            )
+            or not isclose(parameter["point_estimate"], expected[parameter["coordinate"]], rel_tol=2e-11, abs_tol=2e-12)
         ):
             msg = f"ordinary installed example parameter mismatch: {parameter}"
             raise RuntimeError(msg)
