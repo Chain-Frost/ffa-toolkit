@@ -94,11 +94,13 @@ def test_source_header_custody_does_not_emit_identifying_paths_or_email() -> Non
     raw = (
         b"# version : v5\n"
         b"# source file : C:\\private\\record.csv\n"
+        b"# source file : /home/synthetic/record.csv\n"
         b"# date : author@example.invalid\n"
         b"SITEID,WATERYEAR\n001,2000\n"
     )
     assert metadata_excerpt(raw) == [
         "# version : v5",
+        "[identifying source-header value omitted]",
         "[identifying source-header value omitted]",
         "[identifying source-header value omitted]",
     ]

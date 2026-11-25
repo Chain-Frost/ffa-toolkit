@@ -258,7 +258,7 @@ def metadata_excerpt(data: bytes) -> list[str]:
         if not line.startswith("#"):
             break
         if any(term in line.lower() for term in terms):
-            if re.search(r"[A-Za-z]:[\\/]|\\\\|[\w.+-]+@[\w.-]+", line):
+            if "source file" in line.lower() or re.search(r"[A-Za-z]:[\\/]|\\\\|[\w.+-]+@[\w.-]+", line):
                 lines.append("[identifying source-header value omitted]")
             else:
                 lines.append(line[:240])
