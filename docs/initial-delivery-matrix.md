@@ -1,31 +1,37 @@
 # Supported calculations and initial delivery acceptance
 
-Baseline: FFA Toolkit main `34cc841f45555246bbb3ac98c8166e55548678ad`. Planning: [#14]; delivery: [#1].
-This crosswalk describes the accepted software and the remaining requirements; it is not a new
+Integration profile: 26 November 2026. Planning: [#14]; delivery and exact accepted-head/CI record: [#1].
+This crosswalk describes the integrated source tree and remaining requirements; it is not a new
 method registry, result schema, automated gate or implementation prerequisite. Use the live linked
 issues to determine activation and ownership. Independent mathematical verification and native
 qualification are different: **no calculation below is qualified as Flike 5.0.306.0 / file3.10
 equivalent**. See the [compatibility contract](compatibility-contract.md) and
 [optional external evidence](external-evidence.md).
 
-## Currently installed calculation
+## Currently installed deterministic calculations
 
-The only accepted file-to-fit path at the baseline is fixed-H GEV (H=0–4), with complete, exact,
-strictly positive annual maxima and explicit settings. Run the generated example from an installed
-environment (paths below are relative to the repository):
+The CLI supports fixed-H GEV (H=0–4) and ordinary L-moment Gumbel, LN2, LP3 and GP
+(explicit fixed/free location) fits. Inputs are complete, exact, strictly positive annual maxima
+with explicit family-specific settings. Run the generated installed examples from a repository copy:
 
 ```console
-ffa fit --ams docs/examples/fixed-gev-ams.csv --settings docs/examples/fixed-gev-settings.json --output example-result
+ffa fit --ams docs/examples/fixed-gev-ams.csv --settings docs/examples/fixed-gev-settings.json --output example-gev-result
 ffa explain lh-moments-gev --format markdown
+ffa fit --ams docs/examples/ordinary-ams.csv --settings docs/examples/ordinary-settings.json --output example-ordinary-result
+ffa explain l-moments --format markdown
 ```
 
-The settings schema is `ffa-gev-fixed-h/1`; units, year definition, caller source classification,
+The GEV settings schema is `ffa-gev-fixed-h/1`; units, year definition, caller source classification,
 H and requested non-exceedance probabilities are explicit. The three reports are JSON, CSV and text.
 They preserve source/settings byte hashes, parameter/quantile definitions and F/AEP. The fourth-moment
 ratio residual is not a standardized goodness-of-fit statistic. No bootstrap or Bayesian inference
 is invoked by this command. The output directory must not exist. See
 [reporting and settings](wp08-cli-reporting.md) and
-[fixed-H evidence](wp04-fixed-h-gev-evidence.md).
+[fixed-H evidence](wp04-fixed-h-gev-evidence.md). Ordinary settings use `ffa-ordinary-lmoments/1`,
+with explicit positive references for LN/LP3 and explicit GP location choice. Ordinary reports
+include original source/settings byte snapshots checked against their SHA-256 provenance. GEV reports
+preserve exact endpoint/outside diagnostics and warnings. Signed mathematical quantiles remain signed.
+No bootstrap, Bayesian fit, POT exposure or native default is selected by these commands.
 
 ## Workflow matrix
 
@@ -36,23 +42,22 @@ unknown controls never become defaults. Each installed calculation must preserve
 labels, units, observation/exposure decisions, actual file/settings identity, method version,
 outputs and limitations.
 
-The baseline's internal components and tests have independent review evidence in
-[baseline validation](validation.md) and passing [main qualification](https://github.com/Chain-Frost/ffa-toolkit/actions/runs/45612275257).
-“Component” below refers only to that bounded evidence, not a verified installed workflow.
-“Pending” denotes required work, not a selectable command. Follow the cited public method pages and
-[reference register](references.md) for the mathematical basis. The linked issues own the remaining
-work, including integration across shared boundaries.
+The components retain their [baseline validation](validation.md) and scoped independent numerical
+references, with refreshed integrated acceptance recorded in [#1]. “Component” denotes bounded
+mathematical evidence, not a complete installed workflow or native qualification. “Pending” denotes
+required work rather than a selectable command. Use the public method pages and
+[reference register](references.md) for the mathematical basis.
 
-| Family / estimator | Record / exposure | Prior / rating | Output / uncertainty meaning | Internal status and independent evidence | Installed fit at baseline | Remaining owner / work |
+| Family / estimator | Record / exposure | Prior / rating | Output / uncertainty meaning | Internal status and independent evidence | Installed fit | Remaining owner / work |
 | --- | --- | --- | --- | --- | --- | --- |
-| GEV ordinary L and fixed LH, H=0–4 | Exact AMS | None | Fitted point parameters, F/AEP quantiles, raw fourth-ratio residual; no interval | Implemented; [fixed-H tests](../tests/test_gev_lh.py), [CLI tests](../tests/test_wp08_fixed_gev_cli.py), installed smoke | Yes, command above | [#12] fitted support; [#7] reporting; [#2] uncertainty |
-| Gumbel ordinary L, raw Q | Exact AMS | None | Fitted location/scale and quantiles | Implemented, [ordinary L tests](../tests/test_ordinary_lmoments.py) | Pending | [#11] |
-| LN2 ordinary L, raw Q | Exact positive AMS | None; positive physical reference discharge | Fitted natural-log parameters and quantiles | Implemented; independent moment/unit checks in ordinary L tests | Pending | [#11] |
-| LP3 ordinary L, ln(Q/reference) | Exact positive AMS | None; positive reference discharge | Fitted log-coordinate parameters, skew and quantiles; support admission | Implemented; independent inversion, limit, support and unit tests in ordinary L tests | Pending | [#11] |
-| GP ordinary L, raw Q; explicit fixed/free location | Exact AMS (not POT exposure) | None | Point parameters/quantiles with explicit location and shape convention | Both variants implemented; independent inversion/support tests in ordinary L tests | Pending | [#11] |
+| GEV ordinary L and fixed LH, H=0–4 | Exact AMS | None | Fitted point parameters, F/AEP quantiles, raw fourth-ratio residual and exact fitted-support diagnostics; no interval | Implemented; [fixed-H tests](../tests/test_gev_lh.py), [support tests](../tests/test_gev_support.py), CLI/report tests and installed smoke | Yes | [#12] bounded support reporting complete; [#7] broader reports; [#2] standardized diagnostics/uncertainty |
+| Gumbel ordinary L, raw Q | Exact AMS | None | Fitted location/scale and signed quantiles | Implemented; [ordinary tests](../tests/test_ordinary_lmoments.py), [CLI tests](../tests/test_wp08_ordinary_cli.py), independent installed reference | Yes | [#11] bounded point-fit CLI complete; [#7] broader scientific reports |
+| LN2 ordinary L, raw Q | Exact positive AMS | None; positive physical reference discharge | Fitted natural-log parameters and quantiles | Implemented; independent moment/unit and installed CLI checks | Yes | [#11] bounded point-fit CLI complete; [#7] broader reports |
+| LP3 ordinary L, ln(Q/reference) | Exact positive AMS | None; positive reference discharge | Fitted log-coordinate parameters, skew and quantiles; support admission | Implemented; independent inversion, limit/support/unit and installed CLI checks | Yes | [#11] bounded point-fit CLI complete; [#7] broader reports |
+| GP ordinary L, raw Q; explicit fixed/free location | Exact AMS (not POT exposure) | None | Point parameters/quantiles with explicit location and shape convention | Both variants implemented; independent inversion/support and installed CLI references | Yes | [#11] bounded point-fit CLI complete; [#7] broader reports; no POT claim |
 | GEV standardized diagnostics and optimized H | Exact AMS; eligible candidates H=0–4 | None | Conditional variance, standardized z, explicit selection/failure/tie policy; not raw residual | Fixed-H core only; [optimized-H specification](wp04-optimized-h-specification.md), conditional variance/selection verification pending | Pending | [#2], coordinate [#12] |
-| Fixed/selected-H GEV and ordinary L families, declared uncertainty | Exact AMS and admitted model | None | Sampling-based bootstrap intervals, declared refit/reselection and attempted/failed replicates; not Bayesian credible limits | Fixed-H research primitive only (explicit seed, counts, interval level and type-7 interpolation); tests in fixed-H evidence | Pending | [#2], [#11], [#7]; specify broader family/selection uncertainty |
-| LN Bayesian, fixed or estimated log-SD | Explicit classified systematic exact positive AMS and positive left/right/interval censor bounds; missing/excluded preserved, years disjoint | Supplied named Gaussian prior in source coordinates; positive physical reference; no rating | Actual posterior quantities and intervals, separately assessed integration precision | Kernels, likelihood/prior and sampler/proposal components; [independent sampler](../tests/test_wp06_importance_sampling.py) and [curvature](../tests/test_wp06_importance_proposal.py) tests; model binding pending | Pending | [#3] binding, [#6] installed; [#4]/[#5] proposal/precision |
+| Fixed/selected-H GEV and ordinary L families, declared uncertainty | Exact AMS and admitted model | None | Sampling-based bootstrap intervals, declared refit/reselection and attempted/failed replicates; not Bayesian credible limits | Fixed-H research primitive only (explicit seed/counts/interval/type-7 interpolation) | Pending | [#2], [#7], [#1]; specify required family/selection uncertainty and installed integration |
+| LN Bayesian, fixed or estimated log-SD | Classified disjoint systematic exact positive and positive left/right/interval censor records; missing/excluded retained | Supplied named Gaussian prior; positive physical reference; no rating | Internal posterior coordinate means and bounded expected AEP verified; other estimands require moment/tail/precision admission | Explicit binding and actual inference implemented; [analytic/2D-quadrature tests](../tests/test_wp06_lognormal_posterior.py), replay, unit/censor/prior checks; binding explicitly unscaled gamma=1 | Pending | [#3] bounded binding complete; [#6] installed orchestration and explicit scaling; [#5] precision; [#8]/[#9]/[#10] broader bindings |
 | LP3, Gumbel, GEV and GP Bayesian, each with explicit family-specific coordinates/support | Classified exact/censored systematic exposure where the law admits it | Named supplied prior; density-preserving transformations, no rating | Same distinct posterior and precision quantities | [Kernel](../tests/test_distributions.py), [likelihood](../tests/test_likelihood.py), prior/sampler components only; family binding and posterior reference checks pending | Pending | [#8], [#4]/[#5]; clarify GP annual-max interpretation and admitted pairings |
 | Admitted Bayesian families with supplied regional prior | Explicit classified records per family | Joint supplied prior, named coordinates/covariance, regional training-gauge provenance and Jacobian | Posterior conditional on supplied regional information, not a guessed default | [Prior component tests](../tests/test_priors.py); actual regional-prior workflow pending | Pending | [#3]/[#6]/[#8]; preserve regional provenance |
 | Admitted Bayesian families with historical/grouped exposure | Complete disjoint counted groups, perception periods/thresholds, year-labelled exact exceedances and unmeasured counts | Supplied prior; rating separate | Posterior and precision with exposure and counts conserved | [Likelihood](wp05-likelihood-priors-rating.md) and [paired censor integration](../tests/test_wp07_paired_censor_integration.py) components; posterior/CLI missing | Pending | [#9] |
@@ -74,11 +79,11 @@ shape/location conventions; [likelihood integration](wp05-integration.md) for so
 | Python, quality and installation | Distribution `ffa-toolkit`, import `ffa_methods`, CLI `ffa`; Python 3.11–3.14 supported; public baseline and main qualification passed | Use [current development commands](development.md); publication remains disabled |
 | Source readers and chronology | Legacy/Year,AMS parsing, observation adapters and admitted neutral case-a/case-b fixture/manifest; synthetic custody and tamper coverage | Workflow-specific classification, unit/exposure conservation and settings validation [#9]/[#6]/[#11]; do not alter fixture identity or infer a matching run |
 | Five distribution kernels | Probability/quantile/support/log-tail and coordinate tests; [kernel documentation](distribution-kernels.md); admitted report-internal replay | Family binding [#8]; native matching separately |
-| Likelihood, prior and shared rating | Exact/left/right/interval, defined historical/counted terms, named densities and joint rating-scenario composition | Actual posterior bindings [#3]/[#8]/[#9]/[#10] and installed paths [#6]; no assumed native model |
-| Real importance sampling | Full-covariance explicit Gaussian draws and self-normalized weights, local mode/full inverse-curvature builder, bounded mean MCSE/ESS; [execution](wp06-importance-execution.md) and [proposal](methods/importance-sampling-reference.md) evidence | [#4] explicit covariance scaling (Kuczera 1999); [#5] output-specific error/precision, independent replicates and explicit controls. No global ESS tail certificate |
-| Scientific basis | ARR and primary literature catalogued in [references](references.md); source-specific formulas, assumptions and independent expected values required for each additional method | [#2]/[#4]/[#5]/[#10] verify sufficient published mathematics before implementing; no redistribution of restricted material |
-| Independent external validation | Read-only audit/comparator scripts and [external evidence instructions](external-evidence.md); ordinary tests use independent synthetic/analytic checks | [#13] whole-cohort numerical/exposure limitations, archived result identity and settings-matched posterior comparator; external data rights and correspondence remain separate. Support findings: [#12] |
-| Reports, plots and guidance | Typed report formatter, weighted-output bridge, six offline method pages and generated fixed-H example | [#7] complete usable explanations, reproducible installed examples and static plots with source-defined positions/exposure; preserve [#12] support diagnostics and [#5] precision distinctions |
+| Likelihood, prior and shared rating | Exact/left/right/interval, defined historical/counted terms, named densities/joint rating composition; explicit LN binding and executed references | Remaining family/exposure/rating posterior bindings [#8]/[#9]/[#10], regional-prior admission and installed paths [#6]; no assumed native model |
+| Real importance sampling | Full-covariance draws/self-normalized weights, local inverse-curvature builder and explicit gamma-squared covariance scaling; bounded mean MCSE/ESS and actual LN binding | [#4] scaling complete; [#5] output-specific runtime precision, tail/moment admission, replicates and controls; [#6] installed orchestration. Global ESS is not a tail certificate |
+| Scientific basis | ARR/primary references and independently checked equations/tests for admitted components; proposal scaling and precision specification reviewed | [#2]/[#5]/[#8]/[#9]/[#10] sufficient published mathematics and runtime verification for remaining scope; no restricted material redistribution |
+| Independent external validation | Read-only comparators and [archived result identity audit](pyflood2022-archive-identities.md), aggregate-only receipts, synthetic tests and temporary external inputs | [#13] matched posterior comparator, unresolved publication/export precision/provenance and statistical suitability; archived consistency is not a refit or native comparison |
+| Reports, plots and guidance | Typed reports, Bayesian-output bridge, seven offline method pages, generated GEV/ordinary examples, exact support diagnostics and source snapshots | [#7] broader scientific reports, per-workflow examples and static plots/exposure conventions; [#5] precision distinctions and [#6] Bayesian installed path |
 | Native qualification | Gate machinery and synthetic rejection/admission tests, pending public ledger | Native evidence externally managed; no compatibility or release claim |
 
 For Bayesian output, distinguish quantile at expected source-coordinate parameters, posterior mean
@@ -95,7 +100,7 @@ Do not silently reduce delivery to the easiest installed combinations. Continue 
 specified work independently; record the decision and evidence in [#1] before excluding a required
 mathematical workflow:
 
-- [#2]/[#11]: which ordinary-family bootstrap and selected-H uncertainty constructions are required,
+- [#2]/[#1]: which ordinary-family bootstrap and selected-H uncertainty constructions are required,
   explicit controls, failure/reselection semantics and independent tests.
 - [#3]/[#6]/[#8]/[#9]/[#10]: precise family × exposure × supplied/regional prior × shared-rating
   combinations, particularly GP annual maxima versus POT and rating/exposure overlap.

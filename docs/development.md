@@ -4,13 +4,15 @@ This repository contains the accepted independent mathematical software baseline
 activated individually through their owning issues; preserve existing owners and do not infer that
 an issue is active merely because it is listed. The package/import names remain `ffa-toolkit` / `ffa_methods`; the command is `ffa`.
 
+The installed deterministic paths include fixed-H GEV L/LH with exact fitted-support reporting and
+ordinary L-moment Gumbel, lognormal, LP3 and explicit fixed/free-location GP fits. Internal lognormal
+posterior execution and explicit proposal scaling do not make Bayesian fitting available in the CLI.
+
 ## Remaining software requirements
 
-- Expose the implemented ordinary L-moment families through the installed CLI.
-- Report fitted GEV support and endpoint observations explicitly.
 - Complete standardized Wang diagnostics, optimized H selection and declared uncertainty.
-- Integrate explicitly configured lognormal posterior inference, proposal covariance scaling and
-  output-specific Monte Carlo precision/stopping criteria.
+- Deliver installed explicitly configured lognormal Bayesian orchestration; internal binding and
+  proposal covariance scaling are implemented, while output-specific precision/stopping remains pending.
 - Extend explicit posterior bindings to other families, historical/grouped exposure and shared rating error.
 - Deliver scientific reports, static plots, accessible method explanations and offline worked examples.
 - Complete independent whole-cohort external comparisons, archive identity review and a settings-matched

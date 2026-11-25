@@ -61,6 +61,9 @@ packages = ["src/ffa_methods"]
 "docs/methods/lh-moments-gev.md" = "ffa_methods/resources/methods/lh-moments-gev.md"
 "docs/examples/fixed-gev-ams.csv" = "ffa_methods/resources/examples/fixed-gev-ams.csv"
 "docs/examples/fixed-gev-settings.json" = "ffa_methods/resources/examples/fixed-gev-settings.json"
+"docs/examples/ordinary-settings.json" = "ffa_methods/resources/examples/ordinary-settings.json"
+"docs/examples/ordinary-ams.csv" = "ffa_methods/resources/examples/ordinary-ams.csv"
+"docs/methods/l-moments.md" = "ffa_methods/resources/methods/l-moments.md"
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -75,6 +78,9 @@ include = [
     "/docs/methods/lh-moments-gev.md",
     "/docs/examples/fixed-gev-ams.csv",
     "/docs/examples/fixed-gev-settings.json",
+    "/docs/examples/ordinary-settings.json",
+    "/docs/examples/ordinary-ams.csv",
+    "/docs/methods/l-moments.md",
     "/docs/method-registry.json",
     "/docs/references.md",
     "/README.md",

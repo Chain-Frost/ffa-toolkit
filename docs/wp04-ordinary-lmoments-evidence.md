@@ -1,6 +1,6 @@
 # WP04: independent H=0 ordinary L-moment family inversions
 
-**Status: mathematical foundations only. These functions are not qualified against TUFLOW/BMT Flike 5.0.306.0.** The existing [fixed-H GEV evidence](wp04-fixed-h-gev-evidence.md) remains authoritative for GEV. [development requirements](https://github.com/Chain-Frost/ffa-toolkit/blob/main/docs/development.md) remains open.
+**Status: independent mathematical foundations and explicit ordinary L-moment CLI integration. These functions are not qualified against TUFLOW/BMT Flike 5.0.306.0.** See [ordinary CLI guidance](methods/l-moments.md). The existing [fixed-H GEV evidence](wp04-fixed-h-gev-evidence.md) remains authoritative for GEV. [development requirements](https://github.com/Chain-Frost/ffa-toolkit/blob/main/docs/development.md) remains open.
 
 ## Inputs, parameter conventions and formulae
 

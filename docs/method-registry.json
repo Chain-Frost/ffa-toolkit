@@ -23,7 +23,7 @@
   "reference_register": "references.md",
   "implementation_status": "not_implemented",
   "qualification_status": "not_started",
-  "status_applies_to": "Global not_implemented denotes the incomplete full programme, not absence of calculation. The installed CLI supports explicit-settings fixed-H GEV fitting. Per-method entries distinguish implemented kernels, estimators, likelihood/prior/rating/low-flow/sampling components and reporting from outstanding workflows. No method is native-qualified.",
+  "status_applies_to": "Global not_implemented denotes the incomplete full programme, not absence of calculation. The installed CLI supports explicit-settings fixed-H GEV and ordinary L-moment fitting. Per-method entries distinguish implemented kernels, estimators, likelihood/prior/rating/low-flow/sampling components and reporting from outstanding workflows. No method is native-qualified.",
   "progress_tracker": "https://github.com/Chain-Frost/ffa-toolkit/issues",
   "work_package_issues": {},
   "schema_change_notes": [
@@ -453,7 +453,8 @@
       "title": "Legacy L-moment fitting",
       "kind": "estimator",
       "work_packages": [
-        "WP04"
+        "WP04",
+        "WP08"
       ],
       "source_keys": [
         "ARR3",
@@ -461,14 +462,14 @@
         "SCIPY",
         "LMOMENT_LIBRARIES"
       ],
-      "source_location": "ARR Book 3 Chapter 2 section 2.6.4 and legacy examples; family-specific target cases to be acquired",
-      "purpose": "Reproduce L-moment fitting and applicable uncertainty for every legacy-supported family combination",
+      "source_location": "ARR Book 3 Chapter 2 section 2.6.4 and Table 3.2.3; Hosking (1990); native family-specific cases remain unqualified.",
+      "purpose": "Fit the supported ordinary L-moment distributions to explicit, complete positive annual maxima and report deterministic quantiles; broader uncertainty and native mappings remain separate.",
       "key_assumptions": [
-        "Family-specific inversion and parameter mapping",
-        "Target sample treatment and initialization preserved",
-        "Priors, censoring and bootstrap behavior require explicit capability evidence"
+        "Complete, exact, positive annual maxima with explicitly asserted annual-record classification, units and year definition",
+        "Gumbel and LN2 match raw discharge moments; LP3 matches natural-log relative discharge moments; GP location is explicitly fixed or free",
+        "Deterministic point estimates only; no threshold exposure, priors, censoring or bootstrap"
       ],
-      "documentation": "statistical-methods.md",
+      "documentation": "methods/l-moments.md",
       "validation_required": [
         "Sample L-moments",
         "Family-specific inversion and failure cases",
@@ -476,10 +477,10 @@
         "Bootstrap definitions and defaults where supported"
       ],
       "scope": "mvp",
-      "implementation_status": "partial_independent_core",
+      "implementation_status": "partial_independent_core_with_explicit_ordinary_cli",
       "qualification_status": "not_started",
       "implementation_evidence": "wp04-ordinary-lmoments-evidence.md",
-      "remaining_work": "Mathematical H=0 Gumbel, LN2 raw-flow, LP3 log-flow and GP fixed/free-location inversions and independent tests are added alongside GEV. Active #7/#40: final mathematical review, supported data adaptation, declared uncertainty and CLI integration. Deferred #39: native variants/coordinates, vendor bootstrap/default rules and matched family references."
+      "remaining_work": "Explicit H=0 Gumbel, raw-flow LN2, log-flow LP3 and fixed/free-location GP annual-maxima CLI paths use the mathematical core. Declared uncertainty and optimized-H diagnostics remain separate software requirements. Native variants, defaults and matched family runs remain unqualified."
     },
     {
       "method_id": "lh-moments-gev",

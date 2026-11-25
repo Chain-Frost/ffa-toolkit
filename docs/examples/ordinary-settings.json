@@ -1,0 +1,11 @@
+{
+  "schema_version": "ffa-ordinary-lmoments/1",
+  "estimator": "gumbel_lmoments",
+  "discharge_unit": "m3/s",
+  "year_definition": "synthetic_calendar_year",
+  "source_classification": "caller_asserted_complete_exact_positive_annual_maxima",
+  "non_exceedance_probabilities": [
+    0.5,
+    0.9
+  ]
+}

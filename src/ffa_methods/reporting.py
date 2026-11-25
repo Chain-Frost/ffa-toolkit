@@ -9,6 +9,7 @@ import json
 import shutil
 import tempfile
 from collections.abc import Mapping
+from hashlib import sha256
 from io import StringIO
 from math import isfinite
 from pathlib import Path
@@ -246,7 +247,16 @@ def _record_log10_moment(point: ResultPoint, record: dict[str, object], value: f
         raise ValueError(msg)
 
 
-def _point(point: ResultPoint) -> dict[str, object]:
+def _result_interpretation(meaning: ResultMeaning, method_id: str) -> str:
+    if meaning == ResultMeaning.DETERMINISTIC_FITTED_QUANTILE and method_id == "l-moments":
+        return (
+            "Quantile of explicitly configured ordinary H=0 L-moment point estimate; "
+            "not Bayesian, posterior predictive, bootstrapped or native Flike-qualified."
+        )
+    return RESULT_MEANINGS[meaning]
+
+
+def _point(point: ResultPoint, *, method_id: str) -> dict[str, object]:
     """Reject incomplete quantity labels before any JSON, CSV or prose export."""
     value = _number(point.value, label="result value")
     if (
@@ -271,7 +281,7 @@ def _point(point: ResultPoint) -> dict[str, object]:
         raise ValueError(msg)
     record: dict[str, object] = {
         "meaning": point.meaning.value,
-        "interpretation": RESULT_MEANINGS[point.meaning],
+        "interpretation": _result_interpretation(point.meaning, method_id),
         "value": value,
         "unit": _text(point.unit, label="result unit"),
         "input_probability": None,
@@ -432,7 +442,7 @@ def report_document(result: AnalysisResult, *, settings: Mapping[str, object]) -
         raise ValueError(msg)
     parameters = [_parameter(parameter) for parameter in result.parameters]
     diagnostics = [_diagnostic(diagnostic) for diagnostic in result.diagnostics]
-    points = [_point(point) for point in result.values]
+    points = [_point(point, method_id=method_id) for point in result.values]
     warnings = [_text(warning, label="warning") for warning in result.warnings]
     warnings.extend(
         _nonphysical_quantile_warning(point)
@@ -618,8 +628,24 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
     }
 
 
+def _write_source_inputs(staging: Path, result: AnalysisResult, source_inputs: tuple[bytes, bytes]) -> None:
+    ams, settings = source_inputs
+    if (
+        sha256(ams).hexdigest() != result.provenance.input_sha256
+        or sha256(settings).hexdigest() != result.provenance.settings_sha256
+    ):
+        msg = "source snapshot bytes do not match analysis provenance"
+        raise ValueError(msg)
+    (staging / "source-ams.csv").write_bytes(ams)
+    (staging / "source-settings.json").write_bytes(settings)
+
+
 def write_report_bundle(
-    result: AnalysisResult, destination: Path, *, settings: Mapping[str, object]
+    result: AnalysisResult,
+    destination: Path,
+    *,
+    settings: Mapping[str, object],
+    source_inputs: tuple[bytes, bytes] | None = None,
 ) -> tuple[Path, Path, Path]:
     """Publish a staged bundle without silently overwriting an existing directory.
 
@@ -638,6 +664,8 @@ def write_report_bundle(
     try:
         for filename, content in files.items():
             (staging / filename).write_text(content, encoding="utf-8", newline="\n")
+        if source_inputs is not None:
+            _write_source_inputs(staging, result, source_inputs)
         staging.rename(target)
     finally:
         if staging.exists():
