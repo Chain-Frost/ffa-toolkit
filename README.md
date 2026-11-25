@@ -33,3 +33,5 @@ and [third-party notices](THIRD_PARTY_NOTICES.md).
 
 The distribution name is `ffa-toolkit`; the internal import namespace remains `ffa_methods`.
 PyPI publishing is [prepared but disabled](docs/publishing.md). No package release has been published.
+
+Software development continues in Toolkit. See the [supported-calculation matrix](docs/initial-delivery-matrix.md) for accepted components, pending workflows and final installed acceptance.

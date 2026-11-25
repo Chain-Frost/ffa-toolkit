@@ -1,7 +1,9 @@
-# Agent Work Scopes
+# Agent work scopes
 
-See [current development requirements](development.md) and [agent instructions](../AGENTS.md).
+Toolkit issues and migration PRs are the active software assignments. Preserve the existing work-package
+owners and consult open PRs before editing shared source, CLI, reports, registry or CI. A pending PR is
+not accepted baseline functionality. Native research/qualification and original source custody remain
+external. Do not copy private links, discussions, datasets or research artifacts into public work.
 
-Accepted mathematical components are retained; installed workflow integration, diagnostics, precision,
-reports, examples and independent acceptance remain active. Native qualification is separate and pending.
-Existing assignments are not transferred until cutover is explicitly coordinated.
+See the [supported-calculation matrix](initial-delivery-matrix.md), [development requirements](development.md)
+and [agent instructions](../AGENTS.md).

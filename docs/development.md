@@ -1,8 +1,8 @@
 # Development and remaining requirements
 
-This repository is a sanitized accepted-software baseline. Development cutover is pending synchronization
-and owner approval. Existing implementation assignments remain with their current owners until explicitly
-transferred. The package/import names remain `ffa-toolkit` / `ffa_methods`; the command is `ffa`.
+This repository is the active public software development repository. Existing work-package owners
+continue their assignments through the mapped Toolkit issues and migration PRs. Restricted research,
+original custody and native evidence remain external; no pending migration PR is accepted until reviewed. The package/import names remain `ffa-toolkit` / `ffa_methods`; the command is `ffa`.
 
 ## Remaining software requirements
 
@@ -46,9 +46,10 @@ A build or green workflow does not authorize a release or publication.
 
 [External evidence](external-evidence.md) is optional and separate from ordinary public tests.
 
-## Prepared backlog
+## Active software backlog
 
-These are inactive preparation issues pending coordinated cutover; existing assignments continue.
+These mapped issues own ongoing software work. Coordinate existing work-package ownership and open PRs;
+do not duplicate an active assignment. See the [supported-calculation matrix](initial-delivery-matrix.md).
 
 - [Complete independent mathematical CLI delivery](https://github.com/Chain-Frost/ffa-toolkit/issues/1)
 - [Standardized LH diagnostics, optimized H and declared uncertainty](https://github.com/Chain-Frost/ffa-toolkit/issues/2)
