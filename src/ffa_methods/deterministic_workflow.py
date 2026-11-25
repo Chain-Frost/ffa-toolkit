@@ -313,7 +313,7 @@ def _ordinary_settings(values: dict[str, object]) -> OrdinarySettings:
         msg = "ordinary L-moment schema requires an explicit supported estimator"
         raise ValueError(msg)
     expected = _ORDINARY_FIELDS | _ordinary_extra_fields(estimator, values)
-    if set(values) != expected:
+    if frozenset(values) != expected:
         msg = f"ordinary settings keys must match exactly; missing={sorted(expected - set(values))}, unknown={sorted(set(values) - expected)}"
         raise ValueError(msg)
     if values["source_classification"] != EXACT_ASSERTION:
