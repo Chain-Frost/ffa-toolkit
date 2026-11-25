@@ -24,6 +24,7 @@ from ffa_methods.contracts import (
     ResultPoint,
     RunDiagnostic,
 )
+from ffa_methods.gev_support import GEVFittedSupport
 from ffa_methods.guidance import get_method, references
 
 ReportScalar: TypeAlias = str | int | float | bool | None
@@ -365,6 +366,50 @@ def _nonphysical_quantile_warning(point: ResultPoint) -> str:
     )
 
 
+def _fitted_support_fields(support: GEVFittedSupport | None) -> dict[str, object]:
+    """Serialize the optional fixed-GEV diagnostic without changing other report schemas."""
+    if support is None:
+        return {}
+    return {
+        "gev_fitted_support": {
+            "kind": support.kind,
+            "endpoint_exact": support.endpoint_exact,
+            "endpoint_approximate": support.endpoint_approximate,
+            "unit": support.unit,
+            "observation_count": support.observation_count,
+            "outside_count": len(support.outside),
+            "at_endpoint_count": len(support.at_endpoint),
+            "outside": [{"year": row.year, "discharge": row.discharge} for row in support.outside],
+            "at_endpoint": [{"year": row.year, "discharge": row.discharge} for row in support.at_endpoint],
+            "comparison": "exact rational endpoint of fitted binary64 coordinates and admitted binary64 flows",
+            "interpretation": (
+                "The algebraic L/LH fit is retained. Strictly outside observations have zero exact continuous "
+                "density; endpoint equality is distinct and does not certify likelihood admissibility. "
+                "This is not the Wang goodness-of-fit statistic or an H-selection rule."
+            ),
+        }
+    }
+
+
+def _fitted_support_text(support: GEVFittedSupport | None) -> list[str]:
+    if support is None:
+        return []
+    lines = [
+        "",
+        "FITTED GEV SUPPORT (not an H-selection or likelihood test)",
+        f"  Kind: {support.kind}",
+        f"  Exact endpoint (rational): {support.endpoint_exact} {support.unit}",
+        f"  Approximate endpoint (binary64; None if unavailable): {support.endpoint_approximate} {support.unit}",
+        (
+            f"  Observations: {support.observation_count}; outside: {len(support.outside)}; "
+            f"at endpoint: {len(support.at_endpoint)}"
+        ),
+    ]
+    for status, rows in (("outside", support.outside), ("at_endpoint", support.at_endpoint)):
+        lines.extend(f"  {status}: year={row.year}, discharge={row.discharge!r} {support.unit}" for row in rows)
+    return lines
+
+
 def report_document(result: AnalysisResult, *, settings: Mapping[str, object]) -> dict[str, object]:
     """Prepare replayable, finite JSON data from an already computed result."""
     provenance = result.provenance
@@ -435,6 +480,7 @@ def report_document(result: AnalysisResult, *, settings: Mapping[str, object]) -
         "diagnostics": diagnostics,
         "results": points,
         "warnings": warnings,
+        **_fitted_support_fields(result.fitted_gev_support),
     }
 
 
@@ -482,6 +528,9 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
     )
     stream = StringIO(newline="")
     writer = csv.writer(stream, lineterminator="\n")
+    support = doc.get("gev_fitted_support")
+    support_header = ("gev_fitted_support_json",) if support is not None else ()
+    support_cell = (json.dumps(support, ensure_ascii=False, allow_nan=False),) if support is not None else ()
     writer.writerow(
         (
             "method_id",
@@ -490,6 +539,7 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
             "legacy_comparison_status",
             "reference_evidence_status",
             *keys,
+            *support_header,
         )
     )
     provenance = cast(dict[str, object], doc["provenance"])
@@ -502,6 +552,7 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
                 doc["legacy_comparison_status"],
                 provenance["reference_evidence_status"],
                 *("" if point[key] is None else str(point[key]) for key in keys),
+                *support_cell,
             )
         )
     method_guidance = cast(dict[str, object], doc["method_guidance"])
@@ -530,6 +581,7 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
     if not diagnostics:
         lines.append("  None supplied")
     lines.extend(f"  {item['name']}: {item['value']} {item['unit']}" for item in diagnostics)
+    lines.extend(_fitted_support_text(result.fitted_gev_support))
     lines.extend(("", "RESULT POINTS"))
     for point in typed_points:
         components = [

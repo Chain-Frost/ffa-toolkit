@@ -95,3 +95,11 @@ The bridge checks F/AEP complement consistency, unit/probability domains, centra
 ### Signed mathematical quantiles versus physical discharge
 
 Independent review found that a valid, **untruncated** Gumbel/GEV posterior can yield a **negative lower quantile probability limit** even when the expected-parameter, posterior mean, median and predictive quantiles are positive. WP06 correctly returns the signed mathematical result. The bridge and formatter preserve a **finite negative modelled quantile** and emit a clear nonphysical-discharge warning; they do **not** clip it, discard all other estimates, or fabricate a log10 moment. In contrast, **fixed input discharge** for probability/return-period-at-flow remains constrained nonnegative, with units. A synthetic two-component Gumbel regression specifically protects this distinction. The analyst must evaluate physical support and suitability before adopting a discharge estimate; preservation in an unqualified report is not endorsement of negative flows.
+
+Fixed-H GEV reports also include an additive `gev_fitted_support` JSON object,
+the identical object in the GEV-only `gev_fitted_support_json` CSV column,
+and an explicit text section. See the [installed method page](methods/lh-moments-gev.md)
+for the endpoint/equality policy and synthetic violating examples. Existing
+quantile order and values, settings, input hashes, and non-GEV CSV schemas
+are retained. This is an interpretation diagnostic rather than a fit rejection
+or a goodness-of-fit selection rule.

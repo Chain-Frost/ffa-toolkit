@@ -111,3 +111,24 @@ a standardized z statistic. Native settings and comparisons remain a separate qu
 - Hosking, J. R. M. (1990), *L-moments: Analysis and estimation of distributions using linear combinations of order statistics*, https://doi.org/10.1111/j.2517-6161.1990.tb01775.x
 - Wang, Q. J. (1997), *LH moments for statistical analysis of extreme events*, https://doi.org/10.1029/97WR02134
 - Wang, Q. J. (1998), *Approximate goodness-of-fit tests of fitted generalized extreme value distributions using LH moments*, https://doi.org/10.1029/98WR02364
+
+## Fitted support reporting
+
+The fixed-H CLI retains algebraic L/LH estimates and reports strict outside
+and exact endpoint observations separately, using the exact endpoint of the
+computed ARR binary64 coordinates. See [installed method policy and worked
+examples](methods/lh-moments-gev.md). Wang (1998), p.3497, distinguishes
+limitations of fitted-distribution tests beyond a bound; no H-selection or
+bootstrap rule is changed. Earlier cohort comparisons motivate this diagnostic; they are not evidence of its new reporting-policy run.
+
+Targeted read-only verification command (same three pinned source assets as
+[the existing stress matrix](pyflood2022-fit-matrix.md)):
+
+```console
+python -m scripts.verify_gev_support_reporting PINNED_ASSET_DIRECTORY
+```
+
+It verifies source blob identities and SHA-256, matches the admitted GEV
+cohort, and records strict outside and equality counts by H, including any
+case differing from an ordinary rounded endpoint comparison. It does not
+print raw source rows or rerun the other five family variants. Fresh local Python 3.14 execution on 25 November 2026 verified all three pinned input identities and completed 674 sites × five H variants = 3,370 fits. Strict outside station/variant counts for H=0..4 were [1, 5, 7, 11, 22]; exact endpoint-equality counts were all zero; no cases disagreed with ordinary rounded-endpoint comparison. These are mathematical support diagnostics, not native Flike qualification or universal model suitability. Raw inputs were read outside checkout and removed after verification.

@@ -45,6 +45,41 @@ def _check_installed_method_pages(console: Path, output: Path, env: dict[str, st
     _invoke([str(console), "explain", "lp3", "--format", "markdown"], cwd=output, env=env, expected_code=2)
 
 
+def _check_gev_support_report(console: Path, output: Path, env: dict[str, str]) -> None:
+    """Exercise a support-violating fit using the installed entry point."""
+    values = (1, 100, 101, 102, 103, 104, 105, 106, 107, 108)
+    (output / "support-ams.csv").write_text(
+        "Year,AMS\n" + "".join(f"{2000 + i},{q}\n" for i, q in enumerate(values)), encoding="utf-8"
+    )
+    destination = output / "support-report"
+    _invoke(
+        [
+            str(console),
+            "fit",
+            "--ams",
+            "support-ams.csv",
+            "--settings",
+            "fixed-gev-settings.json",
+            "--output",
+            str(destination),
+        ],
+        cwd=output,
+        env=env,
+        expected_code=0,
+    )
+    doc = json.loads((destination / "results.json").read_text(encoding="utf-8"))
+    support = doc["gev_fitted_support"]
+    if (
+        support["kind"] != "finite_upper"
+        or support["outside"] != [{"year": 2008, "discharge": 107}, {"year": 2009, "discharge": 108}]
+        or support["at_endpoint_count"] != 0
+        or "gev_fitted_support_json" not in (destination / "results.csv").read_text(encoding="utf-8")
+        or "outside: year=2009," not in (destination / "report.txt").read_text(encoding="utf-8")
+    ):
+        msg = "installed GEV support reporting did not retain the synthetic outside observations"
+        raise RuntimeError(msg)
+
+
 def smoke_installed(dist_dir: Path) -> None:
     """Check version/help/rejection, import origin and offline packaged resources."""
     wheels = sorted(dist_dir.glob("ffa_toolkit-*.whl"))
@@ -175,6 +210,7 @@ for name in ("fixed-gev-ams.csv", "fixed-gev-settings.json"):
             msg = "installed wheel fixed-H mathematical fit has invalid quantities or provenance"
             raise RuntimeError(msg)
         _invoke(fit_args, cwd=output, env=env, expected_code=2)
+        _check_gev_support_report(console, output, env)
         reference = _invoke([str(console), "references", "ARR3"], cwd=output, env=env, expected_code=0)
         if "### ARR3" not in reference.stdout or "2.6.3.6" not in reference.stdout:
             msg = "installed offline reference register lacks the pinned ARR citation"
