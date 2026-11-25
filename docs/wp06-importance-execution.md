@@ -1,11 +1,9 @@
 # WP06 — Explicit multivariate Normal importance sampling (initial execution component)
 
 **Status:** Mathematical particle-generation and self-normalized weighting implementation,
-not Flike 5.0.306.0 compatibility, not a user-facing fit CLI, and not an automatic
-posterior optimiser. Parent WP06 [development requirements](https://github.com/Chain-Frost/ffa-toolkit/blob/main/docs/development.md);
-bounded initial-execution child [development requirements](https://github.com/Chain-Frost/ffa-toolkit/blob/main/docs/development.md);
-initial software stage [development requirements](https://github.com/Chain-Frost/ffa-toolkit/blob/main/docs/development.md).
-Native legacy rules and comparisons remain deferred in [development requirements](https://github.com/Chain-Frost/ffa-toolkit/blob/main/docs/development.md).
+not native Flike compatibility, not a user-facing fit CLI, and not an automatic
+posterior optimiser. See [development requirements](development.md) for the
+remaining mathematical and software scope; native qualification is separate.
 
 ## Primary mathematical basis and admission limits
 
@@ -23,8 +21,13 @@ proposal, stopping, RNG or default controls.
 This component implements **only the final draw-and-weight stage**, given
 a **caller-supplied** Normal proposal in fully named source coordinates.
 It does **not** fit the mode, numerically calculate a Hessian or select a
-proposal from observations. The separate [#47 local curvature builder](methods/importance-sampling-reference.md)
-can construct the explicit proposal from a supported smooth target without changing this sampler. It does not infer a prior or a statistical
+proposal from observations. The separate [local curvature builder](methods/importance-sampling-reference.md)
+can construct the explicit proposal from a supported smooth target without
+changing this sampler. Its SD multiplier gamma scales the full inverse-curvature
+covariance by gamma squared (Kuczera 1999, p. 1554, equation 17); gamma=1
+retains the unscaled result. The sampler receives the admitted final matrix
+and derivation, never applies a second scale, and uses the same matrix factor
+for draws and log densities. It does not infer a prior or a statistical
 likelihood from a project file. This distinction is deliberate: a generally
 correct importance sampler is useful without misrepresenting native defaults.
 
@@ -116,8 +119,8 @@ mean difference divided by the quadrature sum of their approximate
 standard errors, but the code does not invent an acceptance critical
 value. ESS or this global mean MCSE **cannot certify extreme flood
 quantiles, posterior tail probability limits or stochastic convergence**.
-WP06 #9 retains quantity-specific precision, evidence-informed proposal
-optimization and integration acceptance.
+Quantity-specific precision and workflow integration remain separate
+development requirements.
 
 The proposal is a Normal law with full real support. A posterior supported
 on a strict subset may legitimately produce sampled minus-infinity log
@@ -129,18 +132,15 @@ run with a fabricated result.
 
 ## Scope ownership and next work
 
-- **WP06 #9:** build on the separately tracked #47 local curvature builder;
-  test user-specified support transformations and Jacobians,
-  real source-coordinate likelihood/prior binding, convergence of specific
-  estimands, proposal refinement and full sampler outputs.
-- **WP08 #11:** integrate admitted, reproducible source data and explicit
-  algorithm settings into an installed file-to-calculation-to-report CLI.
-  The existing report bridge formats already calculated WP06 quantities;
-  this initial sampler does not enable `ffa fit`.
-- **Native #39 / qualification #12:** obtain controlled Flike executable
-  build, defaults, proposal/optimizer/Hessian, seed/RNG and run/case
-  correspondence; verify actual stochastic comparison precision.
-  No release or compatibility claim can be made without that evidence.
+- **Posterior integration:** bind source-coordinate likelihoods and priors,
+  including user-specified transformations and Jacobians, and assess
+  output-specific numerical precision.
+- **Installed workflows:** integrate admitted data and explicit algorithm
+  settings into the CLI. The report bridge formats already calculated
+  quantities; this sampler does not by itself enable Bayesian fitting.
+- **Native qualification:** establish controlled executable, settings and
+  matched-run evidence separately; do not claim native equivalence from
+  independent calculations.
 
 The repository retains **Sustainable Use License 1.0**. The implementation
 copies no third-party proprietary/GPL/AGPL code, tests or numeric data.

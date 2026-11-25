@@ -230,7 +230,7 @@ def execute_lognormal_posterior(
 ) -> ExecutedLognormalPosterior:
     """Execute the reviewed WP06 components; no native qualification or CLI implied."""
     target = model.target()
-    construction = build_curvature_proposal(target=target, starting_point=starting_point, controls=curvature)
+    construction = build_curvature_proposal(target=target, starting_point=starting_point, controls=curvature, gamma=1.0)
     result = independent_importance_sample(
         proposal=construction.proposal,
         target=target,

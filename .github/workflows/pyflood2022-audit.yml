@@ -48,6 +48,10 @@ jobs:
         # Preserve preliminary audit failure while still collecting independent matrix evidence.
         if: ${{ !cancelled() && steps.pinned_inputs.outcome == 'success' }}
         run: python -m scripts.validate_pyflood2022_fits "$RUNNER_TEMP/pyflood2022"
+      - name: Audit archived published-result identities without refitting
+        # Read pinned temporary files; emit aggregates/fingerprints, never source rows.
+        if: ${{ !cancelled() && steps.pinned_inputs.outcome == 'success' }}
+        run: python -m scripts.audit_pyflood2022_results "$RUNNER_TEMP/pyflood2022"
       - name: Remove external source inputs
         if: always()
         shell: bash

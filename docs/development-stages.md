@@ -1,7 +1,10 @@
-# Development Stages
+# Development stages
 
-See [current development requirements](development.md) and [agent instructions](../AGENTS.md).
+Initial mathematical/software delivery is active in Toolkit. It requires independent scientific review,
+implemented explicit settings, meaningful numerical verification, actual installed workflows and original
+user explanations. Native executable/settings custody, unresolved vendor rules, matched native runs and
+final compatibility admission remain separate external evidence work. Missing mathematical algorithms
+remain software requirements; missing native evidence must not be invented or described as passing.
 
-Accepted mathematical components are retained; installed workflow integration, diagnostics, precision,
-reports, examples and independent acceptance remain active. Native qualification is separate and pending.
-Existing assignments are not transferred until cutover is explicitly coordinated.
+See the [supported-calculation planning](https://github.com/Chain-Frost/ffa-toolkit/issues/14), [development requirements](development.md)
+and [agent instructions](../AGENTS.md).

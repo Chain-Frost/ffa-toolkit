@@ -4,8 +4,8 @@ The target and the resulting proposal use the same source coordinates. Coordinat
 scales are numerical preconditioners only; no prior, density or Jacobian is changed.
 """
 
-from dataclasses import dataclass
-from math import fsum, isclose, isfinite, sqrt, ulp
+from dataclasses import dataclass, replace
+from math import frexp, fsum, isclose, isfinite, ldexp, sqrt, ulp
 from typing import TypeAlias
 
 from .importance_sampling import ExplicitNormalProposal, ExplicitPosteriorTarget, SamplingError
@@ -71,6 +71,7 @@ class CurvatureProposalResult:
     iterations: int
     evaluations: int
     termination: str = "local stationarity and positive resolved curvature"
+    gamma: float = 1.0
 
 
 def _norm(matrix: Matrix) -> float:
@@ -334,10 +335,62 @@ def _construct(target: ExplicitPosteriorTarget, start: Vector, controls: Curvatu
     raise ProposalConstructionError(msg)
 
 
+def _validate_gamma(gamma: float) -> float:
+    try:
+        valid = not isinstance(gamma, bool) and isfinite(gamma) and gamma > 0
+    except (OverflowError, TypeError) as exc:
+        msg = "proposal SD gamma must be a positive finite number"
+        raise ProposalConstructionError(msg) from exc
+    if not valid:
+        msg = "proposal SD gamma must be a positive finite number"
+        raise ProposalConstructionError(msg)
+    return float(gamma)
+
+
+def _scaled_covariance(covariance: Matrix, gamma: float) -> Matrix:
+    """Scale the admitted source matrix without separately forming gamma squared."""
+    if gamma == 1.0:
+        return covariance
+    fraction, power = frexp(gamma)
+
+    def scale(value: float) -> float:
+        if value == 0.0:
+            return value
+        mantissa, exponent = frexp(value)
+        product = mantissa * fraction * fraction
+        exponent += 2 * power
+        try:
+            converted = ldexp(product, exponent)
+        except OverflowError as exc:
+            msg = "scaled covariance is not representable (overflow)"
+            raise ProposalConstructionError(msg) from exc
+        if not isfinite(converted) or converted == 0.0:
+            msg = "scaled covariance is not representable (overflow or underflow)"
+            raise ProposalConstructionError(msg)
+        # A nonzero subnormal may still have lost substantial relative precision.
+        # Check the mantissa in a normal range so the error test cannot underflow.
+        if not isclose(ldexp(converted, -exponent), product, rel_tol=1e-12):
+            msg = "scaled covariance loses relative precision"
+            raise ProposalConstructionError(msg)
+        return converted
+
+    return tuple(tuple(scale(value) for value in row) for row in covariance)
+
+
 def build_curvature_proposal(
-    *, target: ExplicitPosteriorTarget, starting_point: tuple[tuple[str, float], ...], controls: CurvatureControls
+    *,
+    target: ExplicitPosteriorTarget,
+    starting_point: tuple[tuple[str, float], ...],
+    controls: CurvatureControls,
+    gamma: float = 1.0,
 ) -> CurvatureProposalResult:
-    """Construct an explicitly configured local Gaussian; fail closed outside the smooth SPD basin."""
+    """Construct a local Gaussian, with explicit SD scaling for newly configured workflows.
+
+    Omission of gamma retains the historical unscaled builder. The scale applies
+    only to the admitted source-coordinate covariance, never to the target or
+    curvature used by Newton's method.
+    """
+    gamma = _validate_gamma(gamma)
     coordinates = tuple(name for name, _ in starting_point)
     start = tuple(value for _, value in starting_point)
     if (
@@ -350,7 +403,18 @@ def build_curvature_proposal(
         msg = "one to eight finite named start coordinates and matching scales are required in target order"
         raise ProposalConstructionError(msg)
     try:
-        return _construct(target, start, controls)
+        result = _construct(target, start, controls)
+        covariance = _scaled_covariance(result.proposal.covariance, gamma)
+        try:
+            proposal = replace(
+                result.proposal,
+                covariance=covariance,
+                source=f"{result.proposal.source}; proposal SD gamma={gamma!r} (Kuczera 1999, Eq. 17)",
+            )
+        except SamplingError as exc:
+            msg = f"scaled covariance failed proposal admission: {exc}"
+            raise ProposalConstructionError(msg) from exc
+        return replace(result, proposal=proposal, gamma=gamma)
     except ProposalConstructionError:
         raise
     except (ArithmeticError, SamplingError, ValueError) as exc:

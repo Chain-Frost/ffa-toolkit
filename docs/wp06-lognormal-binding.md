@@ -60,7 +60,9 @@ historical periods or automatic MGBT censoring occurs here.
 
 `execute_lognormal_posterior` uses the target's separate likelihood and
 prior callbacks and the existing local curvature proposal builder and
-sampler. The caller must supply starting coordinates, curvature settings,
+sampler. This bounded execution explicitly retains the unscaled proposal (`gamma=1.0`);
+no native scaling default is inferred. Installed scaling configuration remains in #6.
+The caller must supply starting coordinates, curvature settings,
 seed, particle count and weight-adequacy thresholds. The same bound
 `kernel` factory is supplied to the existing weighted-output functions.
 The result retains the model, source, prior, full proposal diagnostics,
