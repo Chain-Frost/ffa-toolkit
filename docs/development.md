@@ -1,8 +1,8 @@
 # Development and remaining requirements
 
-This repository is a sanitized accepted-software baseline. Development cutover is pending synchronization
-and owner approval. Existing implementation assignments remain with their current owners until explicitly
-transferred. The package/import names remain `ffa-toolkit` / `ffa_methods`; the command is `ffa`.
+This repository contains the accepted independent mathematical software baseline. Assignments are
+activated individually through their owning issues; preserve existing owners and do not infer that
+an issue is active merely because it is listed. The package/import names remain `ffa-toolkit` / `ffa_methods`; the command is `ffa`.
 
 ## Remaining software requirements
 
@@ -15,7 +15,9 @@ transferred. The package/import names remain `ffa-toolkit` / `ffa_methods`; the 
 - Deliver scientific reports, static plots, accessible method explanations and offline worked examples.
 - Complete independent whole-cohort external comparisons, archive identity review and a settings-matched
   posterior comparator without committing external raw archives or records.
-- Reconcile the supported-calculation matrix and finish installed end-to-end acceptance.
+- Complete the outstanding workflows and final installed acceptance in the
+  [supported-calculation matrix](initial-delivery-matrix.md). The matrix records accepted components,
+  installed coverage, linked owners and explicit unresolved scope decisions.
 
 Native executable/settings custody, unknown vendor defaults, controlled reference runs, repeatability
 and final compatibility admission remain separately managed restricted qualification work. Native gaps
@@ -46,9 +48,10 @@ A build or green workflow does not authorize a release or publication.
 
 [External evidence](external-evidence.md) is optional and separate from ordinary public tests.
 
-## Prepared backlog
+## Work-package issues
 
-These are inactive preparation issues pending coordinated cutover; existing assignments continue.
+Use the linked issues for current activation and acceptance status. A planning update does not
+activate other assignments or block sufficiently specified work.
 
 - [Complete independent mathematical CLI delivery](https://github.com/Chain-Frost/ffa-toolkit/issues/1)
 - [Standardized LH diagnostics, optimized H and declared uncertainty](https://github.com/Chain-Frost/ffa-toolkit/issues/2)
@@ -64,4 +67,4 @@ These are inactive preparation issues pending coordinated cutover; existing assi
 - [Report fitted GEV support and endpoint observations](https://github.com/Chain-Frost/ffa-toolkit/issues/12)
 - [Complete read-only independent external validation](https://github.com/Chain-Frost/ffa-toolkit/issues/13)
 - [Reconcile supported calculations and final installed acceptance](https://github.com/Chain-Frost/ffa-toolkit/issues/14)
-- [Verify hosted CI and branch-rule enforcement before cutover](https://github.com/Chain-Frost/ffa-toolkit/issues/15)
+- [Hosted CI and branch-rule enforcement](https://github.com/Chain-Frost/ffa-toolkit/issues/15) (complete)
