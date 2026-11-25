@@ -13,6 +13,14 @@ The input CSV must use WP02's exact `Year,AMS` header and supply **only exact, s
 
 The report records **actual source/settings SHA-256 bytes**, deterministic GEV location/scale/shape `point_estimate` fields rather than posterior parameter means, and `deterministic_fitted_quantile` with explicit F and AEP. The JSON and text files contain computed observation count, LH sample moments and the **unstandardized** fourth-ratio residual when available; that residual is **not** an optimized-H goodness-of-fit z statistic. The existing renderer remains explicitly **not legacy-qualified**. The CLI reports exit 0 for success, 2 for invalid inputs/schema/output collision, and 1 for IO or broken packaged resources. No native executable is accessed.
 
+Fixed-H GEV reports include an additive `gev_fitted_support` JSON object,
+the same object in the GEV-only `gev_fitted_support_json` CSV column,
+and an explicit text section. See the [installed method guidance](methods/lh-moments-gev.md)
+for finite/unbounded endpoint semantics and synthetic violating examples.
+Existing quantile order and values, settings, input hashes and non-GEV CSV
+schemas are retained. This diagnostic does not reject an algebraic fit,
+select H or certify likelihood or engineering suitability.
+
 The scientific basis, exact method scope, limitations and a reproducible synthetic example are included in `ffa explain lh-moments-gev --format markdown` and `ffa references WANG1997`. **Independent mathematical/component tests and installed-wheel verification** establish only that bounded computation, not Flike equivalence. Native comparison/settings remains deferred to [development requirements](https://github.com/Chain-Frost/ffa-toolkit/blob/main/docs/development.md), while broader implementation continues in [development requirements](https://github.com/Chain-Frost/ffa-toolkit/blob/main/docs/development.md)/[development requirements](https://github.com/Chain-Frost/ffa-toolkit/blob/main/docs/development.md).
 
 ---
