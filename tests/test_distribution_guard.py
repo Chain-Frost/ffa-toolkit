@@ -8,9 +8,9 @@ from scripts.verify_distribution import check_member_names
 @pytest.mark.parametrize(
     "filename",
     [
-        "ffa_methods-0.0.0.dev0/reference/legacy-candidates/project.fld",
-        "ffa_methods-0.0.0.dev0/reference/legacy-candidates/manifest.json",
-        "ffa_methods-0.0.0.dev0/src/ffa_methods/data/source.7z",
+        "ffa_toolkit-0.0.0.dev0/reference/legacy-candidates/project.fld",
+        "ffa_toolkit-0.0.0.dev0/reference/legacy-candidates/manifest.json",
+        "ffa_toolkit-0.0.0.dev0/src/ffa_methods/data/source.7z",
         "ffa_methods/samples/case-b_Bayes_Out.txt",
         "ffa_methods/samples/AMS_case-a.csv",
         "ffa_methods/../outside",

@@ -2,7 +2,7 @@
 
 This repository is a sanitized accepted-software baseline. Development cutover is pending synchronization
 and owner approval. Existing implementation assignments remain with their current owners until explicitly
-transferred. The package/import names remain `ffa-methods` / `ffa_methods`; the command is `ffa`.
+transferred. The package/import names remain `ffa-toolkit` / `ffa_methods`; the command is `ffa`.
 
 ## Remaining software requirements
 
