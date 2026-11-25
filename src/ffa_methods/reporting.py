@@ -576,9 +576,7 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
     }
 
 
-def _write_source_inputs(
-    staging: Path, result: AnalysisResult, source_inputs: tuple[bytes, bytes]
-) -> None:
+def _write_source_inputs(staging: Path, result: AnalysisResult, source_inputs: tuple[bytes, bytes]) -> None:
     ams, settings = source_inputs
     if (
         sha256(ams).hexdigest() != result.provenance.input_sha256

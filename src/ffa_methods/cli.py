@@ -84,7 +84,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         except OSError as exc:
             print(f"ffa: fit I/O failure: {exc}", file=sys.stderr)
             return 1
-        print(f"Independent deterministic mathematical fit only — not native Flike-qualified. Reports: {paths[0].parent}")
+        print(
+            f"Independent deterministic mathematical fit only — not native Flike-qualified. Reports: {paths[0].parent}"
+        )
         return 0
     parser.error("no command selected; use fit, explain, references or --help")
     return 2  # Unreachable: parser.error raises SystemExit.

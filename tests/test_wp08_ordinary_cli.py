@@ -77,9 +77,16 @@ def test_ordinary_unsupported_settings_have_no_output(tmp_path: Path, override: 
     assert not destination.exists()
 
 
-@pytest.mark.parametrize("row", [b"2001,\n", b"2001,0\n", b"2000,2\n"])
-def test_ordinary_reuses_exact_record_admission(row: bytes) -> None:
-    with pytest.raises(ValueError):
+@pytest.mark.parametrize(
+    ("row", "message"),
+    [
+        (b"2001,\n", "only complete exact"),
+        (b"2001,0\n", "only complete exact"),
+        (b"2000,2\n", "Duplicate CSV year"),
+    ],
+)
+def test_ordinary_reuses_exact_record_admission(row: bytes, message: str) -> None:
+    with pytest.raises(ValueError, match=message):
         calculate_from_bytes(b"Year,AMS\n2000,1\n" + row + b"2002,4\n", _encoded(_settings()))
 
 
