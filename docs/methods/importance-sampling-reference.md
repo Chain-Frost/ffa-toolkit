@@ -1,10 +1,10 @@
 # WP06 — Mode and curvature construction of a Gaussian importance proposal
 
 **Method ID:** `importance-sampling-reference`. **Scope:** bounded independent
-mathematical proposal construction (#47) and the separately implemented sampler
-(#45/#46); the full model-binding/fitting workflow (#9/#11/#40) is incomplete.
+mathematical proposal construction and the separately implemented sampler;
+the full model-binding/fitting workflow is incomplete.
 Neither the proposal nor the resulting weighted estimates establish native
-Flike 5.0.306.0 compatibility (#39/#12).
+Flike 5.0.306.0 compatibility.
 
 ## Mathematical basis and coordinates
 
@@ -200,9 +200,37 @@ extreme-quantile precision. Posterior probability limits describe flood
 uncertainty conditional on the data/model, not numerical integration
 precision. See `ffa explain quantile-estimands --format markdown`.
 
-Source/observation/model binding, transformations, estimand-specific tail
-precision and installed Bayesian fit orchestration remain #9/#11/#40.
-Native optimizer, prior/defaults and settings-matched comparisons remain
-#39/#12. No native runs, new dependencies or third-party code/data are
-introduced by this original component. Sustainable Use License 1.0 is
+## Explicit lognormal observation binding
+
+The independent lognormal binding accepts a caller-classified systematic
+annual record, physical reference discharge r, and a supplied joint
+Gaussian prior. The coordinates are the mean of ln(Q/r) and the natural
+log of its SD, in that order; the caller may explicitly fix the latter,
+in which case only the mean is estimated. For exact Q the log likelihood
+includes the discharge Jacobian -ln Q. Positive left, right and interval
+censor bounds use Normal tail probabilities; explicit missing and excluded
+rows contribute no likelihood. Native flags, historical/grouped exposure
+and zero-threshold/rating laws are not interpreted. The exact Year,AMS
+CSV path rejects missing/zero values and hashes the source bytes. Direct
+typed records retain a caller-asserted source digest, not proof of custody.
+
+A reproducible synthetic verification uses Q=exp(1), exp(2), exp(3), r=1,
+known log-flow SD=1 and mean prior N(0,1). The exact posterior mean and
+variance are 1.5 and 0.25; the predictive ln(Q) distribution is N(1.5,1.25).
+The binding constructs the local proposal, generates weighted particles
+and evaluates expected AEP at exp(2) against that predictive distribution.
+A separate estimated-scale test verifies actual generated particles for
+a censored dataset against independent two-dimensional quadrature,
+including both posterior coordinate means and expected AEP. The tests
+also check same-runtime seeded replay, unit changes, independent censor
+and correlated prior formulas, and invalid source admission. See the
+[lognormal binding specification](https://github.com/Chain-Frost/ffa-toolkit/blob/main/docs/wp06-lognormal-binding.md)
+for the independent worked examples. This is not an installed Bayesian
+fitting command or legacy settings mapper.
+
+Broader family and observation binding, output-specific numerical
+precision and installed Bayesian fitting remain outstanding (Toolkit
+issues #5, #6, #8 and #9). Native settings-matched comparisons remain
+separate external qualification. No native runs, new dependencies or
+third-party code/data are introduced. Sustainable Use License 1.0 is
 unchanged.

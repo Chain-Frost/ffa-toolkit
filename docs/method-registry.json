@@ -393,11 +393,12 @@
         "Repeat-run stability and printed precision",
         "Independent posterior reference calculations",
         "Deterministic conjugate Normal weighted-coordinate moments and empirical interval refinement",
-        "Independent correlated modal curvature, affine coordinate changes, rejection and actual builder-to-sampler weighted outputs"
+        "Independent correlated modal curvature, affine coordinate changes, rejection and actual builder-to-sampler weighted outputs",
+        "Exact CSV lognormal execution against analytic predictive probability; estimated-scale censored execution against independent quadrature, seeded replay, and independent censor, unit and prior checks"
       ],
       "evidence_gaps": [
-        "Independent local Newton/adaptive Hessian proposal construction and stage-3 Normal importance draws are bounded components; supported source integration and full CLI fitting remain active WP06 #9.",
-        "Actual native Flike optimizer/proposal, random controls, stopping and output interpolation are not established and remain deferred in #39.",
+        "Independent local curvature, Normal importance draws and explicitly classified lognormal source/prior binding are bounded components; broader family/exposure binding, output-specific precision and installed Bayesian fitting remain outstanding.",
+        "Actual native Flike optimizer/proposal, random controls, stopping and output interpolation are not established; external native qualification remains separate.",
         "ESS, approximate mean Monte Carlo standard error, and independent seeds do not by themselves validate extreme-tail flood estimates or native equivalence."
       ],
       "scope": "mvp",
