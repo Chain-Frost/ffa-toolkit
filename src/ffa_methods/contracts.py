@@ -9,6 +9,8 @@ from enum import StrEnum
 from math import isfinite
 from typing import Literal, Protocol
 
+from ffa_methods.gev_support import GEVFittedSupport
+
 
 class ExposureKind(StrEnum):
     """Observed annual exposure. An absent year is not a zero discharge."""
@@ -249,3 +251,4 @@ class AnalysisResult:
     values: tuple[ResultPoint, ...] = ()
     warnings: tuple[str, ...] = ()
     diagnostics: tuple[RunDiagnostic, ...] = ()
+    fitted_gev_support: GEVFittedSupport | None = None
