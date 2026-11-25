@@ -155,7 +155,7 @@ def test_explicit_correlated_covariance_scaling(gamma: float) -> None:
     assert scaled.proposal.coordinates == baseline.proposal.coordinates
     assert scaled.proposal.means == baseline.proposal.means
     assert scaled.proposal.covariance[0][1] == scaled.proposal.covariance[1][0]
-    expected = ((2 * gamma**2 / 7, -gamma**2 / 7), (-gamma**2 / 7, 4 * gamma**2 / 7))
+    expected = ((2 * gamma**2 / 7, -(gamma**2) / 7), (-(gamma**2) / 7, 4 * gamma**2 / 7))
     for actual, reference in zip(scaled.proposal.covariance, expected, strict=True):
         _assert_vector_close(actual, reference, rtol=1e-7)
     point = (2.25, -1.5)
@@ -197,7 +197,7 @@ def test_unrepresentable_scaled_covariance_rejected(gamma: float) -> None:
 def test_scaled_proposal_rechecks_mean_resolution() -> None:
     with pytest.raises(ProposalConstructionError, match="coordinate resolution"):
         build_curvature_proposal(
-            target=_one_dimensional(lambda t: -(t[0] - 1) ** 2 / 2),
+            target=_one_dimensional(lambda t: -((t[0] - 1) ** 2) / 2),
             starting_point=(("x", 1.0),),
             controls=_controls((1.0,)),
             gamma=1e-17,
@@ -209,7 +209,7 @@ def test_gamma_squared_need_not_be_representable_if_covariance_is(gamma: float, 
     # The unscaled covariance is scale**2. Directly forming gamma**2 would
     # overflow or underflow, but the final covariance is a normal finite float.
     result = build_curvature_proposal(
-        target=_one_dimensional(lambda t: -(t[0] / scale) ** 2 / 2),
+        target=_one_dimensional(lambda t: -((t[0] / scale) ** 2) / 2),
         starting_point=(("x", 0.0),),
         controls=_controls((scale,)),
         gamma=gamma,
