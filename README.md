@@ -30,3 +30,6 @@ See [development](docs/development.md), [architecture](docs/architecture-and-val
 [method register](docs/method-registry.json), [scientific references](docs/references.md),
 [compatibility contract](docs/compatibility-contract.md), [fixture admission](docs/sample-data-audit.md)
 and [third-party notices](THIRD_PARTY_NOTICES.md).
+
+The distribution name is `ffa-toolkit`; the internal import namespace remains `ffa_methods`.
+PyPI publishing is [prepared but disabled](docs/publishing.md). No package release has been published.

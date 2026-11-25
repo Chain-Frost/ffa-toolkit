@@ -47,7 +47,7 @@ def _check_installed_method_pages(console: Path, output: Path, env: dict[str, st
 
 def smoke_installed(dist_dir: Path) -> None:
     """Check version/help/rejection, import origin and offline packaged resources."""
-    wheels = sorted(dist_dir.glob("ffa_methods-*.whl"))
+    wheels = sorted(dist_dir.glob("ffa_toolkit-*.whl"))
     if len(wheels) != 1:
         msg = f"expected exactly one project wheel in {dist_dir}"
         raise ValueError(msg)
@@ -82,7 +82,7 @@ import ffa_methods
 site_path = Path(ffa_methods.__file__).resolve()
 assert site_path.is_relative_to(Path(sys.argv[1]).resolve()), site_path
 assert not site_path.is_relative_to(Path(sys.argv[2]).resolve()), site_path
-assert version("ffa-methods") == ffa_methods.__version__
+assert version("ffa-toolkit") == ffa_methods.__version__
 root = files("ffa_methods")
 registry = json.loads(root.joinpath("resources/method-registry.json").read_text(encoding="utf-8"))
 assert registry["compatibility_profile"] == "tuflow-bmt-flike-5.0.306.0-file3.10"
@@ -106,7 +106,7 @@ print(f"wheel import: {site_path}")
             expected_code=0,
         )
         metadata = _invoke(
-            [str(interpreter), "-c", "from importlib.metadata import version; print(version('ffa-methods'))"],
+            [str(interpreter), "-c", "from importlib.metadata import version; print(version('ffa-toolkit'))"],
             cwd=output,
             env=env,
             expected_code=0,
