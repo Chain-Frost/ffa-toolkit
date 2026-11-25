@@ -163,11 +163,6 @@ def _positive_exact_ams_records(data: bytes) -> tuple[GEVSupportObservation, ...
     return tuple(values)
 
 
-def _positive_exact_ams(data: bytes) -> tuple[float, ...]:
-    """Retain the shared exact-positive input adapter for ordinary-family dispatch."""
-    return tuple(record.discharge for record in _positive_exact_ams_records(data))
-
-
 def _fit_diagnostics(fit: GEVLHFit, n: int, unit: str) -> tuple[RunDiagnostic, ...]:
     """Report actual fixed-H fit diagnostics; fourth ratio is NOT standardized z."""
     points = [RunDiagnostic(name="exact_annual_maxima_count", value=float(n), unit="count")]
