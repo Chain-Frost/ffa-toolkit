@@ -12,11 +12,13 @@ Requires Python 3.11–3.14 (3.14 preferred).
 python -m pip install .
 ffa --help
 ffa explain lh-moments-gev
+ffa explain l-moments --format markdown
 ffa fit --ams docs/examples/fixed-gev-ams.csv --settings docs/examples/fixed-gev-settings.json --output example-result
+ffa fit --ams docs/examples/ordinary-ams.csv --settings docs/examples/ordinary-settings.json --output ordinary-result
 ```
 
 The example uses generated annual maxima. The installed calculation path supports explicit-settings,
-complete positive annual maxima and fixed-H GEV L/LH fitting. Other mathematical components include five
+complete positive annual maxima, fixed-H GEV L/LH fitting and ordinary Gumbel, LN2, LP3 and fixed/free-location GP L-moment fits. See [ordinary L-moment guidance](docs/methods/l-moments.md). Other mathematical components include five
 distribution kernels, ordinary L-moment estimators, likelihoods, priors, shared rating errors, low-flow
 screening, importance proposals and sampling, and weighted Bayesian outputs. Internal components are
 not all available through the CLI. Unsupported workflows fail explicitly.

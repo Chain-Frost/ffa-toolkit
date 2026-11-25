@@ -1,6 +1,6 @@
 ## 24 November 2026 — executable fixed-H GEV mathematical CLI (partial)
 
-**Current stage:** The installed `ffa fit` command implements one **mathematically specified deterministic** calculation from exact source bytes to three report files. This supersedes older statements below that no fitting command is available. It does **not** enable Bayesian fitting, optimized-H selection, censored/zero/historical analyses, other distribution fits or native Flike comparison.
+**Current stage:** The installed `ffa fit` command implements a **mathematically specified deterministic** GEV calculation from exact source bytes to three report files. This supersedes older statements below that no fitting command is available. It does **not** enable Bayesian fitting, optimized-H selection, censored/zero/historical analyses or native Flike comparison. Ordinary family fits are described below.
 
 ```console
 ffa fit --ams fixed-gev-ams.csv --settings fixed-gev-settings.json --output fixed-gev-report
@@ -16,6 +16,10 @@ The report records **actual source/settings SHA-256 bytes**, deterministic GEV l
 The scientific basis, exact method scope, limitations and a reproducible synthetic example are included in `ffa explain lh-moments-gev --format markdown` and `ffa references WANG1997`. **Independent mathematical/component tests and installed-wheel verification** establish only that bounded computation, not Flike equivalence. Native comparison/settings remains deferred to [development requirements](https://github.com/Chain-Frost/ffa-toolkit/blob/main/docs/development.md), while broader implementation continues in [development requirements](https://github.com/Chain-Frost/ffa-toolkit/blob/main/docs/development.md)/[development requirements](https://github.com/Chain-Frost/ffa-toolkit/blob/main/docs/development.md).
 
 ---
+
+## Ordinary H=0 CLI extension
+
+The same fit command accepts schema `ffa-ordinary-lmoments/1` for Gumbel, raw-flow LN2, log-flow LP3 and explicitly fixed/free-location GP annual maxima. See [installed guidance and worked examples](methods/l-moments.md). Ordinary reports retain the three existing output formats and additionally stage byte-exact source/settings copies. The existing fixed-H GEV schema and bundle are unchanged; fitted GEV support reporting is tracked separately in [issue #12](https://github.com/Chain-Frost/ffa-toolkit/issues/12). Neither workflow implies native qualification or uncertainty inference.
 
 # WP08: CLI guidance and numerical report contract
 

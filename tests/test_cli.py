@@ -1,4 +1,4 @@
-"""The CLI admits only explicit fixed-H GEV fitting and offline guidance."""
+"""The CLI admits explicit deterministic fitting and offline guidance."""
 
 import pytest
 
@@ -12,7 +12,7 @@ def test_help_is_successful(capsys: pytest.CaptureFixture[str]) -> None:
     assert exit_info.value.code == 0
     output = capsys.readouterr().out
     assert "FFA Toolkit: independent flood frequency analysis" in output
-    assert "complete-positive-AMS fixed-H GEV fitting is" in output
+    assert "fixed-H GEV and ordinary L-moment fits" in output
 
 
 def test_version_distinguishes_package_and_vendor(capsys: pytest.CaptureFixture[str]) -> None:

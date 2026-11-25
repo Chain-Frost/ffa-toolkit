@@ -23,6 +23,9 @@ RESOURCE_FILES: tuple[tuple[str, str], ...] = (
     ("docs/methods/lh-moments-gev.md", "ffa_methods/resources/methods/lh-moments-gev.md"),
     ("docs/examples/fixed-gev-ams.csv", "ffa_methods/resources/examples/fixed-gev-ams.csv"),
     ("docs/examples/fixed-gev-settings.json", "ffa_methods/resources/examples/fixed-gev-settings.json"),
+    ("docs/examples/ordinary-settings.json", "ffa_methods/resources/examples/ordinary-settings.json"),
+    ("docs/examples/ordinary-ams.csv", "ffa_methods/resources/examples/ordinary-ams.csv"),
+    ("docs/methods/l-moments.md", "ffa_methods/resources/methods/l-moments.md"),
 )
 BLOCKED_COMPONENTS = frozenset({"reference", "legacy-candidates", "private-evidence", "local-evidence"})
 BLOCKED_SUFFIXES = (".fld", ".fid", ".7z")

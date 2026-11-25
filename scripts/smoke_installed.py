@@ -5,7 +5,10 @@ import os
 import subprocess
 import sys
 import tempfile
+from hashlib import sha256
+from math import exp, expm1, isclose, log, log1p, pi, sqrt
 from pathlib import Path
+from statistics import NormalDist
 
 
 def _invoke(
@@ -31,6 +34,7 @@ def _check_installed_method_pages(console: Path, output: Path, env: dict[str, st
         "quantile-estimands",
         "importance-sampling-reference",
         "lh-moments-gev",
+        "l-moments",
     ):
         page = _invoke(
             [str(console), "explain", method_id, "--format", "markdown"],
@@ -43,6 +47,122 @@ def _check_installed_method_pages(console: Path, output: Path, env: dict[str, st
             raise RuntimeError(msg)
     _invoke([str(console), "explain", "--format", "markdown"], cwd=output, env=env, expected_code=2)
     _invoke([str(console), "explain", "lp3", "--format", "markdown"], cwd=output, env=env, expected_code=2)
+
+
+def _ordinary_reference(
+    estimator: str, extra: dict[str, object], probabilities: tuple[float, ...]
+) -> tuple[dict[str, float], tuple[float, ...]]:
+    """Independent identities for the three-point [1, 2, 4] synthetic example."""
+    first, second = 7.0 / 3.0, 1.0
+    if estimator == "gumbel_lmoments":
+        scale = second / log(2.0)
+        location = first - 0.5772156649015329 * scale
+        return (
+            {"gumbel.location": location, "gumbel.scale": scale},
+            tuple(location - scale * log(-log(p)) for p in probabilities),
+        )
+    if estimator == "lognormal_lmoments":
+        sd = sqrt(2.0) * NormalDist().inv_cdf((1.0 + second / first) / 2.0)
+        mean = log(first / 2.0) - sd**2 / 2.0
+        return (
+            {"lognormal.mean_loge_flow": mean, "lognormal.loge_sd_loge_flow": log(sd)},
+            tuple(2.0 * exp(mean + sd * NormalDist().inv_cdf(p)) for p in probabilities),
+        )
+    if estimator == "lp3_lmoments":
+        sd = sqrt(pi) * 2.0 * log(2.0) / 3.0
+        return (
+            {"lp3.mean_loge_flow": 0.0, "lp3.loge_sd_loge_flow": log(sd), "lp3.skew_loge_flow": 0.0},
+            tuple(2.0 * exp(sd * NormalDist().inv_cdf(p)) for p in probabilities),
+        )
+    if extra["gp_location_mode"] == "fixed":
+        location, scale, kappa = 0.25, 325.0 / 144.0, 1.0 / 12.0
+        return (
+            {"gp.location": location, "gp.scale": scale, "gp.shape_xi": -kappa},
+            tuple(location - scale * expm1(kappa * log1p(-p)) / kappa for p in probabilities),
+        )
+    location, scale = 1.0 / 3.0, 2.0
+    return (
+        {"gp.location": location, "gp.scale": scale, "gp.shape_xi": 0.0},
+        tuple(location - scale * log1p(-p) for p in probabilities),
+    )
+
+
+def _check_ordinary_result(
+    destination: Path,
+    settings_bytes: bytes,
+    ams_bytes: bytes,
+    expected: dict[str, float],
+    quantiles: tuple[float, ...],
+    probabilities: tuple[float, ...],
+) -> None:
+    """Check the installed report against independent values and byte custody."""
+    doc = json.loads((destination / "results.json").read_text(encoding="utf-8"))
+    provenance = doc["provenance"]
+    if (
+        provenance["method_id"] != "l-moments"
+        or provenance["input_sha256"] != sha256(ams_bytes).hexdigest()
+        or provenance["settings_sha256"] != sha256(settings_bytes).hexdigest()
+        or (destination / "source-ams.csv").read_bytes() != ams_bytes
+        or (destination / "source-settings.json").read_bytes() != settings_bytes
+    ):
+        msg = "ordinary installed example source identity changed"
+        raise RuntimeError(msg)
+    if doc["method_qualification"] != "not_established_by_formatter":
+        msg = "ordinary result incorrectly qualified"
+        raise RuntimeError(msg)
+    parameters = doc["parameters"]
+    if set(expected) != {parameter["coordinate"] for parameter in parameters}:
+        msg = "ordinary installed example parameter coordinates differ"
+        raise RuntimeError(msg)
+    for parameter in parameters:
+        if (
+            parameter["summary_kind"] != "point_estimate"
+            or parameter["mean"] is not None
+            or parameter["standard_deviation"] is not None
+            or not isclose(
+                parameter["point_estimate"], expected[parameter["coordinate"]], rel_tol=2e-11, abs_tol=2e-12
+            )
+        ):
+            msg = f"ordinary installed example parameter mismatch: {parameter}"
+            raise RuntimeError(msg)
+    for point, quantile, probability in zip(doc["results"], quantiles, probabilities, strict=True):
+        if (
+            point["meaning"] != "deterministic_fitted_quantile"
+            or point["unit"] != "m3/s"
+            or point["input_non_exceedance_probability"] != probability
+            or not isclose(point["input_annual_exceedance_probability"], 1.0 - probability, abs_tol=1e-15)
+            or not isclose(point["value"], quantile, rel_tol=2e-11, abs_tol=2e-12)
+        ):
+            msg = f"ordinary installed example quantile mismatch: {point}"
+            raise RuntimeError(msg)
+
+
+def _check_ordinary_installed(console: Path, output: Path, env: dict[str, str]) -> None:
+    """Execute every documented configuration through the actual installed console."""
+    config = json.loads((output / "ordinary-settings.json").read_text(encoding="utf-8"))
+    ams = output / "ordinary-ams.csv"
+    ams_bytes = ams.read_bytes()
+    probabilities = (0.5, 0.9)
+    cases: tuple[tuple[str, str, dict[str, object]], ...] = (
+        ("gumbel", "gumbel_lmoments", {}),
+        ("ln2", "lognormal_lmoments", {"reference_discharge": 2}),
+        ("lp3", "lp3_lmoments", {"reference_discharge": 2}),
+        ("gp-fixed", "gp_lmoments", {"gp_location_mode": "fixed", "gp_location": 0.25}),
+        ("gp-free", "gp_lmoments", {"gp_location_mode": "free"}),
+    )
+    for name, estimator, extra in cases:
+        settings_path = output / f"{name}-settings.json"
+        settings_bytes = json.dumps({**config, "estimator": estimator, **extra}).encode("utf-8")
+        settings_path.write_bytes(settings_bytes)
+        destination = output / f"{name}-report"
+        _invoke(
+            [str(console), "fit", "--ams", str(ams), "--settings", str(settings_path), "--output", str(destination)],
+            cwd=output,
+            env=env,
+            expected_code=0,
+        )
+        expected, quantiles = _ordinary_reference(estimator, extra, probabilities)
+        _check_ordinary_result(destination, settings_bytes, ams_bytes, expected, quantiles, probabilities)
 
 
 def smoke_installed(dist_dir: Path) -> None:
@@ -66,7 +186,7 @@ def smoke_installed(dist_dir: Path) -> None:
         interpreter = environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
         console = environment / ("Scripts/ffa.exe" if os.name == "nt" else "bin/ffa")
         _invoke(
-            [str(interpreter), "-m", "pip", "install", "--no-deps", str(wheel)],
+            [str(interpreter), "-m", "pip", "install", str(wheel)],
             cwd=output,
             env=env,
             expected_code=0,
@@ -147,7 +267,7 @@ print(f"wheel import: {site_path}")
 from importlib.resources import files
 from pathlib import Path
 root = files("ffa_methods").joinpath("resources", "examples")
-for name in ("fixed-gev-ams.csv", "fixed-gev-settings.json"):
+for name in ("fixed-gev-ams.csv", "fixed-gev-settings.json", "ordinary-ams.csv", "ordinary-settings.json"):
     Path(name).write_bytes(root.joinpath(name).read_bytes())
 """
         _invoke([str(interpreter), "-c", copy_examples], cwd=output, env=env, expected_code=0)
@@ -175,6 +295,7 @@ for name in ("fixed-gev-ams.csv", "fixed-gev-settings.json"):
             msg = "installed wheel fixed-H mathematical fit has invalid quantities or provenance"
             raise RuntimeError(msg)
         _invoke(fit_args, cwd=output, env=env, expected_code=2)
+        _check_ordinary_installed(console, output, env)
         reference = _invoke([str(console), "references", "ARR3"], cwd=output, env=env, expected_code=0)
         if "### ARR3" not in reference.stdout or "2.6.3.6" not in reference.stdout:
             msg = "installed offline reference register lacks the pinned ARR citation"

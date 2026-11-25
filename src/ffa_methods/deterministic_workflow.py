@@ -1,4 +1,4 @@
-"""Explicit file-to-fixed-GEV L/LH mathematical fit; never infer Flike defaults.
+"""Explicit file-to-L/LH mathematical fits; never infer Flike defaults.
 
 The Year,AMS CSV is parsed by the existing WP02 evidence reader. Only complete,
 positive, exact, equally weighted annual maxima are admitted. The separate
@@ -9,7 +9,7 @@ This is a deterministic independently specified calculation, not legacy replay.
 import json
 from dataclasses import dataclass
 from hashlib import sha256
-from math import isfinite
+from math import exp, isfinite
 from pathlib import Path
 from typing import cast
 
@@ -25,7 +25,15 @@ from ffa_methods.contracts import (
     RunDiagnostic,
     RunProvenance,
 )
+from ffa_methods.distributions import GeneralizedPareto, Gumbel, Lognormal, LogPearsonIII
 from ffa_methods.estimators.gev_lh import GEVLHFit, fit_gev_lh
+from ffa_methods.estimators.ordinary_lmoments import (
+    OrdinaryLMomentFit,
+    fit_gp_lmoments,
+    fit_gumbel_lmoments,
+    fit_lognormal_lmoments,
+    fit_lp3_lmoments,
+)
 from ffa_methods.legacy.models import ObservationKind
 from ffa_methods.legacy.project import parse_ams_csv
 
@@ -103,8 +111,8 @@ def _ordered_probabilities(raw: object) -> tuple[float, ...]:
     return tuple(probabilities)
 
 
-def load_fixed_gev_settings(data: bytes) -> FixedGEVSettings:
-    """Read JSON without accepting unknown switches, aliases or vendor defaults."""
+def _settings_object(data: bytes) -> dict[str, object]:
+    """Read one settings object without duplicate keys or nonstandard constants."""
     try:
         raw: object = json.loads(
             data.decode("utf-8-sig"), object_pairs_hook=_unique_object, parse_constant=_reject_constant
@@ -115,7 +123,15 @@ def load_fixed_gev_settings(data: bytes) -> FixedGEVSettings:
     if not isinstance(raw, dict):
         msg = "settings JSON root must be an object"
         raise TypeError(msg)
-    values = cast(dict[str, object], raw)
+    return cast(dict[str, object], raw)
+
+
+def load_fixed_gev_settings(data: bytes) -> FixedGEVSettings:
+    """Read JSON without accepting unknown switches, aliases or vendor defaults."""
+    return _fixed_gev_settings(_settings_object(data))
+
+
+def _fixed_gev_settings(values: dict[str, object]) -> FixedGEVSettings:
     if set(values) != set(_FIELDS):
         msg = f"settings keys must match the fixed-H schema exactly; missing={sorted(_FIELDS - set(values))}, unknown={sorted(set(values) - _FIELDS)}"
         raise ValueError(msg)
@@ -186,7 +202,12 @@ def calculate_fixed_gev_from_files(
     """Fit the admitted independent mathematical model and return typed report inputs."""
     raw_ams = ams_path.read_bytes()
     raw_settings = settings_path.read_bytes()
-    config = load_fixed_gev_settings(raw_settings)
+    return _calculate_fixed_gev(raw_ams, raw_settings, load_fixed_gev_settings(raw_settings))
+
+
+def _calculate_fixed_gev(
+    raw_ams: bytes, raw_settings: bytes, config: FixedGEVSettings
+) -> tuple[AnalysisResult, dict[str, str | int | float | bool | None]]:
     values = _positive_exact_ams(raw_ams)
     fitted = fit_gev_lh(values, shift=config.lh_shift)
     points = tuple(
@@ -237,3 +258,216 @@ def calculate_fixed_gev_from_files(
         "non_exceedance_probabilities": ",".join(str(p) for p in config.probabilities),
     }
     return result, settings
+
+
+ORDINARY_SCHEMA = "ffa-ordinary-lmoments/1"
+_ORDINARY_FIELDS = _FIELDS - {"lh_shift"}
+_ORDINARY_ESTIMATORS = frozenset({"gumbel_lmoments", "lognormal_lmoments", "lp3_lmoments", "gp_lmoments"})
+
+
+@dataclass(frozen=True, slots=True)
+class OrdinarySettings:
+    """Explicit H=0 family configuration; no implicit reference or GP location."""
+
+    estimator: str
+    discharge_unit: str
+    year_definition: str
+    probabilities: tuple[float, ...]
+    reference_discharge: float | None = None
+    gp_location_mode: str | None = None
+    gp_location: float | None = None
+
+
+def _finite_setting(value: object, *, field: str) -> float:
+    if type(value) not in (int, float):
+        msg = f"{field} must be a finite number (not boolean)"
+        raise ValueError(msg)
+    try:
+        result = float(cast(int | float, value))
+    except OverflowError as exc:
+        msg = f"{field} must be representable as a finite binary64 number"
+        raise ValueError(msg) from exc
+    if not isfinite(result):
+        msg = f"{field} must be finite"
+        raise ValueError(msg)
+    return result
+
+
+def _ordinary_extra_fields(estimator: str, values: dict[str, object]) -> frozenset[str]:
+    if estimator in ("lognormal_lmoments", "lp3_lmoments"):
+        return frozenset({"reference_discharge"})
+    if estimator == "gp_lmoments":
+        mode = values.get("gp_location_mode")
+        if mode == "fixed":
+            return frozenset({"gp_location_mode", "gp_location"})
+        if mode == "free":
+            return frozenset({"gp_location_mode"})
+        msg = "gp_location_mode must explicitly be 'fixed' or 'free'"
+        raise ValueError(msg)
+    return frozenset()
+
+
+def _ordinary_settings(values: dict[str, object]) -> OrdinarySettings:
+    estimator = values.get("estimator")
+    if not isinstance(estimator, str) or estimator not in _ORDINARY_ESTIMATORS:
+        msg = "ordinary L-moment schema requires an explicit supported estimator"
+        raise ValueError(msg)
+    expected = _ORDINARY_FIELDS | _ordinary_extra_fields(estimator, values)
+    if set(values) != expected:
+        msg = f"ordinary settings keys must match exactly; missing={sorted(expected - set(values))}, unknown={sorted(set(values) - expected)}"
+        raise ValueError(msg)
+    if values["source_classification"] != EXACT_ASSERTION:
+        msg = "caller must explicitly assert complete exact positive annual maxima; no missing/zero/censored admission"
+        raise ValueError(msg)
+    unit = _source_text(values["discharge_unit"], field="discharge_unit")
+    if unit in {"years", "probability"}:
+        msg = "discharge_unit must name a physical flow unit"
+        raise ValueError(msg)
+    reference = (
+        _finite_setting(values["reference_discharge"], field="reference_discharge")
+        if "reference_discharge" in values
+        else None
+    )
+    if reference is not None and reference <= 0:
+        msg = "reference_discharge must be strictly positive"
+        raise ValueError(msg)
+    return OrdinarySettings(
+        estimator=estimator,
+        discharge_unit=unit,
+        year_definition=_source_text(values["year_definition"], field="year_definition"),
+        probabilities=_ordered_probabilities(values["non_exceedance_probabilities"]),
+        reference_discharge=reference,
+        gp_location_mode=cast(str | None, values.get("gp_location_mode")),
+        gp_location=_finite_setting(values["gp_location"], field="gp_location") if "gp_location" in values else None,
+    )
+
+
+def _ordinary_fit(
+    values: tuple[float, ...], config: OrdinarySettings
+) -> (
+    OrdinaryLMomentFit[Gumbel]
+    | OrdinaryLMomentFit[Lognormal]
+    | OrdinaryLMomentFit[LogPearsonIII]
+    | OrdinaryLMomentFit[GeneralizedPareto]
+):
+    if config.estimator == "gumbel_lmoments":
+        return fit_gumbel_lmoments(values)
+    if config.estimator == "gp_lmoments":
+        return fit_gp_lmoments(values, location=config.gp_location)
+    reference = config.reference_discharge
+    if reference is None:
+        msg = "explicit reference_discharge required for lognormal or LP3"
+        raise ValueError(msg)
+    if config.estimator == "lognormal_lmoments":
+        return fit_lognormal_lmoments(values, reference_discharge=reference)
+    if config.estimator == "lp3_lmoments":
+        return fit_lp3_lmoments(values, reference_discharge=reference)
+    msg = "unsupported ordinary estimator"
+    raise ValueError(msg)
+
+
+def _ordinary_parameters(
+    kernel: Gumbel | Lognormal | LogPearsonIII | GeneralizedPareto, unit: str
+) -> tuple[ParameterSummary, ...]:
+    entries: list[tuple[str, str, float]]
+    if isinstance(kernel, Gumbel | GeneralizedPareto):
+        family = "gumbel" if isinstance(kernel, Gumbel) else "gp"
+        entries = [
+            (f"Location ({unit})", f"{family}.location", kernel.location),
+            (f"Scale ({unit})", f"{family}.scale", exp(kernel.log_scale)),
+        ]
+        if isinstance(kernel, GeneralizedPareto):
+            entries.append(("EVT GP shape xi (ARR kappa = -xi)", "gp.shape_xi", kernel.xi))
+    else:
+        family = "lp3" if isinstance(kernel, LogPearsonIII) else "lognormal"
+        entries = [
+            ("Mean of ln(Q/reference_discharge)", f"{family}.mean_loge_flow", kernel.log.mean),
+            ("ln(SD of ln(Q/reference_discharge))", f"{family}.loge_sd_loge_flow", kernel.log.log_sd),
+        ]
+        if isinstance(kernel, LogPearsonIII):
+            entries.append(("Skew of ln(Q/reference_discharge)", "lp3.skew_loge_flow", kernel.skew))
+    return tuple(
+        ParameterSummary(name=name, coordinate=coordinate, mean=value, summary_kind="point_estimate")
+        for name, coordinate, value in entries
+    )
+
+
+def _ordinary_report_settings(config: OrdinarySettings, moments: str) -> dict[str, str | int | float | bool | None]:
+    settings: dict[str, str | int | float | bool | None] = {
+        "schema_version": ORDINARY_SCHEMA,
+        "estimator": config.estimator,
+        "lh_shift": 0,
+        "year_definition": config.year_definition,
+        "discharge_unit": config.discharge_unit,
+        "source_classification": EXACT_ASSERTION,
+        "source_format": "Year,AMS CSV (year_ams_csv)",
+        "moment_coordinates": moments,
+        "probability_count": len(config.probabilities),
+        "non_exceedance_probabilities": ",".join(str(p) for p in config.probabilities),
+        "source_ams_file": "source-ams.csv",
+        "source_settings_file": "source-settings.json",
+    }
+    if config.reference_discharge is not None:
+        settings["reference_discharge"] = config.reference_discharge
+    if config.gp_location_mode is not None:
+        settings["gp_location_mode"] = config.gp_location_mode
+    if config.gp_location is not None:
+        settings["gp_location"] = config.gp_location
+    return settings
+
+
+def _calculate_ordinary(
+    raw_ams: bytes, raw_settings: bytes, config: OrdinarySettings
+) -> tuple[AnalysisResult, dict[str, str | int | float | bool | None]]:
+    values = _positive_exact_ams(raw_ams)
+    fit = _ordinary_fit(values, config)
+    points = tuple(
+        ResultPoint(
+            meaning=ResultMeaning.DETERMINISTIC_FITTED_QUANTILE,
+            value=fit.quantile(probability),
+            unit=config.discharge_unit,
+            input_probability=probability,
+            input_probability_kind=ProbabilityKind.NON_EXCEEDANCE,
+        )
+        for probability in config.probabilities
+    )
+    moment_unit = config.discharge_unit if fit.moment_coordinates == "discharge" else "dimensionless"
+    diagnostics = (
+        RunDiagnostic(name="exact_annual_maxima_count", value=float(len(values)), unit="count"),
+        *(
+            RunDiagnostic(name=f"sample_l_moment_{index}", value=value, unit=moment_unit)
+            for index, value in enumerate(fit.sample_moments, start=1)
+        ),
+    )
+    warnings = [
+        "Independent H=0 ordinary L-moment fit only: NOT Flike-native, Bayesian, bootstrap or optimized-H.",
+        "Source classification, year definition and discharge units are caller assertions, not independently verified.",
+    ]
+    if config.estimator == "gp_lmoments":
+        warnings.append("GP fitted to annual maxima only: this is not a peaks-over-threshold event/exposure model.")
+    result = AnalysisResult(
+        provenance=RunProvenance(
+            compatibility_profile=LEGACY_FLIKE_PROFILE.identifier,
+            method_id="l-moments",
+            method_version="arr-hosking-ordinary-lmoments/1",
+            package_version=__version__,
+            evidence_status=EvidenceStatus.OBSERVED_ARTIFACT,
+            input_sha256=sha256(raw_ams).hexdigest(),
+            settings_sha256=sha256(raw_settings).hexdigest(),
+        ),
+        parameters=_ordinary_parameters(fit.distribution, config.discharge_unit),
+        values=points,
+        diagnostics=diagnostics,
+        warnings=tuple(warnings),
+    )
+    return result, _ordinary_report_settings(config, fit.moment_coordinates)
+
+
+def calculate_from_bytes(
+    raw_ams: bytes, raw_settings: bytes
+) -> tuple[AnalysisResult, dict[str, str | int | float | bool | None]]:
+    """Single explicit schema dispatcher; consumed bytes are also the hashed bytes."""
+    values = _settings_object(raw_settings)
+    if values.get("schema_version") == ORDINARY_SCHEMA:
+        return _calculate_ordinary(raw_ams, raw_settings, _ordinary_settings(values))
+    return _calculate_fixed_gev(raw_ams, raw_settings, _fixed_gev_settings(values))
