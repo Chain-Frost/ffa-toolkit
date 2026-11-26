@@ -11,7 +11,7 @@ from statistics import NormalDist
 from typing import Literal
 
 from ffa_methods.bayesian_outputs import ImportanceParticles, predictive_quantile, weighted_quantile
-from ffa_methods.contracts import ObservationKind, ResultMeaning, RunProvenance
+from ffa_methods.contracts import EvidenceStatus, ObservationKind, ResultMeaning, RunProvenance
 from ffa_methods.importance_sampling import (
     ExplicitNormalProposal,
     ExplicitSamplingControls,
@@ -98,7 +98,7 @@ class PrecisionRequest:
             if self.side not in ("lower", "upper"):
                 msg = "a posterior probability limit needs an explicit side"
                 raise ValueError(msg)
-            self.inverse_level
+            _level(self.inverse_level)
         elif self.interval_mass is not None or self.side is not None:
             msg = "interval mass/side apply only to posterior limits"
             raise ValueError(msg)
@@ -225,6 +225,10 @@ def _window(estimate: float, tolerance: float) -> Bounds:
 
 def _interval(estimate: float, mcse: float, critical: float) -> Bounds:
     half = critical * mcse
+    if not isfinite(half) or half <= 0:
+        msg = "stochastic interval half-width is not positive and finite"
+        raise PrecisionUnavailable(msg)
+    half = nextafter(half, inf)
     lower, upper = estimate - half, estimate + half
     if not lower < estimate < upper or not isfinite(lower) or not isfinite(upper):
         msg = "stochastic interval cannot be represented"
@@ -303,9 +307,7 @@ def _scalar_check(
         elif product < 0:
             negative.append((-product, weight))
     pos, neg = _side(positive), _side(negative)
-    if any(
-        side.count < plan.minimum_side_count or side.effective_size < plan.minimum_side_ess for side in (pos, neg)
-    ):
+    if any(side.count < plan.minimum_side_count or side.effective_size < plan.minimum_side_ess for side in (pos, neg)):
         return ScalarCheck(estimate, None, None, pos, neg, reference, "insufficient centered-contribution resolution")
     # hypot uses scaled Euclidean norm, avoiding premature square underflow.
     mcse = hypot(*(value for value, _ in (*positive, *negative)))
@@ -420,15 +422,14 @@ def _reference_value(request: PrecisionRequest, admission: NormalAdmission) -> f
         probability = admission.probability(_discharge(request), survival=request.meaning != _CDF)
         return _positive(1 / probability) if request.meaning == _PERIOD else probability
     if request.meaning == _PERIOD_LIMIT:
-        mu = admission.mean + admission.posterior_sd * _NORMAL.inv_cdf(1 - request.inverse_level)
+        mu = admission.mean - admission.posterior_sd * _NORMAL.inv_cdf(request.inverse_level)
         z = (log(_discharge(request)) - admission.log_reference - mu) / admission.log_flow_sd
         return _positive(1 / _normal_probability(z, survival=True))
     if request.meaning == "parameter_mean":
         return admission.mean
     if request.meaning == _PREDICTIVE:
-        return _positive(
-            exp(admission.log_reference + admission.mean + admission.predictive_sd * _NORMAL.inv_cdf(request.inverse_level))
-        )
+        z = _NORMAL.inv_cdf(request.inverse_level)
+        return _positive(exp(admission.log_reference + admission.mean + admission.predictive_sd * z))
     centre = admission.mean + admission.log_design_offset(request)
     if request.meaning == _LOG:
         return admission.posterior_sd / log(10) if request.log_moment == "standard_deviation" else centre / log(10)
@@ -472,6 +473,9 @@ def _sample_output(
             periods = tuple(_positive(1 / value) for value in values)
             return SampleOutput(weighted_quantile(periods, particles.weights, request.inverse_level), periods)
         mean = _weighted_mean(particles, values)
+        if not 0 < mean < 1:
+            msg = "weighted probability has saturated or underflowed"
+            raise PrecisionUnavailable(msg)
         return SampleOutput(_positive(1 / mean) if request.meaning == _PERIOD else mean, values)
     return _sample_quantile_output(model, particles, request)
 
@@ -615,7 +619,7 @@ def _audit_output(
         else:
             state = PrecisionState.CRITERIA_NOT_MET
         return OutputCheck(request, state, sample.estimate, reference, window, checks)
-    except (PrecisionUnavailable, ArithmeticError, ValueError) as exc:
+    except PrecisionUnavailable as exc:
         return OutputCheck(
             request,
             PrecisionState.INDETERMINATE,
@@ -624,6 +628,8 @@ def _audit_output(
             window,
             reason=str(exc),
         )
+    except (ArithmeticError, ValueError) as exc:
+        return OutputCheck(request, PrecisionState.EXECUTION_FAILED, None, reference, window, reason=str(exc))
 
 
 @dataclass(frozen=True, slots=True)
@@ -655,7 +661,9 @@ class PrecisionAudit:
 
     @property
     def states(self) -> tuple[PrecisionState, ...]:
-        return tuple(_aggregate(tuple(attempt.outputs[i].state for attempt in self.attempts)) for i in range(len(self.requests)))
+        return tuple(
+            _aggregate(tuple(attempt.outputs[i].state for attempt in self.attempts)) for i in range(len(self.requests))
+        )
 
     @property
     def state(self) -> PrecisionState:
@@ -675,11 +683,7 @@ def _aggregate(states: tuple[PrecisionState, ...]) -> PrecisionState:
 
 
 def _unavailable(request: PrecisionRequest, model: ClassifiedLognormalPosterior, reason: str) -> OutputCheck:
-    if (
-        model.fixed_log_sd is None
-        and request.meaning == _MEAN
-        and _level(request.non_exceedance) > 0.5
-    ):
+    if model.fixed_log_sd is None and request.meaning == _MEAN and _level(request.non_exceedance) > 0.5:
         return OutputCheck(
             request,
             PrecisionState.UNDEFINED,
@@ -706,7 +710,11 @@ def audit_lognormal_precision(
     merely because the sampled weights look healthy.
     """
     reserved, critical = plan.preflight(requests)
-    if proposal.coordinates != model.coordinates or provenance.input_sha256 != model.source_sha256:
+    if (
+        proposal.coordinates != model.coordinates
+        or provenance.input_sha256 != model.source_sha256
+        or provenance.evidence_status == EvidenceStatus.QUALIFIED_REFERENCE
+    ):
         msg = "audit provenance or proposal does not identify the bound source model"
         raise ValueError(msg)
     admission: NormalAdmission | None = None
@@ -715,8 +723,7 @@ def audit_lognormal_precision(
     except (PrecisionUnavailable, ArithmeticError) as exc:
         outputs = tuple(_unavailable(request, model, str(exc)) for request in requests)
         attempts = tuple(
-            Attempt(seed, plan.primary.draw_count, None, False, None, None, None, outputs, str(exc))
-            for seed in plan.seeds
+            Attempt(seed, plan.primary.draw_count, None, False, None, None, None, outputs, str(exc)) for seed in plan.seeds
         )
     else:
         attempts = _run_attempts(model, proposal, provenance, plan, requests, admission, critical)
@@ -737,9 +744,7 @@ def _run_attempts(
     for seed in plan.seeds:
         controls = replace(plan.primary, random_seed=seed)
         try:
-            run = independent_importance_sample(
-                proposal=proposal, target=target, controls=controls, provenance=provenance
-            )
+            run = independent_importance_sample(proposal=proposal, target=target, controls=controls, provenance=provenance)
         except (ArithmeticError, ValueError) as exc:
             failed = tuple(
                 OutputCheck(request, PrecisionState.EXECUTION_FAILED, None, None, None, reason=str(exc))
