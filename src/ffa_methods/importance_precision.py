@@ -123,12 +123,6 @@ class PrecisionRequest:
     def unit_is_discharge(self) -> bool:
         return self.meaning in _QUANTILES and self.meaning != _LOG
 
-    @property
-    def supported(self) -> bool:
-        # The nonlinear expected-parameter and log-SD precision routes remain separate.
-        return self.meaning != _AT_MEAN and self.log_moment != "standard_deviation"
-
-
 @dataclass(frozen=True, slots=True, kw_only=True)
 class PrecisionPlan:
     """Predeclared primary and audit streams, resource and scientific policy."""
@@ -457,6 +451,7 @@ def _probability_values(
 class SampleOutput:
     estimate: float
     values: tuple[float, ...]
+    centering_mean: float | None = None
 
 
 def _sample_output(
@@ -486,8 +481,9 @@ def _sample_quantile_output(
     if request.meaning == "parameter_mean":
         values = tuple(draw[0] for draw in particles.draws)
     elif request.meaning == _AT_MEAN:
-        mean = _weighted_mean(particles, tuple(draw[0] for draw in particles.draws))
-        return SampleOutput(_positive(model.kernel((mean,)).ppf(_level(request.non_exceedance))), ())
+        values = tuple(draw[0] for draw in particles.draws)
+        mean = _weighted_mean(particles, values)
+        return SampleOutput(_positive(model.kernel((mean,)).ppf(_level(request.non_exceedance))), values)
     else:
         values = tuple(_positive(model.kernel(draw).ppf(_level(request.non_exceedance))) for draw in particles.draws)
     if request.meaning in (_MEDIAN, _QUANTILE_LIMIT):
@@ -496,7 +492,8 @@ def _sample_quantile_output(
         values = tuple(log10(value) for value in values)
     estimate = _weighted_mean(particles, values)
     if request.log_moment == "standard_deviation":
-        estimate = sqrt(_weighted_mean(particles, tuple((value - estimate) ** 2 for value in values)))
+        sd = _positive(sqrt(_weighted_mean(particles, tuple(_square(value - estimate) for value in values))))
+        return SampleOutput(sd, values, centering_mean=estimate)
     return SampleOutput(estimate, values)
 
 
@@ -509,6 +506,16 @@ class OutputCheck:
     window: Bounds | None
     scalar_checks: tuple[ScalarCheck, ...] = ()
     reason: str | None = None
+    centering_mean: float | None = None
+    integration_interval: Bounds | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AuditDecision:
+    checks: tuple[ScalarCheck, ...]
+    accepted: bool
+    integration_interval: Bounds | None = None
+    indeterminate_reason: str | None = None
 
 
 def _bracket_check(
@@ -520,7 +527,7 @@ def _bracket_check(
     admission: NormalAdmission,
     plan: PrecisionPlan,
     critical: float,
-) -> tuple[tuple[ScalarCheck, ...], bool]:
+) -> AuditDecision:
     probability = request.inverse_level
     survival = probability > 0.5
     target = 1 - probability if survival else probability
@@ -550,7 +557,84 @@ def _bracket_check(
             decisions.append(reference <= check.interval.upper < target)
         else:
             decisions.append(reference >= check.interval.lower > target)
-    return tuple(checks), all(decisions)
+    return AuditDecision(tuple(checks), all(decisions))
+
+
+def _square(value: float) -> float:
+    square = value * value
+    if not isfinite(square) or (square == 0 and value != 0):
+        msg = "squared centered log contribution is not representable"
+        raise PrecisionUnavailable(msg)
+    return square
+
+
+def _sd_interval(a: Bounds, b: Bounds) -> Bounds:
+    # For variance = b-a², independently bound a² over the whole interval.
+    a_low, a_high = _square(a.lower), _square(a.upper)
+    minimum_square = 0.0 if a.contains(0.0) else max(0.0, nextafter(min(a_low, a_high), -inf))
+    maximum_square = nextafter(max(a_low, a_high), inf)
+    lower = max(0.0, nextafter(b.lower - maximum_square, -inf))
+    upper = nextafter(b.upper - minimum_square, inf)
+    if not isfinite(maximum_square) or not isfinite(lower) or not isfinite(upper) or upper <= lower:
+        msg = "centered second-moment variance interval is unresolved"
+        raise PrecisionUnavailable(msg)
+    return Bounds(max(0.0, nextafter(sqrt(lower), -inf)), nextafter(sqrt(upper), inf))
+
+
+def _sd_check(
+    particles: ImportanceParticles,
+    request: PrecisionRequest,
+    sample: SampleOutput,
+    primary: OutputCheck,
+    admission: NormalAdmission,
+    window: Bounds,
+    plan: PrecisionPlan,
+    critical: float,
+) -> AuditDecision:
+    if primary.centering_mean is None:
+        msg = "primary log10 mean unavailable for centered variance audit"
+        raise PrecisionUnavailable(msg)
+    # Conditional on the primary stream, this centering constant is fixed.
+    residuals = tuple(value - primary.centering_mean for value in sample.values)
+    a_ref = (admission.mean + admission.log_design_offset(request)) / log(10) - primary.centering_mean
+    b_ref = admission.variance / log(10) ** 2 + _square(a_ref)
+    a = _scalar_check(particles, residuals, a_ref, plan, critical)
+    b = _scalar_check(particles, tuple(_square(value) for value in residuals), b_ref, plan, critical)
+    checks = (a, b)
+    if a.interval is None or b.interval is None:
+        return AuditDecision(checks, False)
+    try:
+        interval = _sd_interval(a.interval, b.interval)
+    except PrecisionUnavailable as exc:
+        return AuditDecision(checks, False, indeterminate_reason=str(exc))
+    accepted = (
+        a.interval.contains(a_ref)
+        and b.interval.contains(b_ref)
+        and window.contains(interval.lower)
+        and window.contains(interval.upper)
+    )
+    return AuditDecision(checks, accepted, interval)
+
+
+def _transform_interval(request: PrecisionRequest, interval: Bounds, admission: NormalAdmission) -> Bounds:
+    if request.meaning == _PERIOD:
+        if interval.lower <= 0:
+            msg = "expected-AEP interval is not strictly positive"
+            raise PrecisionUnavailable(msg)
+        lower = nextafter(1 / min(interval.upper, 1.0), -inf)
+        upper = nextafter(1 / interval.lower, inf)
+    elif request.meaning == _AT_MEAN:
+        # Known scale: the conditional design quantile is strictly increasing
+        # in the sole free coordinate. Transform its scalar mean interval.
+        offset = admission.log_design_offset(request)
+        lower = nextafter(_positive(exp(interval.lower + offset)), -inf)
+        upper = nextafter(_positive(exp(interval.upper + offset)), inf)
+    else:
+        return interval
+    if not isfinite(lower) or not isfinite(upper) or lower <= 0 or lower >= upper:
+        msg = "transformed integration interval is not resolved"
+        raise PrecisionUnavailable(msg)
+    return Bounds(lower, upper)
 
 
 def _expectation_check(
@@ -559,25 +643,26 @@ def _expectation_check(
     sample: SampleOutput,
     reference: float,
     window: Bounds,
+    admission: NormalAdmission,
     plan: PrecisionPlan,
     critical: float,
-) -> tuple[tuple[ScalarCheck, ...], bool]:
-    scalar_reference = _positive(1 / reference) if request.meaning == _PERIOD else reference
+) -> AuditDecision:
+    scalar_reference = reference
+    if request.meaning == _PERIOD:
+        scalar_reference = admission.probability(_discharge(request), survival=True)
+    elif request.meaning == _AT_MEAN:
+        scalar_reference = admission.mean
     check = _scalar_check(particles, sample.values, scalar_reference, plan, critical)
     if check.interval is None:
-        return (check,), False
-    interval = check.interval
-    if not interval.contains(scalar_reference):
-        return (check,), False
-    if request.meaning == _PERIOD:
-        if interval.lower <= 0:
-            return (check,), False
-        lower = nextafter(1 / min(interval.upper, 1.0), -inf)
-        upper = nextafter(1 / interval.lower, inf)
-        if not isfinite(lower) or not isfinite(upper):
-            return (check,), False
-        interval = Bounds(lower, upper)
-    return (check,), window.contains(interval.lower) and window.contains(interval.upper)
+        return AuditDecision((check,), False)
+    try:
+        interval = _transform_interval(request, check.interval, admission)
+    except (PrecisionUnavailable, OverflowError) as exc:
+        return AuditDecision((check,), False, indeterminate_reason=str(exc))
+    accepted = (
+        check.interval.contains(scalar_reference) and window.contains(interval.lower) and window.contains(interval.upper)
+    )
+    return AuditDecision((check,), accepted, interval)
 
 
 def _audit_output(
@@ -597,28 +682,21 @@ def _audit_output(
     try:
         reference = _reference_value(request, admission)
         sample = _sample_output(model, particles, request)
-        if not request.supported:
-            msg = "precision propagation for this output is not admitted"
-            raise PrecisionUnavailable(msg)
         if is_primary:
             window = _window(sample.estimate, request.absolute_tolerance)
             state = PrecisionState.CONDITIONAL_PASS if window.contains(reference) else PrecisionState.CRITERIA_NOT_MET
-            return OutputCheck(request, state, sample.estimate, reference, window)
+            return OutputCheck(request, state, sample.estimate, reference, window, centering_mean=sample.centering_mean)
         if primary is None or primary.window is None:
             msg = "primary precision window unavailable"
             raise PrecisionUnavailable(msg)
         window = primary.window
         if request.meaning in _INVERSES:
-            checks, accepted = _bracket_check(model, particles, request, sample, window, admission, plan, critical)
+            decision = _bracket_check(model, particles, request, sample, window, admission, plan, critical)
+        elif request.log_moment == "standard_deviation":
+            decision = _sd_check(particles, request, sample, primary, admission, window, plan, critical)
         else:
-            checks, accepted = _expectation_check(particles, request, sample, reference, window, plan, critical)
-        if any(check.interval is None for check in checks):
-            state = PrecisionState.INDETERMINATE
-        elif accepted and window.contains(reference) and window.contains(sample.estimate):
-            state = PrecisionState.CONDITIONAL_PASS
-        else:
-            state = PrecisionState.CRITERIA_NOT_MET
-        return OutputCheck(request, state, sample.estimate, reference, window, checks)
+            decision = _expectation_check(particles, request, sample, reference, window, admission, plan, critical)
+        return _output_decision(request, sample, reference, window, decision)
     except PrecisionUnavailable as exc:
         return OutputCheck(
             request,
@@ -630,6 +708,28 @@ def _audit_output(
         )
     except (ArithmeticError, ValueError) as exc:
         return OutputCheck(request, PrecisionState.EXECUTION_FAILED, None, reference, window, reason=str(exc))
+
+
+def _output_decision(
+    request: PrecisionRequest, sample: SampleOutput, reference: float, window: Bounds, decision: AuditDecision
+) -> OutputCheck:
+    if decision.indeterminate_reason or any(check.interval is None for check in decision.checks):
+        state = PrecisionState.INDETERMINATE
+    elif decision.accepted and window.contains(reference) and window.contains(sample.estimate):
+        state = PrecisionState.CONDITIONAL_PASS
+    else:
+        state = PrecisionState.CRITERIA_NOT_MET
+    return OutputCheck(
+        request,
+        state,
+        sample.estimate,
+        reference,
+        window,
+        decision.checks,
+        reason=decision.indeterminate_reason,
+        centering_mean=sample.centering_mean,
+        integration_interval=decision.integration_interval,
+    )
 
 
 @dataclass(frozen=True, slots=True)
