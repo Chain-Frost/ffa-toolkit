@@ -1,6 +1,6 @@
 # WP06 — Output-specific importance-sampling precision (proposed contract)
 
-**Proposed mathematical contract; runtime implementation and verification remain pending.**
+**Mathematical contract with a bounded fixed-scale implementation; broader model admission and integration remain pending.**
 Tracking: [#5](https://github.com/Chain-Frost/ffa-toolkit/issues/5),
 initial delivery [#1](https://github.com/Chain-Frost/ffa-toolkit/issues/1).
 Model binding #3, proposal scaling #4, CLI integration #6 and presentation #7
@@ -469,3 +469,14 @@ scale upper quantile means are marked undefined under the admitted full
 Gaussian prior; the other estimated-scale and known-scale censored
 precision routes remain unadmitted. The CLI/report bridge and broader
 model-specific scientific validation remain outstanding under #5/#6/#7.
+
+### Numerical representation and incomplete diagnostics
+
+For known log-SD, log10 design quantiles are evaluated directly as the
+affine function `(ln(reference) + mu + sigma*z_p)/ln(10)`. Their moment
+checks do not require an exponentiated discharge to be representable.
+Tests cover both overflowing and underflowing discharge-space quantiles
+while independently verifying the finite logarithmic means and SDs.
+A later inverse-bound or second-moment resolution failure retains any
+scalar diagnostics already computed for that audit. It remains
+indeterminate and never promotes an unsuccessful attempt to a pass.

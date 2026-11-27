@@ -6,7 +6,7 @@ not posterior uncertainty, general convergence certification or native defaults.
 
 from dataclasses import dataclass, replace
 from enum import StrEnum
-from math import erfc, exp, fsum, hypot, inf, isfinite, log, log10, nextafter, sqrt
+from math import erfc, exp, fsum, hypot, inf, isfinite, log, nextafter, sqrt
 from statistics import NormalDist
 from typing import Literal
 
@@ -37,14 +37,14 @@ _INVERSES = frozenset((_MEDIAN, _PREDICTIVE, _QUANTILE_LIMIT, _PERIOD_LIMIT))
 
 
 class PrecisionState(StrEnum):
-    CONDITIONAL_PASS = "conditional_pass"
+    CONDITIONAL_PASS = "conditional_pass"  # noqa: S105 -- numerical decision state, not a credential
     CRITERIA_NOT_MET = "criteria_not_met"
     INDETERMINATE = "indeterminate"
     UNDEFINED = "undefined"
     EXECUTION_FAILED = "execution_failed"
 
 
-class PrecisionUnavailable(ValueError):
+class PrecisionUnavailableError(ValueError):
     """Unsupported mathematical admission or insufficient numerical resolution."""
 
 
@@ -122,6 +122,7 @@ class PrecisionRequest:
     @property
     def unit_is_discharge(self) -> bool:
         return self.meaning in _QUANTILES and self.meaning != _LOG
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class PrecisionPlan:
@@ -213,7 +214,7 @@ def _window(estimate: float, tolerance: float) -> Bounds:
     upper = nextafter(estimate + tolerance, -inf)
     if not isfinite(estimate - tolerance) or not isfinite(estimate + tolerance) or not lower < estimate < upper:
         msg = "requested precision window cannot be represented"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     return Bounds(lower, upper)
 
 
@@ -221,16 +222,16 @@ def _interval(estimate: float, mcse: float, critical: float) -> Bounds:
     half = critical * mcse
     if not isfinite(half) or half <= 0:
         msg = "stochastic interval half-width is not positive and finite"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     half = nextafter(half, inf)
     lower, upper = estimate - half, estimate + half
     if not lower < estimate < upper or not isfinite(lower) or not isfinite(upper):
         msg = "stochastic interval cannot be represented"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     result = Bounds(nextafter(lower, -inf), nextafter(upper, inf))
     if not isfinite(result.lower) or not isfinite(result.upper):
         msg = "outward-rounded stochastic interval is not finite"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     return result
 
 
@@ -246,7 +247,9 @@ def _side(terms: list[tuple[float, float]]) -> SideResolution:
         return SideResolution(0, 0.0, 0.0)
     largest = max(value for value, _ in terms)
     scaled = tuple(value / largest for value, _ in terms)
-    return SideResolution(len(terms), fsum(weight for _, weight in terms), fsum(scaled) ** 2 / fsum(x * x for x in scaled))
+    return SideResolution(
+        len(terms), fsum(weight for _, weight in terms), fsum(scaled) ** 2 / fsum(x * x for x in scaled)
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -263,20 +266,20 @@ class ScalarCheck:
 def _weighted_mean(particles: ImportanceParticles, values: tuple[float, ...]) -> float:
     if len(values) != len(particles.weights) or any(not isfinite(value) for value in values):
         msg = "invalid or nonfinite scalar integrand"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     # This admitted Normal target is everywhere positive. A stored zero weight
     # cannot represent genuine out-of-support mass in this component.
     if any(weight <= 0 for weight in particles.weights):
         msg = "positive target weight lost numerical resolution"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     products = tuple(w * x for w, x in zip(particles.weights, values, strict=True))
     if any(product == 0 and value != 0 for product, value in zip(products, values, strict=True)):
         msg = "weighted integrand underflow"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     estimate = fsum(products)
     if not isfinite(estimate):
         msg = "weighted expectation is not finite"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     return estimate
 
 
@@ -295,7 +298,7 @@ def _scalar_check(
         product = weight * residual if isfinite(residual) else weight * value - weight * estimate
         if not isfinite(product) or (product == 0 and value != estimate):
             msg = "weighted centered residual is not representable"
-            raise PrecisionUnavailable(msg)
+            raise PrecisionUnavailableError(msg)
         if product > 0:
             positive.append((product, weight))
         elif product < 0:
@@ -307,7 +310,7 @@ def _scalar_check(
     mcse = hypot(*(value for value, _ in (*positive, *negative)))
     try:
         interval = _interval(estimate, mcse, critical)
-    except PrecisionUnavailable as exc:
+    except PrecisionUnavailableError as exc:
         return ScalarCheck(estimate, None, None, pos, neg, reference, str(exc))
     return ScalarCheck(estimate, mcse, interval, pos, neg, reference)
 
@@ -316,14 +319,14 @@ def _normal_probability(z: float, *, survival: bool) -> float:
     value = 0.5 * erfc(z / sqrt(2) if survival else -z / sqrt(2))
     if not 0 < value < 1:
         msg = "analytic probability has saturated or underflowed"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     return value
 
 
 def _positive(value: float) -> float:
     if not isfinite(value) or value <= 0:
         msg = "positive finite quantity is not representable"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     return value
 
 
@@ -380,7 +383,7 @@ def _admit(
         for row in model.series.annual
     ):
         msg = "precision admission currently requires known log-SD and exact included observations"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     if model.coordinates != proposal.coordinates:
         msg = "proposal and target coordinates differ"
         raise ValueError(msg)
@@ -392,7 +395,7 @@ def _admit(
     # mistaken for proof of a globally bounded normalized importance ratio.
     if proposal_variance < prior_variance:
         msg = "bounded-ratio admission requires proposal variance at least the supplied prior variance"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     reference = log(model.reference_discharge)
     logs = tuple(
         log(row.value) - reference
@@ -407,7 +410,7 @@ def _admit(
     log_bound = 0.5 * fsum((log(proposal_variance), -log(variance), displacement * displacement))
     if not isfinite(mean) or not isfinite(log_bound) or log_bound > plan.maximum_log_ratio:
         msg = "analytical ratio envelope exceeds the explicit ceiling or is not resolved"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     return NormalAdmission(mean, variance, sigma, reference, log_bound)
 
 
@@ -443,7 +446,7 @@ def _probability_values(
     # Never substitute 1-CDF for rare SF or accept rounded zero as true support.
     if any(not 0 < value < 1 for value in values):
         msg = "component probability has saturated or underflowed"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     return values
 
 
@@ -459,7 +462,7 @@ def _sample_output(
 ) -> SampleOutput:
     if any(weight <= 0 for weight in particles.weights):
         msg = "positive target weight lost numerical resolution"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     if request.meaning == _PREDICTIVE:
         return SampleOutput(_positive(predictive_quantile(particles, request.inverse_level, model.kernel)), ())
     if request.meaning in _FLOWS:
@@ -470,7 +473,7 @@ def _sample_output(
         mean = _weighted_mean(particles, values)
         if not 0 < mean < 1:
             msg = "weighted probability has saturated or underflowed"
-            raise PrecisionUnavailable(msg)
+            raise PrecisionUnavailableError(msg)
         return SampleOutput(_positive(1 / mean) if request.meaning == _PERIOD else mean, values)
     return _sample_quantile_output(model, particles, request)
 
@@ -480,6 +483,17 @@ def _sample_quantile_output(
 ) -> SampleOutput:
     if request.meaning == "parameter_mean":
         values = tuple(draw[0] for draw in particles.draws)
+    elif request.meaning == _LOG:
+        # log10(q_p) is affine in mu at known scale. Discharge-space
+        # exponentiation is unnecessary and can overflow/underflow even when
+        # the requested logarithmic moment is representable.
+        if model.fixed_log_sd is None:
+            msg = "logarithmic precision requires admitted known log-SD"
+            raise PrecisionUnavailableError(msg)
+        offset = fsum(
+            (log(model.reference_discharge), exp(model.fixed_log_sd) * _NORMAL.inv_cdf(_level(request.non_exceedance)))
+        )
+        values = tuple(fsum((offset, draw[0])) / log(10) for draw in particles.draws)
     elif request.meaning == _AT_MEAN:
         values = tuple(draw[0] for draw in particles.draws)
         mean = _weighted_mean(particles, values)
@@ -488,8 +502,6 @@ def _sample_quantile_output(
         values = tuple(_positive(model.kernel(draw).ppf(_level(request.non_exceedance))) for draw in particles.draws)
     if request.meaning in (_MEDIAN, _QUANTILE_LIMIT):
         return SampleOutput(weighted_quantile(values, particles.weights, request.inverse_level), values)
-    if request.meaning == _LOG:
-        values = tuple(log10(value) for value in values)
     estimate = _weighted_mean(particles, values)
     if request.log_moment == "standard_deviation":
         sd = _positive(sqrt(_weighted_mean(particles, tuple(_square(value - estimate) for value in values))))
@@ -534,18 +546,19 @@ def _bracket_check(
     checks: list[ScalarCheck] = []
     decisions: list[bool] = []
     for bound, is_lower in ((window.lower, True), (window.upper, False)):
-        if request.meaning == _PREDICTIVE:
-            if bound <= 0:
-                msg = "predictive audit window must have positive finite endpoints"
-                raise PrecisionUnavailable(msg)
-            values = _probability_values(model, particles, bound, survival=survival)
-        else:
-            values = tuple(float(value > bound if survival else value <= bound) for value in sample.values)
         if request.meaning != _PERIOD_LIMIT and bound <= 0:
-            msg = "design-quantile audit window must have positive finite endpoints"
-            raise PrecisionUnavailable(msg)
-        reference = admission.inverse_probability(request, bound, survival=survival)
-        check = _scalar_check(particles, values, reference, plan, critical)
+            return AuditDecision(
+                tuple(checks), False, indeterminate_reason="quantile audit window must have positive finite endpoints"
+            )
+        try:
+            if request.meaning == _PREDICTIVE:
+                values = _probability_values(model, particles, bound, survival=survival)
+            else:
+                values = tuple(float(value > bound if survival else value <= bound) for value in sample.values)
+            reference = admission.inverse_probability(request, bound, survival=survival)
+            check = _scalar_check(particles, values, reference, plan, critical)
+        except PrecisionUnavailableError as exc:
+            return AuditDecision(tuple(checks), False, indeterminate_reason=str(exc))
         checks.append(check)
         if check.interval is None:
             decisions.append(False)
@@ -564,7 +577,7 @@ def _square(value: float) -> float:
     square = value * value
     if not isfinite(square) or (square == 0 and value != 0):
         msg = "squared centered log contribution is not representable"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     return square
 
 
@@ -577,7 +590,7 @@ def _sd_interval(a: Bounds, b: Bounds) -> Bounds:
     upper = nextafter(b.upper - minimum_square, inf)
     if not isfinite(maximum_square) or not isfinite(lower) or not isfinite(upper) or upper <= lower:
         msg = "centered second-moment variance interval is unresolved"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     return Bounds(max(0.0, nextafter(sqrt(lower), -inf)), nextafter(sqrt(upper), inf))
 
 
@@ -593,19 +606,22 @@ def _sd_check(
 ) -> AuditDecision:
     if primary.centering_mean is None:
         msg = "primary log10 mean unavailable for centered variance audit"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     # Conditional on the primary stream, this centering constant is fixed.
     residuals = tuple(value - primary.centering_mean for value in sample.values)
     a_ref = (admission.mean + admission.log_design_offset(request)) / log(10) - primary.centering_mean
     b_ref = admission.variance / log(10) ** 2 + _square(a_ref)
     a = _scalar_check(particles, residuals, a_ref, plan, critical)
-    b = _scalar_check(particles, tuple(_square(value) for value in residuals), b_ref, plan, critical)
+    try:
+        b = _scalar_check(particles, tuple(_square(value) for value in residuals), b_ref, plan, critical)
+    except PrecisionUnavailableError as exc:
+        return AuditDecision((a,), False, indeterminate_reason=str(exc))
     checks = (a, b)
     if a.interval is None or b.interval is None:
         return AuditDecision(checks, False)
     try:
         interval = _sd_interval(a.interval, b.interval)
-    except PrecisionUnavailable as exc:
+    except PrecisionUnavailableError as exc:
         return AuditDecision(checks, False, indeterminate_reason=str(exc))
     accepted = (
         a.interval.contains(a_ref)
@@ -620,7 +636,7 @@ def _transform_interval(request: PrecisionRequest, interval: Bounds, admission: 
     if request.meaning == _PERIOD:
         if interval.lower <= 0:
             msg = "expected-AEP interval is not strictly positive"
-            raise PrecisionUnavailable(msg)
+            raise PrecisionUnavailableError(msg)
         lower = nextafter(1 / min(interval.upper, 1.0), -inf)
         upper = nextafter(1 / interval.lower, inf)
     elif request.meaning == _AT_MEAN:
@@ -633,7 +649,7 @@ def _transform_interval(request: PrecisionRequest, interval: Bounds, admission: 
         return interval
     if not isfinite(lower) or not isfinite(upper) or lower <= 0 or lower >= upper:
         msg = "transformed integration interval is not resolved"
-        raise PrecisionUnavailable(msg)
+        raise PrecisionUnavailableError(msg)
     return Bounds(lower, upper)
 
 
@@ -657,10 +673,12 @@ def _expectation_check(
         return AuditDecision((check,), False)
     try:
         interval = _transform_interval(request, check.interval, admission)
-    except (PrecisionUnavailable, OverflowError) as exc:
+    except (PrecisionUnavailableError, OverflowError) as exc:
         return AuditDecision((check,), False, indeterminate_reason=str(exc))
     accepted = (
-        check.interval.contains(scalar_reference) and window.contains(interval.lower) and window.contains(interval.upper)
+        check.interval.contains(scalar_reference)
+        and window.contains(interval.lower)
+        and window.contains(interval.upper)
     )
     return AuditDecision((check,), accepted, interval)
 
@@ -687,8 +705,14 @@ def _audit_output(
             state = PrecisionState.CONDITIONAL_PASS if window.contains(reference) else PrecisionState.CRITERIA_NOT_MET
             return OutputCheck(request, state, sample.estimate, reference, window, centering_mean=sample.centering_mean)
         if primary is None or primary.window is None:
-            msg = "primary precision window unavailable"
-            raise PrecisionUnavailable(msg)
+            return OutputCheck(
+                request,
+                PrecisionState.INDETERMINATE,
+                sample.estimate,
+                reference,
+                None,
+                reason="primary precision window unavailable",
+            )
         window = primary.window
         if request.meaning in _INVERSES:
             decision = _bracket_check(model, particles, request, sample, window, admission, plan, critical)
@@ -697,7 +721,7 @@ def _audit_output(
         else:
             decision = _expectation_check(particles, request, sample, reference, window, admission, plan, critical)
         return _output_decision(request, sample, reference, window, decision)
-    except PrecisionUnavailable as exc:
+    except PrecisionUnavailableError as exc:
         return OutputCheck(
             request,
             PrecisionState.INDETERMINATE,
@@ -784,8 +808,7 @@ class PrecisionAudit:
     def indeterminate_count(self) -> int:
         """Attempts with any indeterminate output; counts can overlap."""
         return sum(
-            any(output.state == PrecisionState.INDETERMINATE for output in attempt.outputs)
-            for attempt in self.attempts
+            any(output.state == PrecisionState.INDETERMINATE for output in attempt.outputs) for attempt in self.attempts
         )
 
     def _complete_schedule(self) -> bool:
@@ -876,10 +899,11 @@ def audit_lognormal_precision(
     admission: NormalAdmission | None = None
     try:
         admission = _admit(model, proposal, plan)
-    except (PrecisionUnavailable, ArithmeticError) as exc:
+    except (PrecisionUnavailableError, ArithmeticError) as exc:
         outputs = tuple(_unavailable(request, model, str(exc)) for request in requests)
         attempts = tuple(
-            Attempt(seed, plan.primary.draw_count, None, False, None, None, None, outputs, str(exc)) for seed in plan.seeds
+            Attempt(seed, plan.primary.draw_count, None, False, None, None, None, outputs, str(exc))
+            for seed in plan.seeds
         )
     else:
         attempts = _run_attempts(model, proposal, provenance, plan, requests, admission, critical)
@@ -900,7 +924,9 @@ def _run_attempts(
     for seed in plan.seeds:
         controls = replace(plan.primary, random_seed=seed)
         try:
-            run = independent_importance_sample(proposal=proposal, target=target, controls=controls, provenance=provenance)
+            run = independent_importance_sample(
+                proposal=proposal, target=target, controls=controls, provenance=provenance
+            )
         except (ArithmeticError, ValueError) as exc:
             failed = tuple(
                 OutputCheck(request, PrecisionState.EXECUTION_FAILED, None, None, None, reason=str(exc))

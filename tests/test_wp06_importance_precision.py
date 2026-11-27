@@ -7,6 +7,7 @@ from statistics import NormalDist
 import pytest
 
 from ffa_methods import importance_precision
+from ffa_methods.bayesian_outputs import ImportanceParticles
 from ffa_methods.contracts import EvidenceStatus, ResultMeaning, RunProvenance
 from ffa_methods.importance_precision import PrecisionPlan, PrecisionRequest, PrecisionState, audit_lognormal_precision
 from ffa_methods.importance_sampling import (
@@ -87,8 +88,12 @@ def _requests() -> tuple[PrecisionRequest, ...]:
     return (
         PrecisionRequest(meaning="parameter_mean", absolute_tolerance=0.16),
         PrecisionRequest(meaning=ResultMeaning.POSTERIOR_MEAN_QUANTILE, non_exceedance=p, absolute_tolerance=6.0),
-        PrecisionRequest(meaning=ResultMeaning.EXPECTED_NON_EXCEEDANCE_PROBABILITY, discharge=x, absolute_tolerance=0.09),
-        PrecisionRequest(meaning=ResultMeaning.EXPECTED_ANNUAL_EXCEEDANCE_PROBABILITY, discharge=x, absolute_tolerance=0.09),
+        PrecisionRequest(
+            meaning=ResultMeaning.EXPECTED_NON_EXCEEDANCE_PROBABILITY, discharge=x, absolute_tolerance=0.09
+        ),
+        PrecisionRequest(
+            meaning=ResultMeaning.EXPECTED_ANNUAL_EXCEEDANCE_PROBABILITY, discharge=x, absolute_tolerance=0.09
+        ),
         PrecisionRequest(meaning=ResultMeaning.RETURN_PERIOD_FROM_EXPECTED_AEP, discharge=x, absolute_tolerance=1.0),
         PrecisionRequest(
             meaning=ResultMeaning.LOG10_QUANTILE_POSTERIOR_MOMENT,
@@ -173,11 +178,15 @@ def test_independent_fixed_budget_all_admitted_outputs_against_conjugate_oracle(
     assert result.critical_value == -normal.inv_cdf(plan.alpha / (2 * (2 * len(requests) + 2)))
     for attempt in result.attempts:
         for output, reference in zip(attempt.outputs, expected, strict=True):
-            assert output.reference is not None and isclose(output.reference, reference, rel_tol=1e-12)
-            assert output.estimate is not None and abs(output.estimate - reference) < output.request.absolute_tolerance
-            assert output.window is not None and output.window.contains(reference)
+            assert output.reference is not None
+            assert isclose(output.reference, reference, rel_tol=1e-12)
+            assert output.estimate is not None
+            assert abs(output.estimate - reference) < output.request.absolute_tolerance
+            assert output.window is not None
+            assert output.window.contains(reference)
             for check in output.scalar_checks:
-                assert check.approximate_mcse is not None and check.approximate_mcse > 0
+                assert check.approximate_mcse is not None
+                assert check.approximate_mcse > 0
                 assert check.positive.count >= plan.minimum_side_count
                 assert check.negative.effective_size >= plan.minimum_side_ess
     # The SD uses the primary log mean for both independently estimated
@@ -204,7 +213,10 @@ def test_independent_fixed_budget_all_admitted_outputs_against_conjugate_oracle(
     )
     mean = fsum(w * draw[0] for w, draw in zip(replay.particles.weights, replay.particles.draws, strict=True))
     expected_mcse = sqrt(
-        fsum((w * (draw[0] - mean)) ** 2 for w, draw in zip(replay.particles.weights, replay.particles.draws, strict=True))
+        fsum(
+            (w * (draw[0] - mean)) ** 2
+            for w, draw in zip(replay.particles.weights, replay.particles.draws, strict=True)
+        )
     )
     diagnostic = result.attempts[1].outputs[0].scalar_checks[0]
     assert diagnostic.approximate_mcse is not None
@@ -225,9 +237,7 @@ def test_explicit_preflight_seed_and_budget_validation() -> None:
     with pytest.raises(ValueError, match="evaluations"):
         replace(plan, maximum_scalar_evaluations=1).preflight(_requests())
     with pytest.raises(ValueError, match="strictly between"):
-        PrecisionRequest(
-            meaning=ResultMeaning.POSTERIOR_MEAN_QUANTILE, non_exceedance=1.0, absolute_tolerance=1.0
-        )
+        PrecisionRequest(meaning=ResultMeaning.POSTERIOR_MEAN_QUANTILE, non_exceedance=1.0, absolute_tolerance=1.0)
     with pytest.raises(ValueError, match="side"):
         PrecisionRequest(
             meaning=ResultMeaning.QUANTILE_MONTE_CARLO_PROBABILITY_LIMIT,
@@ -252,7 +262,11 @@ def test_unadmitted_proposal_and_divergent_free_scale_mean() -> None:
         assert all(not attempt.attempted and attempt.completed_draws is None for attempt in result.attempts)
     free = _model(free=True)
     result = audit_lognormal_precision(
-        model=free, proposal=_proposal(free=True), provenance=_provenance(free), plan=_plan(draws=100), requests=requests
+        model=free,
+        proposal=_proposal(free=True),
+        provenance=_provenance(free),
+        plan=_plan(draws=100),
+        requests=requests,
     )
     assert result.states == (PrecisionState.UNDEFINED, PrecisionState.INDETERMINATE)
     assert all(not attempt.attempted and attempt.outputs[0].estimate is None for attempt in result.attempts)
@@ -286,10 +300,13 @@ def test_failure_retention_and_replay(monkeypatch: pytest.MonkeyPatch) -> None:
     assert first == second
     assert seen == [*plan.seeds, *plan.seeds]
     assert first.state == PrecisionState.EXECUTION_FAILED
-    assert first.attempted_count == 3 and first.completed_count == 2
-    assert first.failed_count == 1 and first.not_attempted_count == 0
+    assert first.attempted_count == 3
+    assert first.completed_count == 2
+    assert first.failed_count == 1
+    assert first.not_attempted_count == 0
     assert first.replicate_spreads == (None,)
-    assert first.attempts[1].completed_draws is None and first.attempts[1].reason == "synthetic density failure"
+    assert first.attempts[1].completed_draws is None
+    assert first.attempts[1].reason == "synthetic density failure"
     assert first.attempts[2].completed_draws == 300
     assert first.attempts[2].outputs[0].estimate is not None
 
@@ -332,7 +349,100 @@ def test_rare_direct_sf_and_unresolved_probability_do_not_silently_pass() -> Non
         model=model, proposal=_proposal(), provenance=_provenance(model), plan=_plan(draws=600), requests=requests
     )
     rare, saturated, unresolved = result.attempts[0].outputs
-    assert rare.estimate is not None and 0 < rare.estimate < 1e-15
+    assert rare.estimate is not None
+    assert 0 < rare.estimate < 1e-15
     assert saturated.state == PrecisionState.INDETERMINATE
     assert unresolved.state in (PrecisionState.INDETERMINATE, PrecisionState.EXECUTION_FAILED)
     assert result.state != PrecisionState.CONDITIONAL_PASS
+
+
+@pytest.mark.parametrize("probability", [0.01, 0.99])
+def test_log_moments_do_not_require_representable_discharge(probability: float) -> None:
+    model = replace(_model(), fixed_log_sd=6.0)
+    proposal = replace(_proposal(), means=(0.0,))
+    requests = tuple(
+        PrecisionRequest(
+            meaning=ResultMeaning.LOG10_QUANTILE_POSTERIOR_MOMENT,
+            non_exceedance=probability,
+            log_moment=kind,
+            absolute_tolerance=0.09,
+        )
+        for kind in ("mean", "standard_deviation")
+    )
+    result = audit_lognormal_precision(
+        model=model, proposal=proposal, provenance=_provenance(model), plan=_plan(), requests=requests
+    )
+    # Independent conjugate completion of the square; the component design
+    # flood itself overflows (upper tail) or rounds to zero (lower tail).
+    precision = 1 + 3 * exp(-12)
+    mean = (6 * exp(-12) / precision + exp(6) * NormalDist().inv_cdf(probability)) / log(10)
+    sd = 1 / sqrt(precision) / log(10)
+    assert abs(mean) > 400
+    assert result.state == PrecisionState.CONDITIONAL_PASS
+    for attempt in result.attempts:
+        for output, reference in zip(attempt.outputs, (mean, sd), strict=True):
+            assert output.reference is not None
+            assert isclose(output.reference, reference, rel_tol=1e-12)
+            assert output.estimate is not None
+            assert abs(output.estimate - reference) < 0.09
+
+
+def test_second_inverse_bound_failure_retains_first_scalar_diagnostic() -> None:
+    model = _model()
+    model = replace(model, prior=replace(model.prior, means=(1.5,), covariance=((1e-4,),)))
+    request = PrecisionRequest(
+        meaning=ResultMeaning.QUANTILE_MONTE_CARLO_PROBABILITY_LIMIT,
+        non_exceedance=0.9,
+        interval_mass=0.8,
+        side="lower",
+        absolute_tolerance=1.8,
+    )
+    result = audit_lognormal_precision(
+        model=model,
+        proposal=_proposal(variance=1e-4),
+        provenance=_provenance(model),
+        plan=_plan(draws=300),
+        requests=(request,),
+    )
+    assert result.state == PrecisionState.INDETERMINATE
+    for attempt in result.attempts[1:]:
+        output = attempt.outputs[0]
+        assert output.reason is not None
+        assert "saturated" in output.reason
+        assert len(output.scalar_checks) == 1
+    assert result.attempted_count == result.completed_count == 3
+
+
+def test_second_log_moment_failure_retains_first_scalar_diagnostic(monkeypatch: pytest.MonkeyPatch) -> None:
+    scalar_check = vars(importance_precision)["_scalar_check"]
+    calls = 0
+
+    def fail_second_moment(
+        particles: ImportanceParticles,
+        values: tuple[float, ...],
+        reference: float,
+        plan: PrecisionPlan,
+        critical: float,
+    ) -> importance_precision.ScalarCheck:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            msg = "synthetic unrepresentable second moment"
+            raise importance_precision.PrecisionUnavailableError(msg)
+        return scalar_check(particles, values, reference, plan, critical)
+
+    monkeypatch.setattr(importance_precision, "_scalar_check", fail_second_moment)
+    model = _model()
+    request = PrecisionRequest(
+        meaning=ResultMeaning.LOG10_QUANTILE_POSTERIOR_MOMENT,
+        non_exceedance=0.9,
+        log_moment="standard_deviation",
+        absolute_tolerance=0.08,
+    )
+    result = audit_lognormal_precision(
+        model=model, proposal=_proposal(), provenance=_provenance(model), plan=_plan(draws=300), requests=(request,)
+    )
+    assert result.state == PrecisionState.INDETERMINATE
+    assert len(result.attempts[1].outputs[0].scalar_checks) == 1
+    assert result.attempts[1].outputs[0].reason == "synthetic unrepresentable second moment"
+    assert len(result.attempts[2].outputs[0].scalar_checks) == 2
