@@ -260,7 +260,52 @@ and correlated prior formulas, and invalid source admission. See the
 for the independent worked examples. This is not an installed Bayesian
 fitting command or legacy settings mapper.
 
-Broader family and observation binding, output-specific numerical
+## Bounded output-specific precision audit
+
+The internal `ffa_methods.importance_precision.audit_lognormal_precision`
+component implements a fixed-budget primary/audit-stream policy for the
+known-log-SD model with exact included annual observations and a supplied
+Gaussian mean prior. Its sufficient admission condition requires proposal
+variance at least the supplied prior variance, a caller-declared upper
+bound on the normalized log importance ratio, and explicit per-side
+contribution-resolution, global weight, draw and output-evaluation gates.
+The same bound model and proposal are used for every declared seed. The
+analytic Normal posterior supplies an additional model-specific check of
+the proposed integration tolerance; it is not used to substitute a point
+estimate for the actual primary sampler result.
+
+Precision is numerical integration error, not posterior credible width
+or predictive flood variability. Scalar expectations use the centered
+self-normalized importance-sampling standard error; predictive and
+posterior inverse outputs use independent probability-space brackets.
+Known-scale expected-parameter quantiles use a monotonic transform of
+the mean-coordinate interval; log10 posterior SD uses two simultaneous
+primary-centered moment intervals. A reciprocal expected AEP requires
+a strictly positive audit probability interval. The per-output record
+retains the primary tolerance window, audit point estimates, available
+scalar checks and interval propagation, as well as failure reasons.
+No universal threshold, native tolerance, adaptive stopping rule or
+finite-sample convergence certificate is supplied.
+
+The admitted case can be checked analytically using the synthetic
+known-scale example above. For prior variance one and proposal variance
+one centered at posterior mean 1.5, the posterior variance is 1/4 and
+the normalized target/proposal ratio is bounded above by two. The
+independent tests are designed to check all admitted estimands, actual
+seeded execution, weighted residual arithmetic, transformed intervals,
+budget and seed validation, and unsuccessful-stream retention.
+
+An estimated log-SD with the full untruncated Gaussian prior has a
+divergent upper-design-quantile mean (non-exceedance level greater than
+one half); the audit marks that population expectation undefined, not
+a finite numerical estimate. Censored known-scale and other estimated-
+scale precision routes remain indeterminate in this component, pending
+their own mathematical admission. The audit is not yet wired to the
+installed Bayesian workflow. See the
+[precision specification](https://github.com/Chain-Frost/ffa-toolkit/blob/main/docs/wp06-output-precision.md)
+for the mathematical contract and limitations.
+
+Broader family and observation binding, remaining output-specific numerical
 precision and installed Bayesian fitting remain outstanding (Toolkit
 issues #5, #6, #8 and #9). Native settings-matched comparisons remain
 separate external qualification. No native runs, new dependencies or
