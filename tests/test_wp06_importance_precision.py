@@ -163,6 +163,12 @@ def test_independent_fixed_budget_all_admitted_outputs_against_conjugate_oracle(
     assert tuple(attempt.seed for attempt in result.attempts) == plan.seeds
     assert all(attempt.attempted and attempt.completed_draws == 1800 for attempt in result.attempts)
     assert result.state == PrecisionState.CONDITIONAL_PASS, result.states
+    assert result.attempted_count == result.completed_count == 3
+    assert result.failed_count == result.indeterminate_count == result.not_attempted_count == 0
+    assert all(spread is not None and spread >= 0 for spread in result.replicate_spreads)
+    incomplete = replace(result, attempts=result.attempts[:-1])
+    assert incomplete.state == PrecisionState.INDETERMINATE
+    assert incomplete.replicate_spreads == (None,) * len(requests)
     # Log SD requires four one-sided bounds, the other outputs two.
     assert result.critical_value == -normal.inv_cdf(plan.alpha / (2 * (2 * len(requests) + 2)))
     for attempt in result.attempts:
@@ -280,6 +286,9 @@ def test_failure_retention_and_replay(monkeypatch: pytest.MonkeyPatch) -> None:
     assert first == second
     assert seen == [*plan.seeds, *plan.seeds]
     assert first.state == PrecisionState.EXECUTION_FAILED
+    assert first.attempted_count == 3 and first.completed_count == 2
+    assert first.failed_count == 1 and first.not_attempted_count == 0
+    assert first.replicate_spreads == (None,)
     assert first.attempts[1].completed_draws is None and first.attempts[1].reason == "synthetic density failure"
     assert first.attempts[2].completed_draws == 300
     assert first.attempts[2].outputs[0].estimate is not None

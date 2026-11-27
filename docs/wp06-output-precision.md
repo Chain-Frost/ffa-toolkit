@@ -427,3 +427,45 @@ adaptive stopping, or new proposal/smoothing method requires a separate
 justification. Do not move these unsolved scientific matters to
 native qualification. Keep #5 open until its mathematical and software
 acceptance is met. No native-equivalence claim.
+
+
+## Bounded implementation checkpoint
+
+The internal `importance_precision` module implements this policy for the
+explicit exact-record lognormal binding with fixed log-SD and a supplied
+one-coordinate Gaussian mean prior. It accepts explicit missing/excluded
+rows but no included censor rows. Its conservative admission condition is
+proposal variance at least the prior variance. For posterior N(m,v) and
+proposal N(g,s²), where s²>v, the supremum of the normalized density
+ratio has logarithm (log(s²/v)+(g-m)²/(s²-v))/2. The caller supplies a
+maximum admitted log ratio; passing this condition establishes a bounded
+ratio under the stated exact Normal mathematics, not a universal proposal
+selection rule. All positive or polynomial/lognormal integrands admitted
+here have finite required moments in that model. Each audit additionally
+checks the analytic scalar reference or inverse probability against the
+corresponding integration bounds. No analytic value replaces the primary
+weighted sample estimate.
+
+The primary and independent audit streams use one model and one proposal.
+The bound budget is reserved before execution (including four one-sided
+bounds for log10 SD). Seed schedules, resource budgets and concentration
+limits are explicit. Positive and negative centered-contribution count,
+mass and effective size supplement the global sampler weight gates; for
+indicator integrands these are event and non-event resolution measures.
+Continuous conditional-probability integrands instead use the two sides
+of their centered contributions. Failure to resolve either side with the
+predeclared criteria is indeterminate. The component rejects saturated
+component CDF/SF values in the admitted continuous positive-support model,
+positive weights rounded to zero and unresolved stochastic intervals.
+
+Only the known-scale one-coordinate expected-parameter quantile admits
+a monotone parameter-mean interval transformation. The centered two-moment
+SD route admits only the same fixed-scale model. Both retain the calculated
+primary output and distinguish the conditional audit from posterior
+uncertainty. The tests use original synthetic exact records and the
+independent conjugate formulas above, not restricted datasets. No new
+native or general-model acceptance is implied. In particular, estimated-
+scale upper quantile means are marked undefined under the admitted full
+Gaussian prior; the other estimated-scale and known-scale censored
+precision routes remain unadmitted. The CLI/report bridge and broader
+model-specific scientific validation remain outstanding under #5/#6/#7.

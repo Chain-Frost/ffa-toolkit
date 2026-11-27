@@ -760,7 +760,45 @@ class PrecisionAudit:
     attempts: tuple[Attempt, ...]
 
     @property
+    def attempted_count(self) -> int:
+        return sum(attempt.attempted for attempt in self.attempts)
+
+    @property
+    def completed_count(self) -> int:
+        """Completed sampler runs, not necessarily accepted outputs."""
+        return sum(attempt.completed_draws == attempt.requested_draws for attempt in self.attempts)
+
+    @property
+    def failed_count(self) -> int:
+        """Attempts with a sampling or output execution failure."""
+        return sum(
+            any(output.state == PrecisionState.EXECUTION_FAILED for output in attempt.outputs)
+            for attempt in self.attempts
+        )
+
+    @property
+    def not_attempted_count(self) -> int:
+        return len(self.plan.seeds) - self.attempted_count
+
+    @property
+    def indeterminate_count(self) -> int:
+        """Attempts with any indeterminate output; counts can overlap."""
+        return sum(
+            any(output.state == PrecisionState.INDETERMINATE for output in attempt.outputs)
+            for attempt in self.attempts
+        )
+
+    def _complete_schedule(self) -> bool:
+        return tuple(attempt.seed for attempt in self.attempts) == self.plan.seeds and all(
+            attempt.requested_draws == self.plan.primary.draw_count
+            and tuple(output.request for output in attempt.outputs) == self.requests
+            for attempt in self.attempts
+        )
+
+    @property
     def states(self) -> tuple[PrecisionState, ...]:
+        if not self._complete_schedule():
+            return (PrecisionState.INDETERMINATE,) * len(self.requests)
         return tuple(
             _aggregate(tuple(attempt.outputs[i].state for attempt in self.attempts)) for i in range(len(self.requests))
         )
@@ -769,8 +807,26 @@ class PrecisionAudit:
     def state(self) -> PrecisionState:
         return _aggregate(self.states)
 
+    @property
+    def replicate_spreads(self) -> tuple[float | None, ...]:
+        """Descriptive max-minus-min, only with the full set of finite estimates."""
+        if not self._complete_schedule():
+            return (None,) * len(self.requests)
+        spreads: list[float | None] = []
+        for index in range(len(self.requests)):
+            estimates = tuple(attempt.outputs[index].estimate for attempt in self.attempts)
+            values = tuple(value for value in estimates if value is not None and isfinite(value))
+            if len(values) != len(self.plan.seeds):
+                spreads.append(None)
+                continue
+            spread = max(values) - min(values)
+            spreads.append(spread if isfinite(spread) else None)
+        return tuple(spreads)
+
 
 def _aggregate(states: tuple[PrecisionState, ...]) -> PrecisionState:
+    if not states:
+        return PrecisionState.INDETERMINATE
     for state in (
         PrecisionState.UNDEFINED,
         PrecisionState.EXECUTION_FAILED,
