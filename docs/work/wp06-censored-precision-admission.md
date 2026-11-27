@@ -271,6 +271,56 @@ consume the reviewed typed evidence rather than reconstruct a pass
 from a numeric value or ESS. A complete implementation still needs
 independent scientific and exact-functional-head review.
 
+### 3.1 Closed-form normalizer and exact all-censored checks
+
+One censor event has an additional independent identity: under the
+base b, Y has marginal distribution N(m,v+sigma²). Therefore A is
+exactly its probability of that event. This applies with any number
+of included exact records. With one event the numerator for E[exp(t mu)]
+is exp(t m + t²v/2) times the same event probability under a base
+mean shifted to m+t v. Divide by A. The identity follows by completing
+the Gaussian square and does not require quadrature in mu.
+
+An especially useful exact all-censored control uses no exact rows,
+prior N(0,1), sigma=1, r=1, and distinct systematic years censored at
+Y=0. With L left and R right events the variable V=Phi(-mu) is
+uniform on (0,1) under the base. The posterior density of V is
+proportional to V^L(1-V)^R. Hence
+
+    A = Beta(L+1,R+1) = L! R!/(L+R+1)!
+    V | data ~ Beta(L+1,R+1)
+    E[F(1|mu)] = (L+1)/(L+R+2)
+    E[S(1|mu)] = (R+1)/(L+R+2).
+
+Since mu=-Phi^(-1)(V), its posterior b-quantile is the
+negative standard Normal inverse of the (1-b)-quantile of V.
+All probabilities and exponentiated output mappings must still
+satisfy their declared numerical representation checks.
+
+For one left event, A=1/2 exactly. The joint Gaussian
+representation Y=mu+independent N(0,1) gives
+E[mu|Y<=0]=-1/sqrt(pi) and Var(mu|Y<=0)=1-1/pi by the
+one-sided truncated Normal moments and Gaussian conditional
+variance. The two equalities verify centered log-moment admission
+without using Toolkit's likelihood or sampler as an oracle.
+
+Independent numerical integration of the original density on the
+real line verified the following all-censored identities:
+
+| L,R | Exact A | Exact expected F at flow 1 | Posterior mu 90th percentile (Beta inverse) |
+| --- | ---: | ---: | ---: |
+| 1,0 | 1/2 | 2/3 | 0.478273532376 |
+| 3,2 | 1/60 | 4/7 | 0.431109472925 |
+| 10,0 | 1/11 | 11/12 | -0.882071138844 |
+
+These are useful exact/analytic controls for the first functional
+extension, including the no-exact-record branch and decreasing
+posterior quantile as left censor evidence accumulates. They are
+not assumptions about arbitrary unequal censor thresholds.
+The one-event and Beta identities can be used as independent
+verification oracles; do not introduce a special production
+posterior in place of the actual supplied censor likelihood.
+
 ## 4. Estimated log-SD: further analytical envelope (separate runtime gate)
 
 The admitted untruncated Gaussian prior on theta=(mu,eta) has mean
@@ -391,7 +441,7 @@ space for the displayed reference quantiles.
 | --- | ---: | ---: |
 | A | 0.0676240123107145 | [0.0674456465907688, 0.0678026053057583] |
 | Posterior mean mu | 0.0158223513737 | [0.0139807751405, 0.0176737116019] |
-| E[mu²] | 0.1329595261168 | [0.1316421299113, 0.1342895617661] |
+| E[mu²] | 0.1329595261158 | [0.1316421299113, 0.1342895617661] |
 | Mean q at F=0.9 | 3.026592795635 | [3.007689324523, 3.045615347351] |
 | Expected AEP at exp(0.35) | 0.3519021069439 | [0.3496425142923, 0.3541759713951] |
 
@@ -488,7 +538,8 @@ for n in (64, 128):
 Review sections 2–3 and the numerical enclosure policy independently.
 First implement the fixed-log-SD censored reference/admission component
 and its meaningful analytic/numerical verification. Include exact-only
-and all-censored limiting cases; left/right/interval/mixed records;
+and all-censored limiting cases (including the exact Beta and one-event
+controls in section 3.1); left/right/interval/mixed records;
 finite-cell lower/upper containment and monotonic refinement for a
 fixed extent; nonconjugate reference outputs and transformed moments;
 positive very small normalizer and exhausted explicit budgets;
