@@ -35,6 +35,7 @@ def _check_installed_method_pages(console: Path, output: Path, env: dict[str, st
         "importance-sampling-reference",
         "lh-moments-gev",
         "l-moments",
+        "frequency-plots",
     ):
         page = _invoke(
             [str(console), "explain", method_id, "--format", "markdown"],
@@ -161,6 +162,25 @@ def _check_ordinary_installed(console: Path, output: Path, env: dict[str, str]) 
         )
         expected, quantiles = _ordinary_reference(estimator, extra, probabilities)
         _check_ordinary_result(destination, settings_bytes, ams_bytes, expected, quantiles, probabilities)
+        plotted = output / f"{name}-frequency-report"
+        _invoke(
+            [str(console), "fit", "--ams", str(ams), "--settings", str(settings_path), "--output", str(plotted),
+             "--frequency-report"],
+            cwd=output, env=env, expected_code=0,
+        )
+        _check_frequency_files(plotted, destination)
+
+
+def _check_frequency_files(plotted: Path, plain: Path) -> None:
+    """Check installed static report output and identity of existing numerical files."""
+    for name in ("results.json", "results.csv", "report.txt"):
+        if (plotted / name).read_bytes() != (plain / name).read_bytes():
+            msg = f"frequency report changed {name}"
+            raise RuntimeError(msg)
+    for name in ("frequency.svg", "frequency-coordinates.csv", "report.html", "source-ams.csv", "source-settings.json"):
+        if not (plotted / name).is_file():
+            msg = f"installed frequency report missing {name}"
+            raise RuntimeError(msg)
 
 
 def _check_gev_support_report(console: Path, output: Path, env: dict[str, str]) -> None:
@@ -328,6 +348,9 @@ for name in ("fixed-gev-ams.csv", "fixed-gev-settings.json", "ordinary-ams.csv",
             msg = "installed wheel fixed-H mathematical fit has invalid quantities or provenance"
             raise RuntimeError(msg)
         _invoke(fit_args, cwd=output, env=env, expected_code=2)
+        plotted = output / "fixed-gev-frequency-report"
+        _invoke([*fit_args[:-1], str(plotted), "--frequency-report"], cwd=output, env=env, expected_code=0)
+        _check_frequency_files(plotted, destination)
         _check_ordinary_installed(console, output, env)
         _check_gev_support_report(console, output, env)
         reference = _invoke([str(console), "references", "ARR3"], cwd=output, env=env, expected_code=0)

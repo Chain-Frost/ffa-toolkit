@@ -107,3 +107,15 @@ The bridge checks F/AEP complement consistency, unit/probability domains, centra
 ### Signed mathematical quantiles versus physical discharge
 
 Independent review found that a valid, **untruncated** Gumbel/GEV posterior can yield a **negative lower quantile probability limit** even when the expected-parameter, posterior mean, median and predictive quantiles are positive. WP06 correctly returns the signed mathematical result. The bridge and formatter preserve a **finite negative modelled quantile** and emit a clear nonphysical-discharge warning; they do **not** clip it, discard all other estimates, or fabricate a log10 moment. In contrast, **fixed input discharge** for probability/return-period-at-flow remains constrained nonnegative, with units. A synthetic two-component Gumbel regression specifically protects this distinction. The analyst must evaluate physical support and suitability before adopting a discharge estimate; preservation in an unqualified report is not endorsement of negative flows.
+
+
+## Opt-in frequency reports (issue #7, bounded first increment)
+
+`ffa fit ... --frequency-report` adds a static SVG, coordinate CSV, printable offline
+HTML report and exact input snapshots to the existing numerical bundle. The existing
+default bundle and result schemas are unchanged. The plot is restricted to consecutive
+exact positive systematic annual maxima and the already admitted deterministic fits.
+Cunnane AEP (descending ranks), F, units, tie decision, signed quantiles, the absence of
+intervals and fitted-support warnings are explicit. See [frequency plot guidance](methods/frequency-plots.md).
+Censored/historical exposure, Bayesian estimands and interval plots, full offline HTML manual,
+independent review and full qualification remain outside this increment.

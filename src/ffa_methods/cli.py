@@ -51,6 +51,9 @@ def make_parser() -> argparse.ArgumentParser:
     fit_parser.add_argument("--ams", required=True, type=Path, metavar="YEAR_AMS_CSV")
     fit_parser.add_argument("--settings", required=True, type=Path, metavar="SETTINGS_JSON")
     fit_parser.add_argument("--output", required=True, type=Path, metavar="NEW_REPORT_DIRECTORY")
+    fit_parser.add_argument(
+        "--frequency-report", action="store_true", help="Add static frequency SVG, coordinate CSV and HTML report"
+    )
     return parser
 
 
@@ -77,8 +80,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             raw_ams = args.ams.read_bytes()
             raw_settings = args.settings.read_bytes()
             result, settings = calculate_from_bytes(raw_ams, raw_settings)
-            source_inputs = (raw_ams, raw_settings) if settings["schema_version"] == ORDINARY_SCHEMA else None
-            paths = write_report_bundle(result, args.output, settings=settings, source_inputs=source_inputs)
+            source_inputs = (
+                (raw_ams, raw_settings)
+                if args.frequency_report or settings["schema_version"] == ORDINARY_SCHEMA
+                else None
+            )
+            paths = write_report_bundle(
+                result, args.output, settings=settings, source_inputs=source_inputs, frequency_report=args.frequency_report
+            )
         except (ValueError, TypeError, OverflowError, FileExistsError) as exc:
             parser.error(str(exc))
         except OSError as exc:

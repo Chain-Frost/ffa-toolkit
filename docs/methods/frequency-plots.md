@@ -1,0 +1,71 @@
+# Exact systematic annual maxima frequency plots
+
+**Method ID:** `frequency-plots` — independent bounded static presentation, version 1.
+Native Flike comparison, model suitability and engineering adoption are not established.
+
+## Purpose and interpretation
+
+Compare observed annual peaks with the fitted design quantiles. A plotting position is a
+rank-based visual diagnostic, not the actual flood probability inferred from a distribution.
+Adjacent ranks are statistically dependent; a visual fit is not an independent goodness-of-fit test.
+
+Use the Cunnane position from ARR Book 3 v4.2 Chapter 2 section 2.6.2,
+printed pp. 35–36, equations (3.2.35) and (3.2.36):
+`AEP_i = (i - 0.4)/(n + 0.2)`, `F_i = 1 - AEP_i`. Here n is the number of
+supplied gauged annual maxima and i=1 is the greatest discharge. Equal flows receive
+consecutive ranks ordered by ascending year; this is a project presentation decision, not
+a native convention or an additional statistical estimator. Each source record and rank is retained.
+
+The horizontal coordinate is proportional to -log10(AEP), with 100% at the left
+and rarer events to the right. The vertical axis is linear in the supplied discharge unit
+and includes zero and signed fitted quantiles; it does not clip nonphysical predictions.
+The graph shows only the actual requested deterministic fitted quantiles; line segments
+are visual guides, not interpolated calculations. No confidence, probability or
+prediction intervals are calculated. Support warnings remain visible; refer to the full
+analysis and check assumptions before adopting a design discharge.
+
+## Offline worked examples
+
+Use the already bundled, original synthetic examples for each installed deterministic path:
+
+~~~console
+ffa fit --ams fixed-gev-ams.csv --settings fixed-gev-settings.json --output gev-plot --frequency-report
+ffa fit --ams ordinary-ams.csv --settings ordinary-settings.json --output gumbel-plot --frequency-report
+ffa explain frequency-plots --format markdown
+~~~
+
+Copy the source resources from an installed wheel using
+`importlib.resources.files("ffa_methods").joinpath("resources", "examples")`.
+For fixed GEV, select each explicit H=0–4 in a separate settings file and output directory.
+For ordinary LN2, LP3 and GP fixed/free location, use the exact changes in
+`ffa explain l-moments --format markdown`; retain each distinct settings file and output directory.
+
+For the three-point ordinary sample (2000:1, 2001:2, 2002:4), descending ranks 1,2,3
+have AEP 3/16, 1/2, 13/16; F is the complement. These are independently
+hand-calculable plotting positions. Fitted results are the actual run values and are
+not additional empirical positions. The deterministic report JSON and CSV are the authoritative
+numerical records; their requested probabilities, discharge values and units are unchanged.
+
+The opt-in report adds `frequency.svg` (standalone vector graphic), `frequency-coordinates.csv`
+(full numeric F, AEP, Q, row, year and rank plus SVG pixel coordinates), and `report.html`
+(self-contained, printable, with the full numerical text report and systematic data table).
+It also retains byte-exact input and settings snapshots for both deterministic schemas.
+The output directory must be new, and no partial bundle is published on validation failure.
+Without the flag, previous outputs and schemas remain unchanged.
+
+## Admission and limitations
+
+Only the existing explicit deterministic ordinary and fixed-H GEV schemas and complete,
+consecutive, positive exact systematic annual maxima are supported. The caller's classification,
+year definition and unit remain assertions. The plot refuses unresolved gaps rather than treating
+them as measured exposure or non-exceedances. Existing unplotted fits are not restricted further.
+No missing, zero, historical, grouped, censored, rating-error, POT, posterior or interval plot
+is admitted here. An annual-maxima GP fit is not a POT workflow. Independence, stationarity,
+physical support, model selection, data quality, rating error and engineering adoption still
+require review. No native labels or defaults are inferred.
+
+**Sources:** ARR 2019, Book 3 v4.2, section 2.6.2, pp. 35–36, Commonwealth of Australia
+(Geoscience Australia), 2019; Cunnane (1978), Journal of Hydrology 37, 205–222,
+DOI 10.1016/0022-1694(78)90017-3 (publisher abstract reviewed; full paper not obtained).
+Use `ffa references ARR3` and `ffa references CUNNANE1978`.
+Independent numeric and installed checks are required before acceptance; native qualification is separate.

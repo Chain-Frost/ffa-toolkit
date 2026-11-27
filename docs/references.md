@@ -167,3 +167,9 @@ See [third-party admission](../THIRD_PARTY_NOTICES.md) and [retained mathematica
 ### OWNER_SETUP
 
 Engineering policy is defined in [repository setup](repository-setup.md), package metadata and [development](development.md). Historical repository comparisons are not public scientific evidence.
+
+### CUNNANE1978
+
+Cunnane, C. (1978). *Unbiased plotting positions — A review*. Journal of Hydrology 37(3–4), 205–222. [DOI 10.1016/0022-1694(78)90017-3](https://doi.org/10.1016/0022-1694(78)90017-3).
+
+**Role:** The publisher abstract identifies alpha=2/5 as a general compromise for plotting positions. ARR Book 3 v4.2, printed pp. 35–36, equations 3.2.35–3.2.36 were inspected directly and supply the operative descending-rank formula and its limits. The full Cunnane paper was not obtained; no source-specific tie or historical rule is inferred from the abstract. No source text or data are redistributed.
