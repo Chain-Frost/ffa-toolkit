@@ -175,9 +175,7 @@ def _reference(
             for i in range(points):
                 mu = low + (i + 0.5) * width
                 mass = eta_mass * _NORMAL.pdf(mu / 0.4) * width / 0.4
-                values = (
-                    _independent_values(mu, eta, free=free) if indicator_bound is None else (float(mu > cut),)
-                )
+                values = _independent_values(mu, eta, free=free) if indicator_bound is None else (float(mu > cut),)
                 cells.append((mass, _weight(mu, eta), values))
     normalizer = fsum(mass * weight for mass, weight, _ in cells)
     means = tuple(
@@ -191,9 +189,7 @@ def _reference(
     return means, variances
 
 
-def _actual_values(
-    model: ClassifiedLognormalPosterior, draw: tuple[float, ...]
-) -> tuple[float, ...]:
+def _actual_values(model: ClassifiedLognormalPosterior, draw: tuple[float, ...]) -> tuple[float, ...]:
     kernel = model.kernel(draw)
     upper_q = kernel.ppf(0.9)
     log_q = log(upper_q) / log(10)
@@ -219,8 +215,8 @@ def _references(*, free: bool) -> tuple[tuple[float, ...], tuple[float, ...]]:
     # Fixed-point survival brackets, not a density-based quantile MCSE.
     assert means[7] > 0.1 > means[8]
     for bound in (1.1, 1.5):
-        a, av = _reference(81, free=free, indicator_bound=bound)
-        b, bv = _reference(161, free=free, indicator_bound=bound)
+        a, av = _reference(161, free=free, indicator_bound=bound)
+        b, bv = _reference(321, free=free, indicator_bound=bound)
         assert isclose(a[0], b[0], rel_tol=0, abs_tol=1e-4)
         assert isclose(av[0], bv[0], rel_tol=0, abs_tol=1e-4)
         means = (*means, *b)

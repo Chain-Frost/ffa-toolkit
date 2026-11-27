@@ -78,7 +78,7 @@ Reference integrates independent Normal density/censor formulas and
 the ratio variance coefficient E_g[W²(h-E_pi[h])²]/E_g[W]². The
 81/161 midpoint grids span nine proposal SDs in each coordinate.
 For posterior indicator reference, split the mu integral at
-log(bound) - z_0.9 exp(eta), and refine both subintervals. These finite
+log(bound) - z_0.9 exp(eta), and refine both subintervals with 161/321 grids. These finite
 grids are a synthetic regression reference, not certified integration
 error bounds for general models.
 
@@ -105,14 +105,65 @@ for the same smooth reference quantities gave:
 | E[log10 q_0.9] | 0.557966602 | 0.547787734 |
 | E[q_0.2] | 0.453498734 | 0.462143398 |
 
-Grid refinement on those smooth quantities and their variance
-coefficients agreed within 7e-15 absolute for that calculation.
-The independent simulation of the eight smooth reference integrands
-on the six fixed streams gave maximum absolute standardized errors
-below 2 and observed/reference MCSE ratios between 0.89 and 1.01.
+Grid refinement on all ten smooth quantities and their variance
+coefficients agreed within 8e-15 absolute in the expanded standalone
+calculation. The initial 81/161 indicator refinement exceeded the
+predeclared 1e-4 absolute quadrature difference at some endpoints;
+refining the grid to 161/321 reduced the largest difference in the
+indicator means and variance coefficients to 3.4e-5 without weakening
+the criterion. All twelve integrands on the six fixed streams gave
+maximum absolute standardized error below 2.91, observed/reference
+MCSE ratios between 0.89 and 1.02, minimum centered side effective
+size above 244, and minimum side count above 877.
 It used separately implemented density/weight calculations, not the
 repository sampler; it does not substitute for executing the committed
 tests. No production precision acceptance is claimed.
+
+
+## Normalized density-ratio envelope: proposed next admission step
+
+A separate sufficient bound is available without estimating a normalizer
+from the sampled weights. Write the target as a constant times
+phi_(m*,P)(theta) W(theta), where m*=m-n P e_eta (m*=m at fixed scale).
+Here W is the product of the exact Gaussian residual factors
+exp(-((y-mu)/sigma)^2/2) and the censor probabilities, so 0<W<=1.
+The normalized density is phi_(m*,P) W / Z_W. If G-P is strictly
+positive definite, completing the square gives the log supremum of
+phi_(m*,P)/g as
+
+    B = (log(det G / det P) + (a-m*)' (G-P)^-1 (a-m*))/2.
+
+If G=P and a=m* exactly in real arithmetic, B=0. Equal covariance
+with unequal means does not have a finite Gaussian ratio supremum.
+The strict covariance requirement for this envelope is stronger than
+the second-moment condition; never conflate them.
+
+For a finite box A around the tilted-prior mean, use a strictly positive
+lower bound for its Gaussian probability (the marginal union bound
+works even with correlation). If each marginal interval spans k SD
+either side, P(A) >= 1 - 2 d Phi(-k), where d is dimension. Bound each
+exact residual on A by its largest absolute log-flow residual divided
+by the smallest sigma on A. For each censor contribution, choose a
+finite nonempty log-flow subinterval contained in the event. Its
+probability on A is at least its width times the smallest Normal
+density bound on A and that subinterval. Specifically, with sigma
+between s_min and s_max and maximum |y-mu| equal to D, the density is
+at least exp(-D²/(2 s_min²))/(sqrt(2 pi) s_max). Multiply these lower
+bounds for W. Then Z_W >= P(A) inf_A W > 0, and B - log(lower Z_W)
+bounds the normalized log ratio. No sampled weight or estimated Z
+is used as a substitute for the lower bound.
+
+For the synthetic examples above with k=1 and finite censor
+subintervals [-1.2,-0.2], [0.1,1.1], [-0.5,0.5], independent
+binary64 calculations give illustrative lower Z_W values 0.0012639283
+(fixed) and 0.0001511031 (estimated scale), giving log-ratio caps
+about 6.67354 and 8.79755 for the matching tilted Gaussian.
+These are mathematical derivation/regression targets, not certified
+outward-rounded runtime values. A runtime implementation must account
+for finite representation of the tilted location, strict matrix signs,
+log determinants, quadratic form, lower box mass and likelihood bounds;
+withhold admission if the declared ceiling or rounding cannot be
+established. This is not a change to the approved exact-record audit.
 
 ## Remaining gates
 

@@ -41,9 +41,7 @@ def _positive_definite(matrix: tuple[tuple[Fraction, ...], ...]) -> bool:
     return b == c and a > 0 and a * d > b * c
 
 
-def _second_moment_envelope(
-    prior: tuple[tuple[float, ...], ...], proposal: tuple[tuple[float, ...], ...]
-) -> bool:
+def _second_moment_envelope(prior: tuple[tuple[float, ...], ...], proposal: tuple[tuple[float, ...], ...]) -> bool:
     p = tuple(tuple(Fraction(v) for v in row) for row in prior)
     g = tuple(tuple(Fraction(v) for v in row) for row in proposal)
     difference = tuple(
