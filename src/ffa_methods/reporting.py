@@ -452,6 +452,37 @@ def _precision_fields(result: AnalysisResult) -> dict[str, object]:
     }
 
 
+def _precision_labels(
+    result: AnalysisResult, points: list[dict[str, object]], settings: Mapping[str, object]
+) -> None:
+    if settings.get("schema_version") != "ffa-lognormal-bayesian/1":
+        return
+    audit = result.precision_audit
+    for point, record in zip(result.values, points, strict=True):
+        record["precision_state"] = "not_assessed"
+        if audit is None:
+            continue
+        for index, request in enumerate(audit.requests):
+            if (
+                request.meaning != point.meaning
+                or request.non_exceedance != point.input_probability
+                or request.discharge != point.input_discharge
+                or request.interval_mass != point.confidence_level
+                or request.side != point.probability_limit_side
+                or request.log_moment != point.log10_moment_kind
+            ):
+                continue
+            state = audit.states[index].value
+            if state == "conditional_pass" and (
+                not audit.attempts or audit.attempts[0].outputs[index].estimate != point.value
+            ):
+                # Different numerical paths (e.g. affine log10 moment versus
+                # discharge-space transform) must not inherit a precision pass.
+                state = "indeterminate_primary_estimate_mismatch"
+            record["precision_state"] = state
+            break
+
+
 def report_document(result: AnalysisResult, *, settings: Mapping[str, object]) -> dict[str, object]:
     """Prepare replayable, finite JSON data from an already computed result."""
     provenance = result.provenance
@@ -475,6 +506,7 @@ def report_document(result: AnalysisResult, *, settings: Mapping[str, object]) -
     parameters = [_parameter(parameter) for parameter in result.parameters]
     diagnostics = [_diagnostic(diagnostic) for diagnostic in result.diagnostics]
     points = [_point(point, method_id=method_id) for point in result.values]
+    _precision_labels(result, points, settings_data)
     warnings = [_text(warning, label="warning") for warning in result.warnings]
     warnings.extend(
         _nonphysical_quantile_warning(point)
@@ -569,6 +601,8 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
         "probability_limit_construction",
         "log10_moment_kind",
     )
+    if settings.get("schema_version") == "ffa-lognormal-bayesian/1":
+        keys = (*keys, "precision_state")
     stream = StringIO(newline="")
     writer = csv.writer(stream, lineterminator="\n")
     support = doc.get("gev_fitted_support")
@@ -647,6 +681,8 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
             )
         if point["log10_moment_kind"] is not None:
             components.append(f"log10 moment={point['log10_moment_kind']}")
+        if "precision_state" in point:
+            components.append(f"numerical precision={point['precision_state']}")
         lines.append("  " + " | ".join(components))
     lines.extend(("", "WARNINGS"))
     warnings = cast(list[str], doc["warnings"])

@@ -216,8 +216,8 @@ def _precision_request(raw: object, outputs: OutputSettings, *, fixed: bool) -> 
         non_exceedance=_optional_number(v["non_exceedance"], name="non_exceedance"),
         discharge=_optional_number(v["discharge"], name="discharge"),
         interval_mass=_optional_number(v["interval_mass"], name="interval_mass"),
-        side=cast("Literal['lower', 'upper'] | None", side),
-        log_moment=cast("Literal['mean', 'standard_deviation'] | None", moment),
+        side=cast(Literal["lower", "upper"] | None, side),
+        log_moment=cast(Literal["mean", "standard_deviation"] | None, moment),
     )
     if (
         (request.non_exceedance is not None and request.non_exceedance not in outputs.probabilities)
@@ -253,6 +253,9 @@ def _precision(
         _precision_request(item, outputs, fixed=fixed)
         for item in _items(v["requests"], name="precision requests")
     )
+    if len({replace(request, absolute_tolerance=1.0) for request in requests}) != len(requests):
+        msg = "precision output identities must be unique, regardless of tolerance"
+        raise ValueError(msg)
     # The report sampler runs once; the existing audit replays that primary
     # stream and independently samples its audit streams. Reserve all draws.
     report_reservation = sampling.draw_count * (300 * len(outputs.probabilities) + 20 * len(outputs.discharges) + 10)
@@ -396,7 +399,17 @@ def calculate_bayesian(
         parameters=run.moments.parameters,
         discharge_unit=model.series.discharge_unit,
         quantiles=tuple(
-            quantile_outputs(run.particles, p, model.kernel, interval_mass=outputs.interval_mass)
+            quantile_outputs(
+                run.particles,
+                p,
+                model.kernel,
+                interval_mass=outputs.interval_mass,
+                mean_undefined_reason=(
+                    "upper design-flood mean diverges for the full Gaussian estimated-log-SD model"
+                    if model.fixed_log_sd is None and p > 0.5
+                    else None
+                ),
+            )
             for p in outputs.probabilities
         ),
         probabilities=tuple(
@@ -405,23 +418,6 @@ def calculate_bayesian(
         ),
         warnings=warnings,
     )
-    # A finite sample mean cannot establish a finite posterior moment. Under
-    # a full Gaussian log-SD prior, the upper design-flood mean is divergent.
-    if model.fixed_log_sd is None and any(p > 0.5 for p in outputs.probabilities):
-        result = replace(
-            result,
-            values=tuple(
-                point for point in result.values
-                if not (
-                    point.meaning == ResultMeaning.POSTERIOR_MEAN_QUANTILE
-                    and point.input_probability is not None and point.input_probability > 0.5
-                )
-            ),
-            warnings=(
-                *result.warnings,
-                "UNDEFINED: posterior mean quantile at F>0.5 diverges for this full Gaussian estimated-log-SD model; omitted.",
-            ),
-        )
     audit = None
     if audit_settings is not None:
         audit = audit_lognormal_precision(
@@ -438,6 +434,10 @@ def calculate_bayesian(
             RunDiagnostic(name="importance_zero_weight_count", value=float(run.moments.zero_weight_count), unit="count"),
             RunDiagnostic(name="local_scaled_gradient_norm", value=construction.scaled_gradient_norm, unit="dimensionless"),
             RunDiagnostic(name="local_scaled_condition", value=construction.scaled_condition, unit="dimensionless"),
+            *(
+                RunDiagnostic(name=f"approximate_parameter_mean_mcse_{coordinate}", value=mcse, unit="source coordinate")
+                for coordinate, mcse in zip(model.coordinates, run.approximate_mean_mcse, strict=True)
+            ),
         ),
         precision_audit=audit,
         warnings=(
