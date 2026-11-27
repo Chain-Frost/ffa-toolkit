@@ -1,0 +1,83 @@
+{
+  "schema_version": "ffa-lognormal-bayesian/1",
+  "estimator": "lognormal_bayesian",
+  "source_format": "year_ams_csv",
+  "source": "synthetic log flows 1, 2, 3",
+  "source_classification": "caller_asserted_classified_systematic_annual_maxima",
+  "discharge_unit": "m3/s",
+  "year_definition": "synthetic calendar year",
+  "reference_discharge": 1,
+  "fixed_log_sd": 0,
+  "prior": {
+    "mode": "supplied",
+    "source": "synthetic Gaussian prior for independent example only",
+    "coordinates": [
+      "lognormal.mean_loge_flow"
+    ],
+    "means": [
+      0
+    ],
+    "covariance": [
+      [
+        1
+      ]
+    ]
+  },
+  "proposal": {
+    "start": [
+      0
+    ],
+    "gamma": 2.05,
+    "scales": [
+      1
+    ],
+    "initial_step": 0.01,
+    "max_refinements": 8,
+    "max_iterations": 30,
+    "gradient_tolerance": 0.00001,
+    "mode_tolerance": 0.00001,
+    "curvature_tolerance": 0.0001,
+    "max_condition": 100000
+  },
+  "sampling": {
+    "rng": "python_random_gauss",
+    "draw_count": 1800,
+    "random_seed": 51,
+    "minimum_effective_size": 600,
+    "maximum_single_weight": 0.05
+  },
+  "outputs": {
+    "non_exceedance_probabilities": [
+      0.9
+    ],
+    "discharges": [
+      7.38905609893065
+    ],
+    "interval_mass": 0.8
+  },
+  "precision": {
+    "mode": "fixed_budget",
+    "audit_seeds": [
+      52,
+      53
+    ],
+    "maximum_total_draws": 7200,
+    "maximum_scalar_evaluations": 2000000,
+    "alpha": 0.05,
+    "minimum_side_count": 8,
+    "minimum_side_ess": 8,
+    "maximum_log_ratio": 1.2,
+    "criterion_source": "synthetic conjugate example only; not an engineering precision criterion",
+    "requests": [
+      {
+        "meaning": "expected_annual_exceedance_probability",
+        "absolute_tolerance": 0.09,
+        "non_exceedance": null,
+        "discharge": 7.38905609893065,
+        "interval_mass": null,
+        "side": null,
+        "log_moment": null
+      }
+    ]
+  }
+}

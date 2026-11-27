@@ -198,6 +198,73 @@ def _check_gev_support_report(console: Path, output: Path, env: dict[str, str]) 
         raise RuntimeError(msg)
 
 
+def _check_bayesian_installed(console: Path, output: Path, env: dict[str, str]) -> None:
+    """Check real console execution from admitted synthetic bytes outside checkout."""
+    for kind in ("fixed", "censored"):
+        ams = output / f"bayesian-{kind}-ams.csv"
+        settings = output / f"bayesian-{kind}-settings.json"
+        destination = output / f"bayesian-{kind}-report"
+        args = [
+            str(console), "fit", "--ams", str(ams), "--settings", str(settings), "--output", str(destination)
+        ]
+        _invoke(args, cwd=output, env=env, expected_code=0)
+        doc = json.loads((destination / "results.json").read_text(encoding="utf-8"))
+        if (
+            doc["method_qualification"] != "not_established_by_formatter"
+            or doc["provenance"]["input_sha256"] != sha256(ams.read_bytes()).hexdigest()
+            or doc["provenance"]["settings_sha256"] != sha256(settings.read_bytes()).hexdigest()
+            or (destination / "source-ams.csv").read_bytes() != ams.read_bytes()
+            or (destination / "source-settings.json").read_bytes() != settings.read_bytes()
+        ):
+            msg = "installed Bayesian workflow lost source custody or qualification status"
+            raise RuntimeError(msg)
+        rows = {point["meaning"]: point for point in doc["results"]}
+        aep = rows["expected_annual_exceedance_probability"]
+        if kind == "fixed":
+            reference = 1 - NormalDist(1.5, sqrt(1.25)).cdf(2.0)
+            z = NormalDist().inv_cdf(0.9)
+            if (
+                not isclose(doc["parameters"][0]["mean"], 1.5, abs_tol=0.16)
+                or not isclose(aep["value"], reference, abs_tol=0.09)
+                or not isclose(rows["posterior_predictive_quantile"]["value"], exp(1.5 + sqrt(1.25) * z), abs_tol=9)
+                or not isclose(rows["posterior_mean_quantile"]["value"], exp(1.5 + z + 0.125), abs_tol=6)
+                or rows["posterior_mean_quantile"]["value"] == rows["quantile_at_expected_parameters"]["value"]
+                or aep["precision_state"] != "conditional_pass"
+                or doc["precision_audit"]["completed_count"] != 3
+            ):
+                msg = "installed fixed-scale Bayesian fit failed conjugate reference or selected-output audit"
+                raise RuntimeError(msg)
+        elif (
+            not isclose(doc["parameters"][0]["mean"], 0.003598304886871672, abs_tol=0.032)
+            or not isclose(doc["parameters"][1]["mean"], -0.01338564667751898, abs_tol=0.012)
+            or not isclose(aep["value"], 0.3686203803796388, abs_tol=0.012)
+            or "posterior_mean_quantile" in rows
+            or aep["precision_state"] != "not_assessed"
+            or not any("UNDEFINED" in warning and "diverges" in warning for warning in doc["warnings"])
+        ):
+            msg = "installed estimated-scale censored Bayesian fit failed independent quadrature reference"
+            raise RuntimeError(msg)
+        replay = output / f"bayesian-{kind}-replay"
+        _invoke([*args[:-1], str(replay)], cwd=output, env=env, expected_code=0)
+        if any(item.read_bytes() != (replay / item.name).read_bytes() for item in destination.iterdir()):
+            msg = "installed Bayesian same-environment seeded replay differs"
+            raise RuntimeError(msg)
+        _invoke(args, cwd=output, env=env, expected_code=2)
+    bad_ams = output / "bayesian-invalid-ams.csv"
+    bad_ams.write_bytes(b"Year,AMS\n2000,0\n")
+    invalid_destination = output / "bayesian-invalid-report"
+    _invoke(
+        [
+            str(console), "fit", "--ams", str(bad_ams), "--settings", str(output / "bayesian-fixed-settings.json"),
+            "--output", str(invalid_destination),
+        ],
+        cwd=output, env=env, expected_code=2,
+    )
+    if invalid_destination.exists():
+        msg = "invalid installed Bayesian input created an output bundle"
+        raise RuntimeError(msg)
+
+
 def smoke_installed(dist_dir: Path) -> None:
     """Check version/help/rejection, import origin and offline packaged resources."""
     wheels = sorted(dist_dir.glob("ffa_toolkit-*.whl"))
@@ -300,7 +367,9 @@ print(f"wheel import: {site_path}")
 from importlib.resources import files
 from pathlib import Path
 root = files("ffa_methods").joinpath("resources", "examples")
-for name in ("fixed-gev-ams.csv", "fixed-gev-settings.json", "ordinary-ams.csv", "ordinary-settings.json"):
+for name in ("fixed-gev-ams.csv", "fixed-gev-settings.json", "ordinary-ams.csv", "ordinary-settings.json",
+             "bayesian-fixed-ams.csv", "bayesian-fixed-settings.json",
+             "bayesian-censored-ams.csv", "bayesian-censored-settings.json"):
     Path(name).write_bytes(root.joinpath(name).read_bytes())
 """
         _invoke([str(interpreter), "-c", copy_examples], cwd=output, env=env, expected_code=0)
@@ -330,6 +399,7 @@ for name in ("fixed-gev-ams.csv", "fixed-gev-settings.json", "ordinary-ams.csv",
         _invoke(fit_args, cwd=output, env=env, expected_code=2)
         _check_ordinary_installed(console, output, env)
         _check_gev_support_report(console, output, env)
+        _check_bayesian_installed(console, output, env)
         reference = _invoke([str(console), "references", "ARR3"], cwd=output, env=env, expected_code=0)
         if "### ARR3" not in reference.stdout or "2.6.3.6" not in reference.stdout:
             msg = "installed offline reference register lacks the pinned ARR citation"

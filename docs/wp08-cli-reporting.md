@@ -1,6 +1,6 @@
 ## 24 November 2026 — executable fixed-H GEV mathematical CLI (partial)
 
-**Current stage:** The installed `ffa fit` command implements a **mathematically specified deterministic** GEV calculation from exact source bytes to three report files. This supersedes older statements below that no fitting command is available. It does **not** enable Bayesian fitting, optimized-H selection, censored/zero/historical analyses or native Flike comparison. Ordinary family fits are described below.
+**Current stage:** The installed `ffa fit` command implements a **mathematically specified deterministic** GEV calculation from exact source bytes to three report files. This supersedes older statements below that no fitting command is available. This fixed-H schema does **not** enable Bayesian fitting, optimized-H selection, censored/zero/historical analyses or native Flike comparison. The separate [issue #6 Bayesian schema](wp08-bayesian-cli.md) composes explicit lognormal inference and typed reporting. Ordinary family fits are described below.
 
 ```console
 ffa fit --ams fixed-gev-ams.csv --settings fixed-gev-settings.json --output fixed-gev-report

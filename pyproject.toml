@@ -65,6 +65,11 @@ packages = ["src/ffa_methods"]
 "docs/examples/ordinary-ams.csv" = "ffa_methods/resources/examples/ordinary-ams.csv"
 "docs/methods/l-moments.md" = "ffa_methods/resources/methods/l-moments.md"
 
+"docs/examples/bayesian-fixed-ams.csv" = "ffa_methods/resources/examples/bayesian-fixed-ams.csv"
+"docs/examples/bayesian-fixed-settings.json" = "ffa_methods/resources/examples/bayesian-fixed-settings.json"
+"docs/examples/bayesian-censored-ams.csv" = "ffa_methods/resources/examples/bayesian-censored-ams.csv"
+"docs/examples/bayesian-censored-settings.json" = "ffa_methods/resources/examples/bayesian-censored-settings.json"
+
 [tool.hatch.build.targets.sdist]
 include = [
     "/src/ffa_methods",
@@ -80,6 +85,10 @@ include = [
     "/docs/examples/fixed-gev-settings.json",
     "/docs/examples/ordinary-settings.json",
     "/docs/examples/ordinary-ams.csv",
+    "/docs/examples/bayesian-fixed-ams.csv",
+    "/docs/examples/bayesian-fixed-settings.json",
+    "/docs/examples/bayesian-censored-ams.csv",
+    "/docs/examples/bayesian-censored-settings.json",
     "/docs/methods/l-moments.md",
     "/docs/method-registry.json",
     "/docs/references.md",

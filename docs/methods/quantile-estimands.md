@@ -30,3 +30,27 @@ The current CLI cannot fit source files; formatter output is always explicitly *
 **Mathematical basis:** ARR 2019 Book 3 Chapter 2 §2.5 equations 3.2.25–3.2.34 and §§2.6.3.6–2.6.3.7 equations 3.2.52–3.2.56; Kuczera (1999), DOI 10.1029/1999WR900012 (`ARR3`, `KUCZERA1999`).
 
 **Observed candidate tables:** expected-parameter rows, 90% Monte Carlo limits and expected-probability/return-period columns (`LEGACY_SAMPLES`), without verified settings/interval interpolation. **Project decision:** preserve estimand, source-coordinate and base-10/probability distinctions. **Remaining:** fitted engine, interval interpolation, native output matching and independent acceptance. Citations are included in the installed `ffa references` command.
+
+## Explicit lognormal Bayesian CLI examples
+
+The versioned `ffa-lognormal-bayesian/1` workflow composes the existing
+classified lognormal binding, local curvature, full covariance scaling,
+actual independent importance sampler and typed WP06 output bridge. It
+does not choose native Flike defaults. From a checkout, run:
+
+```console
+ffa fit --ams docs/examples/bayesian-fixed-ams.csv --settings docs/examples/bayesian-fixed-settings.json --output fixed-bayes
+ffa fit --ams docs/examples/bayesian-censored-ams.csv --settings docs/examples/bayesian-censored-settings.json --output censored-bayes
+```
+
+The four example files are also packaged in `ffa_methods/resources/examples/`.
+The full versioned settings contract, derivation and synthetic reference
+checks are in [Bayesian CLI workflow](../wp08-bayesian-cli.md).
+The fixed example audits its expected AEP only, with explicit example
+tolerances; all other results remain unassessed. The estimated-scale
+censored example has no output precision admission. For the full Gaussian
+estimated-log-SD prior the mean design quantile at F > 0.5 is divergent,
+so that particular estimand is explicitly omitted rather than replaced by
+a finite simulated average. Other estimands are distinct, not substitutes.
+Neither example establishes native equivalence, engineering suitability
+or general tail precision.

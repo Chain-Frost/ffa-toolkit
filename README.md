@@ -15,13 +15,14 @@ ffa explain lh-moments-gev
 ffa explain l-moments --format markdown
 ffa fit --ams docs/examples/fixed-gev-ams.csv --settings docs/examples/fixed-gev-settings.json --output example-result
 ffa fit --ams docs/examples/ordinary-ams.csv --settings docs/examples/ordinary-settings.json --output ordinary-result
+ffa fit --ams docs/examples/bayesian-fixed-ams.csv --settings docs/examples/bayesian-fixed-settings.json --output bayesian-result
 ```
 
 The example uses generated annual maxima. The installed calculation path supports explicit-settings,
 complete positive annual maxima, fixed-H GEV L/LH fitting and ordinary Gumbel, LN2, LP3 and fixed/free-location GP L-moment fits. See [ordinary L-moment guidance](docs/methods/l-moments.md). Other mathematical components include five
 distribution kernels, ordinary L-moment estimators, likelihoods, priors, shared rating errors, low-flow
 screening, importance proposals and sampling, and weighted Bayesian outputs. Internal components are
-not all available through the CLI. Unsupported workflows fail explicitly. See the
+not all available through the CLI. The explicit lognormal Bayesian workflow supports supplied Gaussian priors and classified systematic annual records, subject to the [workflow scope and acceptance](docs/wp08-bayesian-cli.md). Unsupported workflows fail explicitly. See the
 [supported-calculation matrix](docs/initial-delivery-matrix.md) for the installed boundary,
 remaining workflow requirements and independent acceptance criteria.
 

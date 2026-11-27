@@ -586,7 +586,7 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
     """Return a deterministic JSON, tabular CSV and text presentation of identical values."""
     doc = report_document(result, settings=settings)
     typed_points = cast(list[dict[str, object]], doc["results"])
-    keys = (
+    keys: tuple[str, ...] = (
         "meaning",
         "value",
         "unit",

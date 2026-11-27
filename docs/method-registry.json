@@ -23,7 +23,7 @@
   "reference_register": "references.md",
   "implementation_status": "not_implemented",
   "qualification_status": "not_started",
-  "status_applies_to": "Global not_implemented denotes the incomplete full programme, not absence of calculation. The installed CLI supports explicit-settings fixed-H GEV and ordinary L-moment fitting. Per-method entries distinguish implemented kernels, estimators, likelihood/prior/rating/low-flow/sampling components and reporting from outstanding workflows. No method is native-qualified.",
+  "status_applies_to": "Global not_implemented denotes the incomplete full programme, not absence of calculation. The CLI supports explicit-settings fixed-H GEV and ordinary L-moment fitting; explicit lognormal Bayesian orchestration is the bounded issue #6 implementation under review. Per-method entries distinguish implemented kernels, estimators, likelihood/prior/rating/low-flow/sampling components and reporting from outstanding workflows. No method is native-qualified.",
   "progress_tracker": "https://github.com/Chain-Frost/ffa-toolkit/issues",
   "work_package_issues": {},
   "schema_change_notes": [
@@ -400,7 +400,7 @@
         "Bounded known-scale exact-record precision audit against conjugate Normal reference outputs, centered residual MCSE, simultaneous inverse and transformed intervals, reproducibility and retained unsuccessful attempts"
       ],
       "evidence_gaps": [
-        "Independent local curvature, explicit full covariance scaling, Normal importance draws, explicit lognormal binding and a bounded known-scale exact-record precision audit are internal components; broader model/exposure precision admission and installed Bayesian fitting remain outstanding.",
+        "Independent local curvature, explicit full covariance scaling, Normal importance draws, explicit lognormal binding and a bounded known-scale exact-record precision audit are composed in the issue #6 CLI implementation; installed acceptance, broader model/exposure precision admission and native comparison remain outstanding.",
         "Actual native Flike optimizer/proposal, random controls, stopping and output interpolation are not established; external native qualification remains separate.",
         "ESS, approximate mean Monte Carlo standard error, and independent seeds do not by themselves validate extreme-tail flood estimates or native equivalence."
       ],
@@ -446,7 +446,7 @@
       "qualification_status": "not_started",
       "evidence_gaps": [
         "Weighted estimands use an explicitly defined empirical interpolation; FLIKE reporting rules and the zero-threshold log10 calculation require native evidence.",
-        "Binary64 generalized inverse is independently tested; the native interpolation, printed tail limits and solver precision remain unqualified."
+        "Binary64 generalized inverse is independently tested; issue #6 adds explicit lognormal CLI/report composition with selected-output audit labels and omission of divergent estimated-scale upper design-flood means. Installed acceptance and native interpolation, printed tail limits and solver precision remain unqualified."
       ]
     },
     {
