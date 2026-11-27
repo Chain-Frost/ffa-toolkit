@@ -88,9 +88,9 @@ invalid, but is outside this bounded-ratio admission route.
 Any established positive lower bound A_L<=A gives
 
     pi/g <= K = B/A_L,
-    log K <= log B - log A_L
+    log K = log B - log A_L.
 
-where K is the upper bound B/A_L, not an estimate of the largest
+Here K is the upper bound B/A_L, not an estimate of the largest
 observed normalized weight. For admission compare a conservative
 upper enclosure of log(B/A_L) against the caller's predeclared
 maximum_log_ratio. Record both terms and their derivation. Never
