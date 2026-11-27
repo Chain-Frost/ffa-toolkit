@@ -96,6 +96,15 @@ def _requests() -> tuple[PrecisionRequest, ...]:
             log_moment="mean",
             absolute_tolerance=0.09,
         ),
+        PrecisionRequest(
+            meaning=ResultMeaning.LOG10_QUANTILE_POSTERIOR_MOMENT,
+            non_exceedance=p,
+            log_moment="standard_deviation",
+            absolute_tolerance=0.08,
+        ),
+        PrecisionRequest(
+            meaning=ResultMeaning.QUANTILE_AT_EXPECTED_PARAMETERS, non_exceedance=p, absolute_tolerance=5.0
+        ),
         PrecisionRequest(meaning=ResultMeaning.POSTERIOR_PREDICTIVE_QUANTILE, non_exceedance=p, absolute_tolerance=9.0),
         PrecisionRequest(meaning=ResultMeaning.POSTERIOR_MEDIAN_QUANTILE, non_exceedance=p, absolute_tolerance=7.0),
         PrecisionRequest(
@@ -139,6 +148,8 @@ def test_independent_fixed_budget_all_admitted_outputs_against_conjugate_oracle(
         1 - f,
         1 / (1 - f),
         (1.5 + z) / log(10),
+        0.5 / log(10),
+        exp(1.5 + z),
         exp(1.5 + sqrt(1.25) * z),
         exp(1.5 + z),
         exp(1.5 + z + 0.5 * normal.inv_cdf(0.1)),
@@ -152,7 +163,8 @@ def test_independent_fixed_budget_all_admitted_outputs_against_conjugate_oracle(
     assert tuple(attempt.seed for attempt in result.attempts) == plan.seeds
     assert all(attempt.attempted and attempt.completed_draws == 1800 for attempt in result.attempts)
     assert result.state == PrecisionState.CONDITIONAL_PASS, result.states
-    assert result.critical_value == -normal.inv_cdf(plan.alpha / (2 * 2 * len(requests)))
+    # Log SD requires four one-sided bounds, the other outputs two.
+    assert result.critical_value == -normal.inv_cdf(plan.alpha / (2 * (2 * len(requests) + 2)))
     for attempt in result.attempts:
         for output, reference in zip(attempt.outputs, expected, strict=True):
             assert output.reference is not None and isclose(output.reference, reference, rel_tol=1e-12)
@@ -162,6 +174,16 @@ def test_independent_fixed_budget_all_admitted_outputs_against_conjugate_oracle(
                 assert check.approximate_mcse is not None and check.approximate_mcse > 0
                 assert check.positive.count >= plan.minimum_side_count
                 assert check.negative.effective_size >= plan.minimum_side_ess
+    # The SD uses the primary log mean for both independently estimated
+    # moments; the expected-parameter quantile transforms a mean interval.
+    for attempt in result.attempts[1:]:
+        sd, at_mean = attempt.outputs[6:8]
+        assert len(sd.scalar_checks) == 2
+        assert sd.integration_interval is not None
+        assert sd.integration_interval.contains(0.5 / log(10))
+        assert at_mean.integration_interval is not None
+        assert at_mean.integration_interval.contains(exp(1.5 + z))
+    assert result.attempts[0].outputs[1].estimate != result.attempts[0].outputs[7].estimate
     # The first audit stream uses the primary window, not its own estimate.
     assert tuple(item.window for item in result.attempts[1].outputs) == tuple(
         item.window for item in result.attempts[0].outputs
@@ -263,28 +285,24 @@ def test_failure_retention_and_replay(monkeypatch: pytest.MonkeyPatch) -> None:
     assert first.attempts[2].outputs[0].estimate is not None
 
 
-def test_tight_tolerance_and_unimplemented_propagation_do_not_pass() -> None:
+def test_tight_tolerance_for_scalar_and_transformed_outputs_does_not_pass() -> None:
     model = _model()
     requests = (
         PrecisionRequest(meaning="parameter_mean", absolute_tolerance=1e-7),
         PrecisionRequest(
-            meaning=ResultMeaning.QUANTILE_AT_EXPECTED_PARAMETERS, non_exceedance=0.9, absolute_tolerance=100
+            meaning=ResultMeaning.QUANTILE_AT_EXPECTED_PARAMETERS, non_exceedance=0.9, absolute_tolerance=1e-7
         ),
         PrecisionRequest(
             meaning=ResultMeaning.LOG10_QUANTILE_POSTERIOR_MOMENT,
             non_exceedance=0.9,
             log_moment="standard_deviation",
-            absolute_tolerance=100,
+            absolute_tolerance=1e-7,
         ),
     )
     result = audit_lognormal_precision(
         model=model, proposal=_proposal(), provenance=_provenance(model), plan=_plan(draws=400), requests=requests
     )
-    assert result.states == (
-        PrecisionState.CRITERIA_NOT_MET,
-        PrecisionState.INDETERMINATE,
-        PrecisionState.INDETERMINATE,
-    )
+    assert result.states == (PrecisionState.CRITERIA_NOT_MET,) * 3
     assert all(item.estimate is not None for item in result.attempts[0].outputs)
 
 
