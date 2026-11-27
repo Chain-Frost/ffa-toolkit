@@ -150,7 +150,7 @@ class ClassifiedFixedFamilyPosterior:
         else:
             self._validate_lp3_shape()
         # Validate the fixed scale and the representative kernel construction.
-        self._raw_kernel(0.0)
+        _ = self._raw_kernel(0.0)
 
     def _validate_lp3_shape(self) -> None:
         if abs(self.fixed_shape) >= 2.0 or 0.0 < abs(self.fixed_shape) < 1.6e-5:
@@ -265,7 +265,9 @@ def execute_fixed_family_posterior(
 ) -> ExecutedFixedFamilyPosterior:
     """Execute existing local curvature and sampling components with explicit gamma."""
     target = model.target()
-    construction = build_curvature_proposal(target=target, starting_point=starting_point, controls=curvature, gamma=gamma)
+    construction = build_curvature_proposal(
+        target=target, starting_point=starting_point, controls=curvature, gamma=gamma
+    )
     result = independent_importance_sample(
         proposal=construction.proposal,
         target=target,

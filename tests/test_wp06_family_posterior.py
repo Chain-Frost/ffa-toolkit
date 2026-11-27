@@ -105,7 +105,12 @@ def _terms(family: PosteriorFamily, shape: float, mu: float) -> tuple[float, ...
 
 @pytest.mark.parametrize(
     ("family", "shape"),
-    [(PosteriorFamily.GEV, 0.2), (PosteriorFamily.GEV, -0.2), (PosteriorFamily.LP3, 1.0), (PosteriorFamily.LP3, -1.0)],
+    [
+        (PosteriorFamily.GEV, 0.2),
+        (PosteriorFamily.GEV, -0.2),
+        (PosteriorFamily.LP3, 1.0),
+        (PosteriorFamily.LP3, -1.0),
+    ],
 )
 def test_family_density_prior_and_censor_terms(family: PosteriorFamily, shape: float) -> None:
     model = _model(family, shape)
@@ -117,9 +122,8 @@ def test_family_density_prior_and_censor_terms(family: PosteriorFamily, shape: f
     for term, reference in zip(actual.terms[:4], expected, strict=True):
         assert isclose(term.log_value, reference, rel_tol=0, abs_tol=2e-12)
     assert isclose(model.target().log_likelihood((mu,)), fsum(expected), rel_tol=0, abs_tol=3e-12)
-    assert isclose(
-        model.target().log_prior((mu,)), log(NormalDist(model.prior.means[0], 0.25).pdf(mu)), abs_tol=1e-12
-    )
+    expected_prior = log(NormalDist(model.prior.means[0], 0.25).pdf(mu))
+    assert isclose(model.target().log_prior((mu,)), expected_prior, rel_tol=0, abs_tol=1e-12)
     assert model.source_sha256 in model.target().source
     # Move the parameter far enough that the exact observation becomes impossible.
     impossible_mu = mu + (10.0 if shape > 0 else -10.0)
@@ -176,7 +180,8 @@ def test_executed_posterior_against_independent_quadrature(family: PosteriorFami
     )
     proposal = result.construction.proposal
     assert result.construction.gamma == 1.5
-    # A fixed-scale nonsingular density is bounded. The proposal variance
+    # At fixed observed discharge the density is bounded in location.
+    # The proposal variance
     # exceeds half the prior variance, making the Gaussian ratio integrable.
     assert proposal.covariance[0][0] > 0.0625 / 2.0
     normal = NormalDist(proposal.means[0], sqrt(proposal.covariance[0][0]))
@@ -229,7 +234,8 @@ def test_exact_csv_and_unsupported_sources(family: PosteriorFamily, shape: float
     with pytest.raises(PosteriorBindingError, match="zero-threshold"):
         replace(model, series=replace(model.series, zero_threshold=0.0))
     with pytest.raises(PosteriorBindingError, match="systematic"):
-        replace(model, series=replace(model.series, annual=(replace(model.series.annual[0], exposure=ExposureKind.HISTORICAL),)))
+        row = replace(model.series.annual[0], exposure=ExposureKind.HISTORICAL)
+        replace(model, series=replace(model.series, annual=(row,)))
     with pytest.raises(ValueError, match="overlapping"):
         replace(model, series=replace(model.series, annual=(model.series.annual[0],) * 2))
     with pytest.raises(PosteriorBindingError, match="one finite"):
@@ -251,3 +257,35 @@ def test_shape_and_reference_admission() -> None:
     # Exact zero limits are not the near-zero LP3 approximation.
     assert isclose(replace(gev, fixed_shape=0.0).kernel((3.0,)).cdf(4.0), exp(-exp(-1.0)), abs_tol=1e-14)
     assert isclose(replace(lp3, fixed_shape=0.0).kernel((0.0,)).cdf(2 * exp(1.0)), NormalDist().cdf(1.0), abs_tol=1e-14)
+
+
+def test_nonunit_scale_and_lp3_reference() -> None:
+    gev = replace(_model(PosteriorFamily.GEV, 0.2), fixed_log_scale=log(2.0))
+    kernel = gev.kernel((4.0,))
+    cdf, density = _law(PosteriorFamily.GEV, 0.2, 0.0, 1.0)
+    assert isclose(kernel.cdf(6.0), cdf, rel_tol=0, abs_tol=1e-14)
+    assert isclose(kernel.logpdf(6.0), log(density / 2.0), rel_tol=0, abs_tol=1e-12)
+
+    lp3 = replace(_model(PosteriorFamily.LP3, -1.0), fixed_log_scale=log(2.0), reference_discharge=5.0)
+    kernel = lp3.kernel((0.5,))
+    q = 5.0 * exp(0.5 + 2.0 * 0.25)
+    standardized_q = 2.0 * exp(0.25)
+    cdf, density = _law(PosteriorFamily.LP3, -1.0, 0.0, standardized_q)
+    assert isclose(kernel.cdf(q), cdf, rel_tol=0, abs_tol=1e-14)
+    # Independent density transform d(ln(Q/r)/SD)/dQ = 1/(SD*Q).
+    assert isclose(kernel.logpdf(q), log(density * standardized_q / (2.0 * q)), rel_tol=0, abs_tol=1e-12)
+
+
+@pytest.mark.parametrize(("family", "shape"), [(PosteriorFamily.GEV, 0.2), (PosteriorFamily.LP3, -1.0)])
+def test_interval_intersecting_support(family: PosteriorFamily, shape: float) -> None:
+    model = _model(family, shape)
+    if family == PosteriorFamily.GEV:
+        # Finite lower endpoint = 6 - 1/0.2 = 1; interval crosses it.
+        mu, low, high = 6.0, 0.5, 4.5
+    else:
+        # Finite upper log endpoint = 2; interval crosses Q=2*exp(2).
+        mu, low, high = 0.0, 2.0 * exp(1.5), 2.0 * exp(2.5)
+    row = _row(2000, ObservationKind.INTERVAL_CENSORED, lower=low, upper=high)
+    model = replace(model, series=replace(model.series, annual=(row,)))
+    mass = _law(family, shape, mu, high)[0] - _law(family, shape, mu, low)[0]
+    assert isclose(model.log_likelihood((mu,)), log(mass), rel_tol=0, abs_tol=2e-12)

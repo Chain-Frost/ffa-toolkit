@@ -7,7 +7,7 @@ equivalence claim, or admission under the output-specific precision contract in 
 ## Mathematical contract and source
 
 ARR Book 3 v4.2, Chapter 2 §2.4.2.1–2.4.2.2 and Table 3.2.1 (printed pp. 26–28,
-PDF pp. 43–45), §2.6.3.5 (printed p. 40), §2.6.3.6 equations 3.2.52–3.2.54
+PDF pp. 43–45), §2.6.3.1–2.6.3.3 (printed pp. 37–38), §2.6.3.5 (printed p. 40), §2.6.3.6 equations 3.2.52–3.2.54
 (printed p. 42), and §2.6.3.7 (printed p. 43) were inspected in the official
 [PDF](https://www.arr-software.org/pdfs/ARR_190514_Book3_V4.2.pdf).
 See [references](references.md) and [distribution kernels](distribution-kernels.md).
@@ -105,9 +105,11 @@ integrated posterior values using six reference asymptotic standard
 errors, integrating p^2/g times the centered squared integrand for the
 actual proposal g. The finite integration interval and tolerance are
 specific to these synthetic cases, not a general precision criterion.
-The fixed-scale nonsingular density is bounded and the proposal variance
+At fixed observed discharge, the fixed-scale nonsingular density is bounded
+in the free location coordinate; the proposal variance
 is checked to exceed half the Gaussian prior variance. Tests also cover
-source/coordinate rejection, zero limits and out-of-support exact data.
+source/coordinate rejection, zero limits, nonunit scales, intervals
+intersecting support and out-of-support exact data.
 
 **Validation pending:** repository tests, Ruff/format, strict Pyright,
 Python 3.11/3.14 full quality/build/distribution/installed smoke,
