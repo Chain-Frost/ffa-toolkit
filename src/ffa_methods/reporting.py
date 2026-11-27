@@ -9,6 +9,7 @@ import json
 import shutil
 import tempfile
 from collections.abc import Mapping
+from dataclasses import asdict
 from hashlib import sha256
 from io import StringIO
 from math import isfinite
@@ -420,6 +421,37 @@ def _fitted_support_text(support: GEVFittedSupport | None) -> list[str]:
     return lines
 
 
+def _precision_fields(result: AnalysisResult) -> dict[str, object]:
+    audit = result.precision_audit
+    if audit is None:
+        return {}
+    if audit.provenance != result.provenance:
+        msg = "precision audit provenance does not identify the analysis result"
+        raise ValueError(msg)
+    return {
+        "precision_audit": {
+            "scope": "selected_output_fixed_budget_audit",
+            "state": audit.state.value,
+            "states": [state.value for state in audit.states],
+            "requests": [asdict(request) for request in audit.requests],
+            "plan": asdict(audit.plan),
+            "admission": None if audit.admission is None else asdict(audit.admission),
+            "proposal_coordinates": audit.proposal.coordinates,
+            "proposal_means": audit.proposal.means,
+            "proposal_covariance": audit.proposal.covariance,
+            "reserved_evaluations": audit.reserved_evaluations,
+            "critical_value": audit.critical_value,
+            "attempts": [asdict(attempt) for attempt in audit.attempts],
+            "replicate_spreads": audit.replicate_spreads,
+            "attempted_count": audit.attempted_count,
+            "completed_count": audit.completed_count,
+            "failed_count": audit.failed_count,
+            "not_attempted_count": audit.not_attempted_count,
+            "indeterminate_count": audit.indeterminate_count,
+        }
+    }
+
+
 def report_document(result: AnalysisResult, *, settings: Mapping[str, object]) -> dict[str, object]:
     """Prepare replayable, finite JSON data from an already computed result."""
     provenance = result.provenance
@@ -491,6 +523,7 @@ def report_document(result: AnalysisResult, *, settings: Mapping[str, object]) -
         "results": points,
         "warnings": warnings,
         **_fitted_support_fields(result.fitted_gev_support),
+        **_precision_fields(result),
     }
 
 
