@@ -160,15 +160,17 @@ def _svg(points: tuple[PlotPoint, ...], scale: PlotScale, unit: str, notice: str
             f'<circle data-series="{point.series}" cx="{x}" cy="{y}" r="4" fill="{color}">'
             f"<title>{escape(label)}</title></circle>"
         )
-    lines.extend((
-        '<circle cx="120" cy="522" r="4" fill="#202c39"/>',
-        '<text x="132" y="526">Observed Cunnane positions</text>',
-        '<circle cx="370" cy="522" r="4" fill="#1767a0"/>',
-        '<text x="382" y="526">Requested fitted quantiles (segments are guides)</text>',
-        '<text x="110" y="545">No intervals; independent mathematical fit, not native-qualified.</text>',
-        f'<text x="110" y="563" font-size="11">{escape(notice)}</text>',
-        '</g></svg>',
-    ))
+    lines.extend(
+        (
+            '<circle cx="120" cy="522" r="4" fill="#202c39"/>',
+            '<text x="132" y="526">Observed Cunnane positions</text>',
+            '<circle cx="370" cy="522" r="4" fill="#1767a0"/>',
+            '<text x="382" y="526">Requested fitted quantiles (segments are guides)</text>',
+            '<text x="110" y="545">No intervals; independent mathematical fit, not native-qualified.</text>',
+            f'<text x="110" y="563" font-size="11">{escape(notice)}</text>',
+            "</g></svg>",
+        )
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -179,16 +181,23 @@ def _coordinate_csv(points: tuple[PlotPoint, ...], scale: PlotScale, unit: str) 
         ("series", "source_index", "year", "descending_rank", "F", "AEP", "discharge", "unit", "svg_x", "svg_y")
     )
     for point in points:
-        writer.writerow((
-            point.series, point.source_index, point.year, point.rank, point.non_exceedance,
-            point.aep, point.discharge, unit, *scale.xy(point),
-        ))
+        writer.writerow(
+            (
+                point.series,
+                point.source_index,
+                point.year,
+                point.rank,
+                point.non_exceedance,
+                point.aep,
+                point.discharge,
+                unit,
+                *scale.xy(point),
+            )
+        )
     return stream.getvalue()
 
 
-def _html_report(
-    svg: str, points: tuple[PlotPoint, ...], report_text: str, unit: str, year_definition: str
-) -> str:
+def _html_report(svg: str, points: tuple[PlotPoint, ...], report_text: str, unit: str, year_definition: str) -> str:
     observed = tuple(point for point in points if point.series == "observed")
     rows = "".join(
         f"<tr><td>{point.source_index}</td><td>{point.year}</td><td>{point.rank}</td>"
@@ -243,6 +252,12 @@ def render_frequency_files(
         or not isinstance(year_definition, str)
     ):
         msg = "frequency report requires an admitted deterministic systematic-AMS settings schema"
+        raise ValueError(msg)
+    if any(
+        not (0x20 <= ord(char) <= 0xD7FF or 0xE000 <= ord(char) <= 0xFFFD or 0x10000 <= ord(char) <= 0x10FFFF)
+        for char in unit
+    ):
+        msg = "discharge unit contains a character forbidden in SVG XML"
         raise ValueError(msg)
     observed = _observed_points(raw_ams)
     points = (*observed, *_fitted_points(result, unit))

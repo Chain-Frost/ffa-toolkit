@@ -111,8 +111,8 @@ def test_ties_and_unordered_source_keep_every_row(tmp_path: Path) -> None:
     [
         b"Year,AMS\n2000,1\n2001,2\n2003,4\n",
         b"Year,AMS\n2000,1\n2001,\n2002,4\n",
-    b"Year,AMS\n2000,1\n2001,0\n2002,4\n",
-    b"Year,AMS,Flag\n2000,1,0\n2001,2,1\n2002,4,0\n",
+        b"Year,AMS\n2000,1\n2001,0\n2002,4\n",
+        b"Year,AMS,Flag\n2000,1,0\n2001,2,1\n2002,4,0\n",
     ],
 )
 def test_unadmitted_frequency_data_never_publish(tmp_path: Path, data: bytes) -> None:
@@ -161,8 +161,6 @@ def test_gev_support_violations_remain_visible(tmp_path: Path) -> None:
 def test_non_deterministic_estimand_rejected() -> None:
     raw_ams = (EXAMPLES / "ordinary-ams.csv").read_bytes()
     result, settings = calculate_from_bytes(raw_ams, (EXAMPLES / "ordinary-settings.json").read_bytes())
-    posterior = replace(
-        result, values=(replace(result.values[0], meaning=ResultMeaning.POSTERIOR_PREDICTIVE_QUANTILE),)
-    )
+    posterior = replace(result, values=(replace(result.values[0], meaning=ResultMeaning.POSTERIOR_PREDICTIVE_QUANTILE),))
     with pytest.raises(ValueError, match="deterministic fitted quantiles"):
         render_frequency_files(posterior, settings=settings, raw_ams=raw_ams, report_text="")
