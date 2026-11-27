@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 RESOURCE_FILES: tuple[tuple[str, str], ...] = (
     ("docs/method-registry.json", "ffa_methods/resources/method-registry.json"),
     ("docs/references.md", "ffa_methods/resources/references.md"),
+    ("docs/wp08-bayesian-cli.md", "ffa_methods/resources/wp08-bayesian-cli.md"),
     ("docs/compatibility-contract.md", "ffa_methods/resources/compatibility-contract.md"),
     ("docs/distribution-kernels.md", "ffa_methods/resources/distribution-kernels.md"),
     ("docs/methods/mgb-low-flow-screen.md", "ffa_methods/resources/methods/mgb-low-flow-screen.md"),

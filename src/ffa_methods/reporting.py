@@ -431,6 +431,7 @@ def _precision_fields(result: AnalysisResult) -> dict[str, object]:
     return {
         "precision_audit": {
             "scope": "selected_output_fixed_budget_audit",
+            "state_applies_to": "audit primary estimates, not the whole report",
             "state": audit.state.value,
             "states": [state.value for state in audit.states],
             "requests": [asdict(request) for request in audit.requests],

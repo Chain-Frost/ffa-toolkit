@@ -424,7 +424,7 @@ def calculate_bayesian(
             model=model, proposal=construction.proposal, provenance=provenance,
             plan=audit_settings.plan, requests=audit_settings.requests,
         )
-    precision_status = "not_assessed" if audit is None else f"selected_outputs_{audit.state.value}"
+    precision_status = "not_assessed" if audit is None else f"selected_audit_estimates_{audit.state.value}"
     result = replace(
         result,
         diagnostics=(
@@ -474,7 +474,13 @@ def calculate_bayesian(
         "non_exceedance_probabilities": _json(outputs.probabilities),
         "discharges": _json(outputs.discharges),
         "precision_status": precision_status,
+        "precision_audit_includes_primary_replay": audit is not None,
         "source_ams_file": "source-ams.csv",
         "source_settings_file": "source-settings.json",
     }
+    if audit is not None:
+        settings["precision_scheduled_draws_including_report"] = audit.plan.total_draws + sampling.draw_count
+        settings["precision_report_scalar_reservation"] = sampling.draw_count * (
+            300 * len(outputs.probabilities) + 20 * len(outputs.discharges) + 10
+        )
     return result, settings

@@ -117,3 +117,7 @@ settings and input, fixed-budget acceptance and existing output rejection.
 Run all development commands on Python 3.11 and 3.14 and independently
 review the final head; the PR author has not run those checks in the
 connector environment. No native execution, release, publication or merge.
+
+## Integration coordination
+
+Base `affc0315e96978c22930cdb0776f90fca2f9528b` includes #31. Concurrent PRs #32/#34/#35 update the registry, #35 updates the calculation matrix, and #36 updates the CLI, formatter, packaging, installed smoke and guidance. Reconcile these shared files against the actual latest main before validation. Preserve #36's deterministic-only plot admission, the Bayesian output-specific audit and both sets of example resources and tests. No existing branch or main has been overwritten.

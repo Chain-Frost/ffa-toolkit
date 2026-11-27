@@ -70,6 +70,8 @@ packages = ["src/ffa_methods"]
 "docs/examples/bayesian-censored-ams.csv" = "ffa_methods/resources/examples/bayesian-censored-ams.csv"
 "docs/examples/bayesian-censored-settings.json" = "ffa_methods/resources/examples/bayesian-censored-settings.json"
 
+"docs/wp08-bayesian-cli.md" = "ffa_methods/resources/wp08-bayesian-cli.md"
+
 [tool.hatch.build.targets.sdist]
 include = [
     "/src/ffa_methods",
@@ -90,6 +92,7 @@ include = [
     "/docs/examples/bayesian-censored-ams.csv",
     "/docs/examples/bayesian-censored-settings.json",
     "/docs/methods/l-moments.md",
+    "/docs/wp08-bayesian-cli.md",
     "/docs/method-registry.json",
     "/docs/references.md",
     "/README.md",
