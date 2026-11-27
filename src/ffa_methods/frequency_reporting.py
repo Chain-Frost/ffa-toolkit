@@ -6,12 +6,15 @@ from dataclasses import dataclass
 from html import escape
 from io import StringIO
 from math import ceil, isfinite, log10
+from typing import Self
 
 from ffa_methods.contracts import AnalysisResult, ProbabilityKind, ResultMeaning
-from ffa_methods.deterministic_workflow import EXACT_ASSERTION, ORDINARY_SCHEMA, SETTINGS_SCHEMA
 from ffa_methods.legacy.models import ObservationKind
 from ffa_methods.legacy.project import parse_ams_csv
 
+# Deliberately version-gated here: future fitter schemas do not automatically gain plotting admission.
+_ADMITTED_SCHEMAS = ("ffa-gev-fixed-h/1", "ffa-ordinary-lmoments/1")
+_EXACT_ASSERTION = "caller_asserted_complete_exact_positive_annual_maxima"
 _SOURCE = "ARR Book 3 v4.2, Chapter 2, section 2.6.2, eq. (3.2.36), printed pp. 35–36"
 _LIMITS = (
     "Observed ranks are plotting positions, not fitted probabilities. Fitted markers are the requested "
@@ -89,7 +92,7 @@ class PlotScale:
     high: float
 
     @classmethod
-    def from_points(cls, points: tuple[PlotPoint, ...]) -> "PlotScale":
+    def from_points(cls, points: tuple[PlotPoint, ...]) -> Self:
         decades = max(1, ceil(-log10(min(point.aep for point in points))))
         magnitude = max(abs(point.discharge) for point in points)
         low = min(0.0, min(point.discharge / magnitude for point in points))
@@ -115,11 +118,13 @@ def _axis_svg(scale: PlotScale, unit: str) -> list[str]:
         value = ((1.0 - fraction) * scale.low + fraction * scale.high) * scale.magnitude
         lines.append(f'<path d="M{_LEFT} {y} H{_RIGHT}" stroke="#d5dbe2"/>')
         lines.append(f'<text x="100" y="{y + 4}" text-anchor="end">{value:.5g}</text>')
-    lines.extend((
-        f'<path d="M{_LEFT} {_TOP} V{_BOTTOM} H{_RIGHT}" fill="none" stroke="#202c39"/>',
-        '<text x="535" y="500" text-anchor="middle">Annual exceedance probability (AEP, log scale)</text>',
-        f'<text x="20" y="250" text-anchor="middle" transform="rotate(-90 20 250)">Discharge ({escape(unit)})</text>',
-    ))
+    lines.extend(
+        (
+            f'<path d="M{_LEFT} {_TOP} V{_BOTTOM} H{_RIGHT}" fill="none" stroke="#202c39"/>',
+            '<text x="535" y="500" text-anchor="middle">Annual exceedance probability (AEP, log scale)</text>',
+            f'<text x="20" y="250" text-anchor="middle" transform="rotate(-90 20 250)">Discharge ({escape(unit)})</text>',
+        )
+    )
     return lines
 
 
@@ -133,9 +138,7 @@ def _support_notice(result: AnalysisResult) -> str:
     return details
 
 
-def _svg(
-    points: tuple[PlotPoint, ...], scale: PlotScale, unit: str, notice: str
-) -> str:
+def _svg(points: tuple[PlotPoint, ...], scale: PlotScale, unit: str, notice: str) -> str:
     lines = [
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 580" role="img" aria-labelledby="title desc">',
         '<title id="title">Annual maximum flood frequency — independent, not native-qualified</title>',
@@ -172,7 +175,9 @@ def _svg(
 def _coordinate_csv(points: tuple[PlotPoint, ...], scale: PlotScale, unit: str) -> str:
     stream = StringIO(newline="")
     writer = csv.writer(stream, lineterminator="\n")
-    writer.writerow(("series", "source_index", "year", "descending_rank", "F", "AEP", "discharge", "unit", "svg_x", "svg_y"))
+    writer.writerow(
+        ("series", "source_index", "year", "descending_rank", "F", "AEP", "discharge", "unit", "svg_x", "svg_y")
+    )
     for point in points:
         writer.writerow((
             point.series, point.source_index, point.year, point.rank, point.non_exceedance,
@@ -182,12 +187,18 @@ def _coordinate_csv(points: tuple[PlotPoint, ...], scale: PlotScale, unit: str) 
 
 
 def _html_report(
-    svg: str, observed: tuple[PlotPoint, ...], report_text: str, unit: str, year_definition: str
+    svg: str, points: tuple[PlotPoint, ...], report_text: str, unit: str, year_definition: str
 ) -> str:
+    observed = tuple(point for point in points if point.series == "observed")
     rows = "".join(
         f"<tr><td>{point.source_index}</td><td>{point.year}</td><td>{point.rank}</td>"
         f"<td>{point.discharge!r}</td><td>{point.non_exceedance!r}</td><td>{point.aep!r}</td></tr>"
         for point in sorted(observed, key=lambda point: point.source_index or 0)
+    )
+    fitted_rows = "".join(
+        f"<tr><td>{point.non_exceedance!r}</td><td>{point.aep!r}</td><td>{point.discharge!r}</td></tr>"
+        for point in points
+        if point.series == "fitted"
     )
     return (
         '<!doctype html>\n<html lang="en"><meta charset="utf-8"><title>FFA frequency report</title>'
@@ -205,6 +216,10 @@ def _html_report(
         'No historical, censored, missing, excluded or zero observations are admitted to this report.</p>'
         f'<table><thead><tr><th>Source record</th><th>Year</th><th>Rank</th><th>Q ({escape(unit)})</th>'
         f'<th>F</th><th>AEP</th></tr></thead><tbody>{rows}</tbody></table>'
+        '<h2>Requested deterministic design quantiles</h2>'
+        f'<table><thead><tr><th>F</th><th>AEP</th><th>Q ({escape(unit)})</th></tr></thead>'
+        f'<tbody>{fitted_rows}</tbody></table>'
+        '<p>No uncertainty intervals are calculated. These are not adopted estimates.</p>'
         '<h2>Calculated results, assumptions, diagnostics and warnings</h2>'
         f'<pre>{escape(report_text)}</pre>'
         '<h2>Plot reference and replay</h2><p>Cunnane, C. (1978), Unbiased plotting positions — A review, '
@@ -222,8 +237,8 @@ def render_frequency_files(
     """Produce additive static files; no fitting, uncertainty or source defaults."""
     unit, year_definition = settings.get("discharge_unit"), settings.get("year_definition")
     if (
-        settings.get("schema_version") not in (SETTINGS_SCHEMA, ORDINARY_SCHEMA)
-        or settings.get("source_classification") != EXACT_ASSERTION
+        settings.get("schema_version") not in _ADMITTED_SCHEMAS
+        or settings.get("source_classification") != _EXACT_ASSERTION
         or not isinstance(unit, str)
         or not isinstance(year_definition, str)
     ):
@@ -236,5 +251,5 @@ def render_frequency_files(
     return {
         "frequency.svg": svg,
         "frequency-coordinates.csv": _coordinate_csv(points, scale, unit),
-        "report.html": _html_report(svg, observed, report_text, unit, year_definition),
+        "report.html": _html_report(svg, points, report_text, unit, year_definition),
     }

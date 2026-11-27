@@ -659,7 +659,9 @@ def write_report_bundle(
         if source_inputs is None:
             msg = "frequency report requires immutable source inputs"
             raise ValueError(msg)
-        files.update(render_frequency_files(result, settings=settings, raw_ams=source_inputs[0], report_text=files["report.txt"]))
+        files.update(
+            render_frequency_files(result, settings=settings, raw_ams=source_inputs[0], report_text=files["report.txt"])
+        )
     target = destination.resolve(strict=False)
     if destination.exists() or destination.is_symlink():
         msg = f"output directory already exists: {destination}"

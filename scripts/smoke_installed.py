@@ -164,9 +164,20 @@ def _check_ordinary_installed(console: Path, output: Path, env: dict[str, str]) 
         _check_ordinary_result(destination, settings_bytes, ams_bytes, expected, quantiles, probabilities)
         plotted = output / f"{name}-frequency-report"
         _invoke(
-            [str(console), "fit", "--ams", str(ams), "--settings", str(settings_path), "--output", str(plotted),
-             "--frequency-report"],
-            cwd=output, env=env, expected_code=0,
+            [
+                str(console),
+                "fit",
+                "--ams",
+                str(ams),
+                "--settings",
+                str(settings_path),
+                "--output",
+                str(plotted),
+                "--frequency-report",
+            ],
+            cwd=output,
+            env=env,
+            expected_code=0,
         )
         _check_frequency_files(plotted, destination)
 

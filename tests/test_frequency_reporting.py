@@ -2,6 +2,7 @@
 
 import csv
 import json
+from dataclasses import replace
 from math import ceil, isclose, log10
 from pathlib import Path
 from typing import cast
@@ -9,6 +10,9 @@ from typing import cast
 import pytest
 
 from ffa_methods.cli import main
+from ffa_methods.contracts import ResultMeaning
+from ffa_methods.deterministic_workflow import calculate_from_bytes
+from ffa_methods.frequency_reporting import render_frequency_files
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "docs" / "examples"
 
@@ -33,9 +37,7 @@ def _rows(directory: Path) -> list[dict[str, str]]:
         ("gp_lmoments", {"gp_location_mode": "free"}),
     ],
 )
-def test_ordinary_frequency_plot_coordinates(
-    tmp_path: Path, estimator: str, extra: dict[str, object]
-) -> None:
+def test_ordinary_frequency_plot_coordinates(tmp_path: Path, estimator: str, extra: dict[str, object]) -> None:
     ams = EXAMPLES / "ordinary-ams.csv"
     config = tmp_path / "settings.json"
     settings = cast(dict[str, object], json.loads((EXAMPLES / "ordinary-settings.json").read_text(encoding="utf-8")))
@@ -104,12 +106,15 @@ def test_ties_and_unordered_source_keep_every_row(tmp_path: Path) -> None:
     assert [int(row["source_index"]) for row in observed] == [2, 1, 3]
 
 
-@pytest.mark.parametrize("data", [
-    b"Year,AMS\n2000,1\n2001,2\n2003,4\n",
-    b"Year,AMS\n2000,1\n2001,\n2002,4\n",
+@pytest.mark.parametrize(
+    "data",
+    [
+        b"Year,AMS\n2000,1\n2001,2\n2003,4\n",
+        b"Year,AMS\n2000,1\n2001,\n2002,4\n",
     b"Year,AMS\n2000,1\n2001,0\n2002,4\n",
     b"Year,AMS,Flag\n2000,1,0\n2001,2,1\n2002,4,0\n",
-])
+    ],
+)
 def test_unadmitted_frequency_data_never_publish(tmp_path: Path, data: bytes) -> None:
     ams = tmp_path / "ams.csv"
     ams.write_bytes(data)
@@ -119,3 +124,45 @@ def test_unadmitted_frequency_data_never_publish(tmp_path: Path, data: bytes) ->
     assert exc.value.code == 2
     assert not destination.exists()
     assert not list(tmp_path.glob(".result-*"))
+
+
+def test_single_signed_quantile_and_escaped_unit(tmp_path: Path) -> None:
+    config = tmp_path / "settings.json"
+    settings = cast(dict[str, object], json.loads((EXAMPLES / "ordinary-settings.json").read_text(encoding="utf-8")))
+    config.write_text(
+        json.dumps({**settings, "non_exceedance_probabilities": [0.01], "discharge_unit": "m3/s <&>"}),
+        encoding="utf-8",
+    )
+    destination = tmp_path / "report"
+    assert _run(EXAMPLES / "ordinary-ams.csv", config, destination) == 0
+    row = _rows(destination)[-1]
+    assert float(row["discharge"]) < 0
+    assert row["unit"] == "m3/s <&>"
+    svg = (destination / "frequency.svg").read_text(encoding="utf-8")
+    assert "<polyline" not in svg
+    assert "m3/s &lt;&amp;&gt;" in svg
+    assert "Negative mathematical quantiles" in svg
+
+
+def test_gev_support_violations_remain_visible(tmp_path: Path) -> None:
+    ams = tmp_path / "ams.csv"
+    ams.write_text(
+        "Year,AMS\n" + "".join(f"{2000 + i},{q}\n" for i, q in enumerate((1, *range(100, 109)))),
+        encoding="utf-8",
+    )
+    destination = tmp_path / "report"
+    assert _run(ams, EXAMPLES / "fixed-gev-settings.json", destination) == 0
+    rows = _rows(destination)
+    assert [int(row["year"]) for row in rows[:2]] == [2009, 2008]
+    assert "GEV support: 2 outside; 0 at endpoint" in (destination / "frequency.svg").read_text(encoding="utf-8")
+    assert "outside: year=2009" in (destination / "report.html").read_text(encoding="utf-8")
+
+
+def test_non_deterministic_estimand_rejected() -> None:
+    raw_ams = (EXAMPLES / "ordinary-ams.csv").read_bytes()
+    result, settings = calculate_from_bytes(raw_ams, (EXAMPLES / "ordinary-settings.json").read_bytes())
+    posterior = replace(
+        result, values=(replace(result.values[0], meaning=ResultMeaning.POSTERIOR_PREDICTIVE_QUANTILE),)
+    )
+    with pytest.raises(ValueError, match="deterministic fitted quantiles"):
+        render_frequency_files(posterior, settings=settings, raw_ams=raw_ams, report_text="")
