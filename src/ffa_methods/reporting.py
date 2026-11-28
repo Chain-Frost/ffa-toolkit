@@ -29,6 +29,7 @@ from ffa_methods.contracts import (
     ResultPoint,
     RunDiagnostic,
 )
+from ffa_methods.frequency_reporting import render_frequency_files
 from ffa_methods.gev_support import GEVFittedSupport
 from ffa_methods.guidance import get_method, references
 
@@ -787,6 +788,7 @@ def write_report_bundle(
     *,
     settings: Mapping[str, object],
     source_inputs: tuple[bytes, bytes] | None = None,
+    frequency_report: bool = False,
 ) -> tuple[Path, Path, Path]:
     """Publish a staged bundle without silently overwriting an existing directory.
 
@@ -794,6 +796,13 @@ def write_report_bundle(
     the directory is renamed so consumers do not observe partially generated files.
     """
     files = render_report_files(result, settings=settings)
+    if frequency_report:
+        if source_inputs is None:
+            msg = "frequency report requires immutable source inputs"
+            raise ValueError(msg)
+        files.update(
+            render_frequency_files(result, settings=settings, raw_ams=source_inputs[0], report_text=files["report.txt"])
+        )
     target = validate_output_path(destination)
     staging = Path(tempfile.mkdtemp(prefix=f".{target.name}-", dir=target.parent))
     try:
@@ -801,7 +810,7 @@ def write_report_bundle(
             (staging / filename).write_text(content, encoding="utf-8", newline="\n")
         if source_inputs is not None:
             _write_source_inputs(staging, result, source_inputs)
-        validate_output_path(target)
+        validate_output_path(destination)
         staging.rename(target)
     finally:
         if staging.exists():

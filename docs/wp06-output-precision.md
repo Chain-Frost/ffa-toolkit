@@ -473,9 +473,8 @@ uncertainty. The tests use original synthetic exact records and the
 independent conjugate formulas above, not restricted datasets. No new
 native or general-model acceptance is implied. In particular, estimated-
 scale upper quantile means are marked undefined under the admitted full
-Gaussian prior; the other estimated-scale and known-scale censored
-precision routes remain unadmitted. The CLI/report bridge and broader
-model-specific scientific validation remain outstanding under #5/#6/#7.
+Gaussian prior. Broader model-specific admission and validation remain
+outstanding under #5.
 
 ### Numerical representation and incomplete diagnostics
 
@@ -490,5 +489,12 @@ indeterminate and never promotes an unsuccessful attempt to a pass.
 
 ### Censored and estimated-scale follow-up
 
-See [the separate moment-eligibility and verification candidate](wp06-censored-scale-precision.md).
-It does not extend the production audit's admitted model domain or change its criteria.
+For a fixed-scale model with censored records, explicit internal
+`PrecisionPlan.censored_reference_controls` selects the [deterministic enclosure route](work/wp06-censored-precision-admission.md)
+for the location mean, expected F and direct expected AEP. Failure under those
+controls withholds admission. Without the controls, nonconjugate models may
+use the [exact reflection route](wp06-censored-scale-precision.md), subject
+to the normalized ratio bound and the available output-specific references.
+Reflected inverse outputs still need independent endpoint probability bounds.
+The [Bayesian CLI](wp08-bayesian-cli.md) can dispatch the reflection route
+but does not expose the deterministic enclosure controls.
