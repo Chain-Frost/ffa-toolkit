@@ -565,3 +565,121 @@ CLI, dependency, fixture, CI or publishing change. Issue #5 remains
 open. The proposal, numerical checks and eventual implementation
 need their own appropriate independent review; native Flike
 qualification remains external.
+
+
+## 7. Fixed-scale numerical reference implementation checkpoint
+
+The mathematical specification at commit `6653fd488d896c0bfbd9ed4908c4c0101c857ec1`
+received an independent review with no findings. The following new
+functional contribution requires its own exact-head review.
+
+### Implemented component
+
+The internal `censored_reference.fixed_scale_reference` computes
+deterministic reference enclosures for the exact-real fixed-scale
+model (stored binary64 settings interpreted exactly). The adapter
+`importance_censor_reference.bound_fixed_scale_reference` extracts
+the included records and the actual prior/proposal settings from
+`ClassifiedLognormalPosterior` and preserves their complete identity.
+It does not evaluate a different prior or treat missing/excluded
+rows as observations. The existing stochastic precision audit and
+its accepted exact-only tests remain unchanged.
+
+Arithmetic uses independent 64-digit Decimal contexts with directed
+floor/ceiling rounding for arithmetic operations. The monotonic
+elementary exp, ln and sqrt operations enclose their correctly
+rounded results by adjacent decimal numbers; inputs are exact
+binary64-to-decimal conversions, not short decimal renderings.
+This relies on the documented decimal arithmetic contract
+([Python decimal documentation](https://docs.python.org/3/library/decimal.html)).
+No unchecked float transcendental, CDF evaluation, tolerance-based
+quadrature error estimate or midpoint substitution enters the
+enclosure. The pi constant is bounded and independently checked
+by the alternating rational Machin identity.
+
+For Normal survival at a nonnegative argument x<=8, integrate the
+Taylor expansion of exp(-t²/2) from 0 to x. With an even number
+of terms, the partial sum is a lower bound and adding the next
+positive term gives an upper bound, by the signed Taylor remainder.
+Every term and partial sum is enclosed; at most 192 terms are used.
+The fixed 1e-55 term cutoff only selects between two mathematically
+valid Taylor bounds, not an output acceptance tolerance. For
+8<x<=64, integration by parts supplies
+
+    phi(x)*x/(1+x²) <= S(x) <= phi(x)/x.
+
+For x>64, use zero lower bound and the upper bound at 64 by
+monotonicity. Reflection handles negative arguments. A resulting
+wide interval is not a precision pass. Direct survival evaluation
+avoids subtracting rounded CDFs from one in the upper tail.
+
+Partition the standardized base coordinate z=(mu-m)/sqrt(v) into
+exact dyadic cells on [-extent,extent]. On each cell the product of
+its width and the enclosed standard Normal density range encloses
+the base mass. Interval arithmetic maps the cell to mu, evaluates
+censor-factor ranges, and encloses the product with each integrand.
+For a two-sided event the CDF/SF difference is evaluated on the
+whole mu cell (a possibly wider alternative to the separate extrema
+of section 2.2). The lower bound is intersected with zero and the
+upper with one by proven probability support. Cells crossing an
+indicator threshold use [0,1], not a midpoint indicator.
+
+The omitted mass is bounded by 2 phi(extent)/extent. Mean and
+centered-second-moment tails use the absolute truncated moment
+bounds in section 3; exp(mu) uses the shifted Normal identity.
+All signed normalization divisions use the interval quotient.
+Supported reference requests are E[mu], E[(mu-c)^2], E[exp(mu)],
+expected F/direct AEP at positive flow, and posterior mean-coordinate
+CDF/direct strict SF at a specified threshold. Return full Decimal
+intervals, not an estimated reference point; the actual flood output
+transforms, certified inverse-Normal thresholds, and their connection
+to the stochastic audit remain separate implementation work.
+
+`ReferenceControls` requires an explicit standardized extent,
+dyadic level, cell budget, cell-term budget, and normalized log-ratio
+ceiling. The current extent range 1..16 and dyadic levels 0..10
+are implementation resource limits, not engineering tolerances.
+Preflight reserves cell terms for all requests and censor events;
+a cell term needs at most four point survival evaluations, each with
+at most 192 series terms. No adaptive grid refinement or sampling is
+performed by this component. Ratio eligibility is withheld for
+unresolved normalizer, displaced equal base variance, narrower
+proposal, unresolved positive variance difference, numerical failure,
+or ceiling exceedance. It is only mathematical ratio-envelope
+eligibility, not a conditional precision pass or qualification of
+the binary64 likelihood/sampler implementation.
+
+### Executed checks and current limitations
+
+Seven focused tests of the standalone numerical core passed on
+Linux CPython 3.13.5 (7.03 seconds). The local source/test bytes
+were verified against the Git blobs added to the PR. They cover
+mixed exact/left/right/interval reference containment and dyadic
+refinement; independent exact single-event and all-censored Beta
+identities; signed, centered, exponential and probability
+integrands; direct rare survival; narrow unresolved interval;
+identical versus displaced equal covariance; smaller proposal
+variance; ratio ceiling; unit rescaling; ambient Decimal context;
+predeclared resource budgets; and exact rational pi verification.
+
+For the mixed case in section 5, extent eight and dyadic level five
+(512 cells) the implementation encloses A in
+[0.0649765706311381, 0.0703427704429115], with normalized log-ratio
+upper bound 3.44320850548382 (rounded here for display).
+Level seven (2048 cells) gives A in
+[0.0669554962743191, 0.0682969857185926] and log-ratio upper
+3.41320709459474. Both intervals contain the independent quadrature
+value 0.0676240123107145. These deliberately loose bounds use density
+rectangles and dependency-preserving interval arithmetic, not
+convergence extrapolation. They are not necessarily narrow enough
+for a particular stochastic audit's specified tolerance.
+
+Repository endpoint validation and independent functional review
+are still required, including the two additional typed-binding
+tests. The full checkout is not available in the local Linux
+environment used for the standalone tests. The concurrent PR #34
+owns broader scalar moment eligibility and sampler regression tests;
+coordinate registry and method-status updates with that PR rather
+than duplicate them or imply a new precision-pass route. Keep #5
+open. This contribution introduces no installed CLI/schema,
+sampling/proposal change, dependency, native claim or publication.
