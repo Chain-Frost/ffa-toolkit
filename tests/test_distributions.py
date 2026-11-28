@@ -8,6 +8,7 @@ from typing import Protocol, SupportsFloat, TypeAlias, cast
 
 import pytest
 from scipy.special import gammainc, gammaincc, ndtr, ndtri
+from scipy.stats import norm
 
 from ffa_methods.distributions import (
     GEV,
@@ -429,3 +430,16 @@ def test_lp3_large_shape_log_density_matches_independent_gamma_equation(
     # No SciPy gamma.logpdf or FFA density was used to derive these targets.
     model = LogPearsonIII(LogCoordinates(0.0, 0.0), skew)
     assert math.isclose(model.logpdf(math.exp(z)), expected_logpdf, rel_tol=0.0, abs_tol=2e-9)
+
+
+def test_scalar_lognormal_repeated_evaluation_preserves_scipy_density_and_tails() -> None:
+    log_flow = LogCoordinates(0.3, -0.2, reference_discharge=2.5)
+    kernel = Lognormal(log_flow)
+    frozen = norm(loc=log_flow.mean, scale=math.exp(log_flow.log_sd))
+    for flow in (1e-200, 0.125, 1.0, 2.5, 17.0, 1e200):
+        y = math.log(flow) - math.log(log_flow.reference_discharge)
+        assert kernel.cdf(flow) == float(frozen.cdf(y))
+        assert kernel.sf(flow) == float(frozen.sf(y))
+        assert kernel.logcdf(flow) == float(frozen.logcdf(y))
+        assert kernel.logsf(flow) == float(frozen.logsf(y))
+        assert kernel.logpdf(flow) == float(frozen.logpdf(y)) - math.log(flow)
