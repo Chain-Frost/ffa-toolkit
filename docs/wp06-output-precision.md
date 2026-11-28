@@ -487,3 +487,8 @@ while independently verifying the finite logarithmic means and SDs.
 A later inverse-bound or second-moment resolution failure retains any
 scalar diagnostics already computed for that audit. It remains
 indeterminate and never promotes an unsuccessful attempt to a pass.
+
+### Censored and estimated-scale follow-up
+
+See [the separate moment-eligibility and verification candidate](wp06-censored-scale-precision.md).
+It does not extend the production audit's admitted model domain or change its criteria.

@@ -10,6 +10,15 @@ Invalid parameters and NaN inputs raise `ValueError`. Impossible exact observati
 
 SciPy primitives implement Gumbel, GEV, GP and normal. LP3 uses a gamma-transform Pearson III representation with log-domain incomplete-gamma series/continued-fraction fallback when SciPy's log-tail underflows, and with overflow-safe gamma coordinate arithmetic: the default SciPy Pearson III inverse survival lost precision in rare tails for some skew values during local tests. The *lower* series now has a decreasing-term remainder bound and an adaptive, finite iteration budget; near its large-shape mode the logarithmic prefactor uses the Stirling/deviance form to avoid subtracting enormous nearly equal terms. The exact zero-skew limit is normal; for |skew| below 1.6e-5 the numerical implementation uses a normal approximation to avoid catastrophic cancellation in the gamma density (a numerical rule, **not** a claimed legacy inference rule). This approximation is accurate at regular quantiles but **not** uniformly accurate in extremely deep log tails: immediately below the switch, the normal and exact-gamma log CDF at ln(q)=-40 can differ by about 0.17. Rare upper tails must use inverse survival directly; `ppf(1-p)` is not reliable when 1-p rounds to one. Finite endpoints and logarithmic tails beyond floating-point representability remain limited by binary64.
 
+For GEV right-tail log survival, write the CDF as `exp(-u)` with
+`log(u) = -log1p(xi*z)/xi` and `z = (q-mu)/scale`. At zero shape
+`log(u) = -z`. For `log(u) <= -36`, the correction to
+`log(1-exp(-u)) = log(u) + O(u)` is below one binary64 ulp.
+Returning `log(u)` directly preserves the right-censor likelihood
+when survival would underflow or become subnormal in probability
+space. This calculation still requires representable standardization
+and support arithmetic. [ARR Book 3](references.md)
+
 ## Coordinates, support and sign conventions
 
 | Family | Coordinates | Support and SciPy mapping |
