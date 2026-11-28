@@ -204,9 +204,7 @@ def _check_bayesian_installed(console: Path, output: Path, env: dict[str, str]) 
         ams = output / f"bayesian-{kind}-ams.csv"
         settings = output / f"bayesian-{kind}-settings.json"
         destination = output / f"bayesian-{kind}-report"
-        args = [
-            str(console), "fit", "--ams", str(ams), "--settings", str(settings), "--output", str(destination)
-        ]
+        args = [str(console), "fit", "--ams", str(ams), "--settings", str(settings), "--output", str(destination)]
         _invoke(args, cwd=output, env=env, expected_code=0)
         doc = json.loads((destination / "results.json").read_text(encoding="utf-8"))
         if (
@@ -255,10 +253,18 @@ def _check_bayesian_installed(console: Path, output: Path, env: dict[str, str]) 
     invalid_destination = output / "bayesian-invalid-report"
     _invoke(
         [
-            str(console), "fit", "--ams", str(bad_ams), "--settings", str(output / "bayesian-fixed-settings.json"),
-            "--output", str(invalid_destination),
+            str(console),
+            "fit",
+            "--ams",
+            str(bad_ams),
+            "--settings",
+            str(output / "bayesian-fixed-settings.json"),
+            "--output",
+            str(invalid_destination),
         ],
-        cwd=output, env=env, expected_code=2,
+        cwd=output,
+        env=env,
+        expected_code=2,
     )
     if invalid_destination.exists():
         msg = "invalid installed Bayesian input created an output bundle"

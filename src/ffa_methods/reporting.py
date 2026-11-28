@@ -6,14 +6,17 @@ not be exposed as an independent unverified-input-to-analysis CLI command.
 
 import csv
 import json
+import ntpath
 import shutil
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import asdict
 from hashlib import sha256
 from io import StringIO
 from math import isfinite
-from pathlib import Path
+from os import name as os_name
+from pathlib import Path, PureWindowsPath
+from stat import FILE_ATTRIBUTE_REPARSE_POINT, S_ISDIR, S_ISLNK
 from typing import TypeAlias, cast
 
 from ffa_methods import __version__
@@ -453,11 +456,19 @@ def _precision_fields(result: AnalysisResult) -> dict[str, object]:
     }
 
 
+def _reported_precision_state(result: AnalysisResult, index: int, value: object) -> str:
+    audit = result.precision_audit
+    if audit is None:
+        return "not_assessed"
+    state = audit.states[index].value
+    if state == "conditional_pass" and audit.attempts[0].outputs[index].estimate != value:
+        return "indeterminate_primary_estimate_mismatch"
+    return state
+
+
 def _precision_labels(
-    result: AnalysisResult, points: list[dict[str, object]], settings: Mapping[str, object]
+    result: AnalysisResult, points: list[dict[str, object]], parameters: list[dict[str, object]]
 ) -> None:
-    if settings.get("schema_version") != "ffa-lognormal-bayesian/1":
-        return
     audit = result.precision_audit
     for point, record in zip(result.values, points, strict=True):
         record["precision_state"] = "not_assessed"
@@ -473,15 +484,15 @@ def _precision_labels(
                 or request.log_moment != point.log10_moment_kind
             ):
                 continue
-            state = audit.states[index].value
-            if state == "conditional_pass" and (
-                not audit.attempts or audit.attempts[0].outputs[index].estimate != point.value
-            ):
-                # Different numerical paths (e.g. affine log10 moment versus
-                # discharge-space transform) must not inherit a precision pass.
-                state = "indeterminate_primary_estimate_mismatch"
-            record["precision_state"] = state
+            record["precision_state"] = _reported_precision_state(result, index, point.value)
             break
+    for parameter in parameters:
+        parameter["mean_precision_state"] = "not_assessed"
+    if audit is not None and len(parameters) == 1:
+        for index, request in enumerate(audit.requests):
+            if request.meaning == "parameter_mean":
+                parameters[0]["mean_precision_state"] = _reported_precision_state(result, index, parameters[0]["mean"])
+                break
 
 
 def report_document(result: AnalysisResult, *, settings: Mapping[str, object]) -> dict[str, object]:
@@ -507,7 +518,8 @@ def report_document(result: AnalysisResult, *, settings: Mapping[str, object]) -
     parameters = [_parameter(parameter) for parameter in result.parameters]
     diagnostics = [_diagnostic(diagnostic) for diagnostic in result.diagnostics]
     points = [_point(point, method_id=method_id) for point in result.values]
-    _precision_labels(result, points, settings_data)
+    if settings_data.get("schema_version") == "ffa-lognormal-bayesian/1":
+        _precision_labels(result, points, parameters)
     warnings = [_text(warning, label="warning") for warning in result.warnings]
     warnings.extend(
         _nonphysical_quantile_warning(point)
@@ -579,7 +591,41 @@ def _parameter_text_lines(params: list[dict[str, object]]) -> list[str]:
             lines.append(
                 f"  {parameter['name']} [{parameter['coordinate']}] "
                 f"mean={parameter['mean']}, sd={parameter['standard_deviation']}"
+                + (
+                    f" | mean numerical precision={parameter['mean_precision_state']}"
+                    if "mean_precision_state" in parameter
+                    else ""
+                )
             )
+    return lines
+
+
+def _result_text_lines(points: list[dict[str, object]]) -> list[str]:
+    lines: list[str] = []
+    for point in points:
+        components = [
+            f"{point['meaning']} = {point['value']} {point['unit']}",
+            f"meaning: {point['interpretation']}",
+        ]
+        if point["input_probability"] is not None:
+            components.append(
+                f"input {point['input_probability_kind']}={point['input_probability']}; "
+                f"F={_display(point['input_non_exceedance_probability'])}; "
+                f"AEP={_display(point['input_annual_exceedance_probability'])}"
+            )
+        if point["input_discharge"] is not None:
+            components.append(f"input discharge={point['input_discharge']} {point['input_discharge_unit']}")
+        if point["reported_probability_level"] is not None:
+            components.append(
+                f"probability limit: {point['probability_limit_side']} "
+                f"at level={point['reported_probability_level']}; "
+                f"construction={point['probability_limit_construction']}"
+            )
+        if point["log10_moment_kind"] is not None:
+            components.append(f"log10 moment={point['log10_moment_kind']}")
+        if "precision_state" in point:
+            components.append(f"numerical precision={point['precision_state']}")
+        lines.append("  " + " | ".join(components))
     return lines
 
 
@@ -661,30 +707,7 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
     lines.extend(f"  {item['name']}: {item['value']} {item['unit']}" for item in diagnostics)
     lines.extend(_fitted_support_text(result.fitted_gev_support))
     lines.extend(("", "RESULT POINTS"))
-    for point in typed_points:
-        components = [
-            f"{point['meaning']} = {point['value']} {point['unit']}",
-            f"meaning: {point['interpretation']}",
-        ]
-        if point["input_probability"] is not None:
-            components.append(
-                f"input {point['input_probability_kind']}={point['input_probability']}; "
-                f"F={_display(point['input_non_exceedance_probability'])}; "
-                f"AEP={_display(point['input_annual_exceedance_probability'])}"
-            )
-        if point["input_discharge"] is not None:
-            components.append(f"input discharge={point['input_discharge']} {point['input_discharge_unit']}")
-        if point["reported_probability_level"] is not None:
-            components.append(
-                f"probability limit: {point['probability_limit_side']} "
-                f"at level={point['reported_probability_level']}; "
-                f"construction={point['probability_limit_construction']}"
-            )
-        if point["log10_moment_kind"] is not None:
-            components.append(f"log10 moment={point['log10_moment_kind']}")
-        if "precision_state" in point:
-            components.append(f"numerical precision={point['precision_state']}")
-        lines.append("  " + " | ".join(components))
+    lines.extend(_result_text_lines(typed_points))
     lines.extend(("", "WARNINGS"))
     warnings = cast(list[str], doc["warnings"])
     lines.extend(f"  - {warning}" for warning in warnings)
@@ -710,6 +733,38 @@ def _write_source_inputs(staging: Path, result: AnalysisResult, source_inputs: t
     (staging / "source-settings.json").write_bytes(settings)
 
 
+def _reserved_windows_component(part: str) -> bool:
+    is_reserved = cast(Callable[[str], bool] | None, getattr(ntpath, "isreserved", None))
+    if is_reserved is not None:
+        return is_reserved(part)
+    return PureWindowsPath(part).is_reserved() or ":" in part or part.endswith((".", " "))
+
+
+def validate_output_path(destination: Path) -> Path:
+    """Require a new directory beneath an existing, non-redirected parent."""
+    if ".." in destination.parts:
+        msg = "output directory must not traverse parent components"
+        raise ValueError(msg)
+    target = destination.absolute()
+    if os_name == "nt" and any(_reserved_windows_component(part) for part in target.parts[1:]):
+        msg = "output path contains a Windows device, stream or ambiguous component"
+        raise ValueError(msg)
+    for path in reversed(target.parents):
+        info = path.lstat()
+        if S_ISLNK(info.st_mode) or (os_name == "nt" and info.st_file_attributes & FILE_ATTRIBUTE_REPARSE_POINT):
+            msg = f"output directory must not traverse symbolic links or reparse points: {path}"
+            raise ValueError(msg)
+        if not S_ISDIR(info.st_mode):
+            msg = f"output parent is not a directory: {path}"
+            raise NotADirectoryError(msg)
+    try:
+        target.lstat()
+    except FileNotFoundError:
+        return target
+    msg = f"output directory already exists: {destination}"
+    raise FileExistsError(msg)
+
+
 def write_report_bundle(
     result: AnalysisResult,
     destination: Path,
@@ -723,19 +778,14 @@ def write_report_bundle(
     the directory is renamed so consumers do not observe partially generated files.
     """
     files = render_report_files(result, settings=settings)
-    target = destination.resolve(strict=False)
-    if destination.exists() or destination.is_symlink():
-        msg = f"output directory already exists: {destination}"
-        raise FileExistsError(msg)
-    if not target.parent.is_dir():
-        msg = f"output parent directory does not exist: {target.parent}"
-        raise FileNotFoundError(msg)
+    target = validate_output_path(destination)
     staging = Path(tempfile.mkdtemp(prefix=f".{target.name}-", dir=target.parent))
     try:
         for filename, content in files.items():
             (staging / filename).write_text(content, encoding="utf-8", newline="\n")
         if source_inputs is not None:
             _write_source_inputs(staging, result, source_inputs)
+        validate_output_path(target)
         staging.rename(target)
     finally:
         if staging.exists():

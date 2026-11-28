@@ -2,8 +2,7 @@
 
 Tracking: [#6](https://github.com/Chain-Frost/ffa-toolkit/issues/6).
 This implementation composes the existing WP06 target, curvature proposal,
-explicit gamma scaling, weighted sampler and WP08 reports. It is a draft
-software integration; endpoint acceptance and independent review are pending.
+explicit gamma scaling, weighted sampler and WP08 reports.
 No native Flike comparison or engineering qualification is claimed.
 
 ## Source and settings contract
@@ -53,18 +52,21 @@ The report includes exact input/settings snapshots verified against SHA-256,
 source coordinates, separate estimands, seed and actual stream description,
 proposal mean/covariance and local diagnostics. For selected requests the
 JSON contains the full precision attempt ledger, admission, criteria and
-per-request states; CSV/text report per-point numerical status. A conditional
+per-request states. CSV and text show result-point precision states. JSON and text
+also show parameter-mean precision states. The ledger shows whether the primary
+replay was attempted. A conditional
 pass applies only to the audited primary estimate; a different numerical
 result path cannot inherit it. Unrequested outputs remain not_assessed.
 Existing deterministic report schemas and contents are retained. Existing
-destinations and symbolic-link/parent-component traversal are rejected;
-the existing staged publication does not claim protection against hostile
-concurrent directory replacement.
+destinations, parent traversal, symbolic links and Windows reparse points are
+rejected before calculation and checked again at publication. Publish into an
+output parent you control. The staged rename is not a portable atomic no-replace
+operation against a directory inserted between the final check and rename.
 
 ## Mathematical basis and independent references
 
-See ARR Book 3 v4.2 Chapter 2 §§2.6.3.6–7, Eqs 3.2.52–54 and 3.2.56;
-Kuczera (1999), p. 1554, Eqs (16)–(17);
+See ARR Book 3 v4.2 Chapter 2 Â§Â§2.6.3.6â€“7, Eqs 3.2.52â€“54 and 3.2.56;
+Kuczera (1999), p. 1554, Eqs (16)â€“(17);
 [importance sampling](methods/importance-sampling-reference.md),
 [lognormal binding](wp06-lognormal-binding.md),
 [output precision](wp06-output-precision.md), and the
@@ -110,13 +112,12 @@ precision remains unadmitted by the existing audit.
 
 The four files under [examples](examples/) are generated mathematical data,
 also included in wheel and sdist. Run both command examples from
-[quantile estimands](methods/quantile-estimands.md). Proposed endpoint
+[quantile estimands](methods/quantile-estimands.md). Endpoint
 tests cover the above independent references, source hashes and exact bytes,
 distinct estimands, reproducibility, undefined mean omission, invalid
 settings and input, fixed-budget acceptance and existing output rejection.
-Run all development commands on Python 3.11 and 3.14 and independently
-review the final head; the PR author has not run those checks in the
-connector environment. No native execution, release, publication or merge.
+See [PR #37](https://github.com/Chain-Frost/ffa-toolkit/pull/37) for exact-head
+acceptance evidence.
 
 ## Integration coordination
 

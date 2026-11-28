@@ -116,6 +116,14 @@ def _quantile_points(output: QuantileOutputs, unit: str) -> tuple[list[ResultPoi
     ]
     if output.mean_undefined_reason is not None:
         warnings.append(f"WP06 quantile F={f:.17g}: UNDEFINED posterior mean quantile; {output.mean_undefined_reason}.")
+    moment_points, moment_warnings = _log_quantile_moments(output, unit)
+    return points + moment_points, warnings + moment_warnings
+
+
+def _log_quantile_moments(output: QuantileOutputs, unit: str) -> tuple[list[ResultPoint], list[str]]:
+    f = output.non_exceedance
+    points: list[ResultPoint] = []
+    warnings: list[str] = []
     log_mean = output.mean_log10_quantile
     log_sd = output.standard_deviation_log10_quantile
     if output.nonpositive_quantile_weight:

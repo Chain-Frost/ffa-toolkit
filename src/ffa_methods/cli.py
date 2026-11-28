@@ -9,7 +9,7 @@ from ffa_methods import __version__
 from ffa_methods.bayesian_workflow import BAYESIAN_SCHEMA
 from ffa_methods.deterministic_workflow import ORDINARY_SCHEMA, calculate_from_bytes
 from ffa_methods.guidance import explain, references
-from ffa_methods.reporting import write_report_bundle
+from ffa_methods.reporting import validate_output_path, write_report_bundle
 
 
 def make_parser() -> argparse.ArgumentParser:
@@ -55,18 +55,6 @@ def make_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _check_output_path(destination: Path) -> None:
-    if destination.exists() or destination.is_symlink():
-        msg = f"output directory already exists: {destination}"
-        raise FileExistsError(msg)
-    if ".." in destination.parts or any(parent.is_symlink() for parent in destination.parents):
-        msg = "output directory must not traverse parent components or symbolic links"
-        raise ValueError(msg)
-    if not destination.parent.is_dir():
-        msg = f"output parent directory does not exist: {destination.parent}"
-        raise FileNotFoundError(msg)
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     """Return 0 on success, 2 for invalid inputs, 1 for IO/broken resources."""
     parser = make_parser()
@@ -89,7 +77,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             raw_ams = args.ams.read_bytes()
             raw_settings = args.settings.read_bytes()
-            _check_output_path(args.output)
+            validate_output_path(args.output)
             result, settings = calculate_from_bytes(raw_ams, raw_settings)
             source_inputs = (
                 (raw_ams, raw_settings) if settings["schema_version"] in (ORDINARY_SCHEMA, BAYESIAN_SCHEMA) else None

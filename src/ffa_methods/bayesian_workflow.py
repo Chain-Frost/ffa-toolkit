@@ -5,9 +5,10 @@ import json
 from dataclasses import asdict, dataclass, replace
 from hashlib import sha256
 from io import StringIO
+from itertools import pairwise
 from math import isfinite
 from re import fullmatch
-from typing import Literal, cast
+from typing import cast
 
 from ffa_methods import __version__
 from ffa_methods.bayesian_outputs import probability_outputs, quantile_outputs
@@ -40,9 +41,20 @@ BAYESIAN_SCHEMA = "ffa-lognormal-bayesian/1"
 METHOD_VERSION = "explicit-lognormal-bayesian-cli/1"
 _FIELDS = frozenset(
     {
-        "schema_version", "estimator", "source_format", "source", "source_classification",
-        "discharge_unit", "year_definition", "reference_discharge", "fixed_log_sd",
-        "prior", "proposal", "sampling", "outputs", "precision",
+        "schema_version",
+        "estimator",
+        "source_format",
+        "source",
+        "source_classification",
+        "discharge_unit",
+        "year_definition",
+        "reference_discharge",
+        "fixed_log_sd",
+        "prior",
+        "proposal",
+        "sampling",
+        "outputs",
+        "precision",
     }
 )
 
@@ -50,9 +62,9 @@ _FIELDS = frozenset(
 def _object(value: object, fields: frozenset[str], *, name: str) -> dict[str, object]:
     if not isinstance(value, dict):
         msg = f"{name} must be a JSON object"
-        raise ValueError(msg)
+        raise TypeError(msg)
     result = cast(dict[str, object], value)
-    if set(result) != fields:
+    if frozenset(result) != fields:
         msg = f"{name} keys must match exactly; missing={sorted(fields - set(result))}, unknown={sorted(set(result) - fields)}"
         raise ValueError(msg)
     return result
@@ -84,7 +96,7 @@ def _integer(value: object, *, name: str) -> int:
 
 
 def _items(value: object, *, name: str, maximum: int = 200) -> list[object]:
-    if not isinstance(value, list) or len(value) > maximum:
+    if not isinstance(value, list) or len(cast(list[object], value)) > maximum:
         msg = f"{name} must be an array of at most {maximum} entries"
         raise ValueError(msg)
     return cast(list[object], value)
@@ -108,9 +120,7 @@ def _level(value: object, *, name: str) -> float:
 
 def _ordered(value: object, *, name: str, probability: bool) -> tuple[float, ...]:
     numbers = _vector(value, name=name, maximum=200)
-    if any(n <= 0 or (probability and n >= 1) for n in numbers) or any(
-        b <= a for a, b in zip(numbers, numbers[1:], strict=False)
-    ):
+    if any(n <= 0 or (probability and n >= 1) for n in numbers) or any(b <= a for a, b in pairwise(numbers)):
         msg = f"{name} must be strictly increasing, positive and within the requested domain"
         raise ValueError(msg)
     return numbers
@@ -136,7 +146,9 @@ def _outputs(raw: object) -> OutputSettings:
 
 def _prior(raw: object, coordinates: tuple[str, ...]) -> JointGaussianPrior:
     values = _object(raw, frozenset({"mode", "source", "coordinates", "means", "covariance"}), name="prior")
-    named = tuple(_text(v, name="prior coordinate") for v in _items(values["coordinates"], name="coordinates", maximum=2))
+    named = tuple(
+        _text(v, name="prior coordinate") for v in _items(values["coordinates"], name="coordinates", maximum=2)
+    )
     if values["mode"] != "supplied" or named != coordinates:
         msg = "prior must be supplied Gaussian in the exact ordered free lognormal coordinates"
         raise ValueError(msg)
@@ -161,10 +173,20 @@ class ProposalSettings:
 
 
 def _proposal(raw: object, coordinates: tuple[str, ...]) -> ProposalSettings:
-    keys = frozenset({
-        "start", "gamma", "scales", "initial_step", "max_refinements", "max_iterations",
-        "gradient_tolerance", "mode_tolerance", "curvature_tolerance", "max_condition",
-    })
+    keys = frozenset(
+        {
+            "start",
+            "gamma",
+            "scales",
+            "initial_step",
+            "max_refinements",
+            "max_iterations",
+            "gradient_tolerance",
+            "mode_tolerance",
+            "curvature_tolerance",
+            "max_condition",
+        }
+    )
     v = _object(raw, keys, name="proposal")
     return ProposalSettings(
         tuple(zip(coordinates, _vector(v["start"], name="proposal start"), strict=True)),
@@ -202,7 +224,9 @@ def _sampling(raw: object) -> ExplicitSamplingControls:
 def _precision_request(raw: object, outputs: OutputSettings, *, fixed: bool) -> PrecisionRequest:
     v = _object(
         raw,
-        frozenset({"meaning", "absolute_tolerance", "non_exceedance", "discharge", "interval_mass", "side", "log_moment"}),
+        frozenset(
+            {"meaning", "absolute_tolerance", "non_exceedance", "discharge", "interval_mass", "side", "log_moment"}
+        ),
         name="precision request",
     )
     meaning = _text(v["meaning"], name="precision meaning")
@@ -216,8 +240,8 @@ def _precision_request(raw: object, outputs: OutputSettings, *, fixed: bool) -> 
         non_exceedance=_optional_number(v["non_exceedance"], name="non_exceedance"),
         discharge=_optional_number(v["discharge"], name="discharge"),
         interval_mass=_optional_number(v["interval_mass"], name="interval_mass"),
-        side=cast(Literal["lower", "upper"] | None, side),
-        log_moment=cast(Literal["mean", "standard_deviation"] | None, moment),
+        side=side,
+        log_moment=moment,
     )
     if (
         (request.non_exceedance is not None and request.non_exceedance not in outputs.probabilities)
@@ -234,6 +258,7 @@ def _precision_request(raw: object, outputs: OutputSettings, *, fixed: bool) -> 
 class AuditSettings:
     plan: PrecisionPlan
     requests: tuple[PrecisionRequest, ...]
+    report_scalar_reservation: int
 
 
 def _precision(
@@ -241,17 +266,26 @@ def _precision(
 ) -> AuditSettings | None:
     if raw == {"mode": "not_assessed"}:
         return None
-    keys = frozenset({
-        "mode", "audit_seeds", "maximum_total_draws", "maximum_scalar_evaluations", "alpha",
-        "minimum_side_count", "minimum_side_ess", "maximum_log_ratio", "criterion_source", "requests",
-    })
+    keys = frozenset(
+        {
+            "mode",
+            "audit_seeds",
+            "maximum_total_draws",
+            "maximum_scalar_evaluations",
+            "alpha",
+            "minimum_side_count",
+            "minimum_side_ess",
+            "maximum_log_ratio",
+            "criterion_source",
+            "requests",
+        }
+    )
     v = _object(raw, keys, name="precision")
     if v["mode"] != "fixed_budget":
         msg = "precision mode must explicitly be not_assessed or fixed_budget"
         raise ValueError(msg)
     requests = tuple(
-        _precision_request(item, outputs, fixed=fixed)
-        for item in _items(v["requests"], name="precision requests")
+        _precision_request(item, outputs, fixed=fixed) for item in _items(v["requests"], name="precision requests")
     )
     if len({replace(request, absolute_tolerance=1.0) for request in requests}) != len(requests):
         msg = "precision output identities must be unique, regardless of tolerance"
@@ -273,7 +307,7 @@ def _precision(
         criterion_source=_text(v["criterion_source"], name="criterion_source"),
     )
     plan.preflight(requests)
-    return AuditSettings(plan, requests)
+    return AuditSettings(plan, requests, report_reservation)
 
 
 def _csv_flow(token: str) -> float | None:
@@ -337,9 +371,14 @@ def _model(data: bytes, v: dict[str, object]) -> ClassifiedLognormalPosterior:
         raise ValueError(msg)
     if v["source_format"] == "year_ams_csv":
         return bind_exact_lognormal_csv(
-            data, source=source, discharge_unit=unit, year_definition=year,
-            source_classification=SOURCE_CLASSIFICATION, reference_discharge=reference,
-            fixed_log_sd=fixed, prior=prior,
+            data,
+            source=source,
+            discharge_unit=unit,
+            year_definition=year,
+            source_classification=SOURCE_CLASSIFICATION,
+            reference_discharge=reference,
+            fixed_log_sd=fixed,
+            prior=prior,
         )
     if v["source_format"] != "classified_systematic_csv":
         msg = "unsupported Bayesian source format"
@@ -383,11 +422,16 @@ def calculate_bayesian(
     )
     target = model.target()
     construction = build_curvature_proposal(
-        target=target, starting_point=proposal_settings.start,
-        controls=proposal_settings.controls, gamma=proposal_settings.gamma,
+        target=target,
+        starting_point=proposal_settings.start,
+        controls=proposal_settings.controls,
+        gamma=proposal_settings.gamma,
     )
     run = independent_importance_sample(
-        proposal=construction.proposal, target=target, controls=sampling, provenance=provenance,
+        proposal=construction.proposal,
+        target=target,
+        controls=sampling,
+        provenance=provenance,
     )
     warnings = [
         "Independent explicitly configured lognormal Bayesian fit; not native Flike-qualified.",
@@ -421,29 +465,42 @@ def calculate_bayesian(
     audit = None
     if audit_settings is not None:
         audit = audit_lognormal_precision(
-            model=model, proposal=construction.proposal, provenance=provenance,
-            plan=audit_settings.plan, requests=audit_settings.requests,
+            model=model,
+            proposal=construction.proposal,
+            provenance=provenance,
+            plan=audit_settings.plan,
+            requests=audit_settings.requests,
         )
     precision_status = "not_assessed" if audit is None else f"selected_audit_estimates_{audit.state.value}"
     result = replace(
         result,
         diagnostics=(
             RunDiagnostic(name="importance_draw_count", value=float(sampling.draw_count), unit="count"),
-            RunDiagnostic(name="importance_effective_sample_size", value=run.moments.effective_sample_size, unit="count"),
+            RunDiagnostic(
+                name="importance_effective_sample_size", value=run.moments.effective_sample_size, unit="count"
+            ),
             RunDiagnostic(name="importance_largest_weight", value=run.moments.largest_weight, unit="fraction"),
-            RunDiagnostic(name="importance_zero_weight_count", value=float(run.moments.zero_weight_count), unit="count"),
-            RunDiagnostic(name="local_scaled_gradient_norm", value=construction.scaled_gradient_norm, unit="dimensionless"),
+            RunDiagnostic(
+                name="importance_zero_weight_count", value=float(run.moments.zero_weight_count), unit="count"
+            ),
+            RunDiagnostic(
+                name="local_scaled_gradient_norm", value=construction.scaled_gradient_norm, unit="dimensionless"
+            ),
             RunDiagnostic(name="local_scaled_condition", value=construction.scaled_condition, unit="dimensionless"),
             *(
-                RunDiagnostic(name=f"approximate_parameter_mean_mcse_{coordinate}", value=mcse, unit="source coordinate")
+                RunDiagnostic(
+                    name=f"approximate_parameter_mean_mcse_{coordinate}", value=mcse, unit="source coordinate"
+                )
                 for coordinate, mcse in zip(model.coordinates, run.approximate_mean_mcse, strict=True)
             ),
         ),
         precision_audit=audit,
         warnings=(
             *result.warnings,
-            f"Monte Carlo precision: {precision_status}; unaudited outputs remain unassessed. "
-            "Conditional audit acceptance is not posterior uncertainty or native qualification.",
+            (
+                f"Monte Carlo precision: {precision_status}; unaudited outputs remain unassessed. "
+                "Conditional audit acceptance is not posterior uncertainty or native qualification."
+            ),
         ),
     )
     settings: dict[str, str | int | float | bool | None] = {
@@ -474,13 +531,11 @@ def calculate_bayesian(
         "non_exceedance_probabilities": _json(outputs.probabilities),
         "discharges": _json(outputs.discharges),
         "precision_status": precision_status,
-        "precision_audit_includes_primary_replay": audit is not None,
+        "precision_audit_attempted_primary_replay": audit is not None and audit.attempts[0].attempted,
         "source_ams_file": "source-ams.csv",
         "source_settings_file": "source-settings.json",
     }
-    if audit is not None:
+    if audit is not None and audit_settings is not None:
         settings["precision_scheduled_draws_including_report"] = audit.plan.total_draws + sampling.draw_count
-        settings["precision_report_scalar_reservation"] = sampling.draw_count * (
-            300 * len(outputs.probabilities) + 20 * len(outputs.discharges) + 10
-        )
+        settings["precision_report_scalar_reservation"] = audit_settings.report_scalar_reservation
     return result, settings
