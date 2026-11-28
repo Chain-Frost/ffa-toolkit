@@ -68,6 +68,7 @@ class ResultMeaning(StrEnum):
 
     QUANTILE_AT_EXPECTED_PARAMETERS = "quantile_at_expected_parameters"
     DETERMINISTIC_FITTED_QUANTILE = "deterministic_fitted_quantile"
+    QUANTILE_BOOTSTRAP_LIMIT = "quantile_parametric_bootstrap_percentile_limit"
     POSTERIOR_MEAN_QUANTILE = "posterior_mean_quantile"
     POSTERIOR_MEDIAN_QUANTILE = "posterior_median_quantile"
     POSTERIOR_PREDICTIVE_QUANTILE = "posterior_predictive_quantile"
@@ -258,3 +259,4 @@ class AnalysisResult:
     diagnostics: tuple[RunDiagnostic, ...] = ()
     fitted_gev_support: GEVFittedSupport | None = None
     precision_audit: PrecisionAudit | None = None
+    candidate_gev_support: tuple[GEVFittedSupport, ...] = ()

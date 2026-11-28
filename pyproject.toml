@@ -23,7 +23,11 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Hydrology",
     "Typing :: Typed",
 ]
-dependencies = ["scipy==1.17.0; python_version >= '3.12'", "scipy>=1.16,<1.17; python_version < '3.12'"]
+dependencies = [
+    "numpy>=1.25.2",
+    "scipy==1.17.0; python_version >= '3.12'",
+    "scipy>=1.16,<1.17; python_version < '3.12'",
+]
 
 [project.urls]
 Repository = "https://github.com/Chain-Frost/ffa-toolkit"
@@ -64,6 +68,8 @@ packages = ["src/ffa_methods"]
 "docs/examples/ordinary-settings.json" = "ffa_methods/resources/examples/ordinary-settings.json"
 "docs/examples/ordinary-ams.csv" = "ffa_methods/resources/examples/ordinary-ams.csv"
 "docs/methods/l-moments.md" = "ffa_methods/resources/methods/l-moments.md"
+"docs/methods/frequency-plots.md" = "ffa_methods/resources/methods/frequency-plots.md"
+"docs/methods/manual.html" = "ffa_methods/resources/methods/manual.html"
 
 "docs/examples/bayesian-fixed-ams.csv" = "ffa_methods/resources/examples/bayesian-fixed-ams.csv"
 "docs/examples/bayesian-fixed-settings.json" = "ffa_methods/resources/examples/bayesian-fixed-settings.json"
@@ -93,6 +99,8 @@ include = [
     "/docs/examples/bayesian-censored-settings.json",
     "/docs/methods/l-moments.md",
     "/docs/wp08-bayesian-cli.md",
+    "/docs/methods/frequency-plots.md",
+    "/docs/methods/manual.html",
     "/docs/method-registry.json",
     "/docs/references.md",
     "/README.md",
