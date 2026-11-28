@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 from hashlib import sha256
-from math import erf, exp, expm1, fsum, inf, isclose, log, pi, sqrt
+from math import erf, exp, expm1, fsum, inf, isclose, log, log1p, nextafter, pi, sqrt
 
 import pytest
 
@@ -143,6 +143,15 @@ def test_estimated_posterior(family: PosteriorFamily, shape: float) -> None:
     d = 2 * proposal.covariance[1][1] - COV[1][1]
     assert a > 0
     assert a * d > b * b
+    # The domain argument in the worked example uses the stronger G-P > 0
+    # and bounds the whitened center after the squared-likelihood tilt.
+    assert proposal.covariance[0][0] > COV[0][0]
+    assert (proposal.covariance[0][0] - COV[0][0]) * (proposal.covariance[1][1] - COV[1][1]) > (
+        proposal.covariance[0][1] - COV[0][1]
+    ) ** 2
+    u = (proposal.means[0] - model.prior.means[0]) / 0.25
+    v = (proposal.means[1] / 0.16 - RHO * u) / sqrt(1 - RHO**2)
+    assert sqrt(u * u + v * v) + 4 * 0.16 < 1.3
     coarse, cvar = _quadrature(family, shape, proposal, 10, 81)
     refined, rvar = _quadrature(family, shape, proposal, 12, 145)
     particles = result.sampling.particles
@@ -265,3 +274,56 @@ def test_estimated_csv_source(family: PosteriorFamily, shape: float) -> None:
     assert bound.series.discharge_unit == "L/s"
     mu, eta = model.prior.means
     assert bound.log_likelihood((mu, eta)) == 2 * bound.kernel((mu, eta)).logpdf(1.3)
+
+
+@pytest.mark.parametrize("skew", [0.0, 1.0])
+def test_lp3_neighbour_of_reference_at_small_scale(skew: float) -> None:
+    model = replace(_estimated(PosteriorFamily.LP3, skew), reference_discharge=10.0)
+    q = nextafter(10.0, inf)
+    eta = log(1e-16)
+    mu = 2 * exp(eta) if skew else 0.0
+    z = (log1p((q - 10) / 10) - mu) / exp(eta)
+    expected = log(_standard(PosteriorFamily.LP3, skew, z)[2]) - eta - log(q)
+    assert isclose(model.kernel((mu, eta)).logpdf(q), expected, rel_tol=0, abs_tol=2e-13)
+
+
+def test_lp3_log_observation_resolution() -> None:
+    model = replace(_estimated(PosteriorFamily.LP3, 1.0), reference_discharge=1.0)
+    # 70-digit direct Erlang evaluation retains ln(2)-binary64 ln(2) before scaling.
+    assert isclose(model.kernel((log(2), log(3e-17))).logpdf(2), 35.8467913373, abs_tol=6e-11, rel_tol=0)
+
+
+@pytest.mark.parametrize(
+    ("mu", "eta", "xi", "q"),
+    [
+        (0.2, 0.1, -0.4, 2.962927295189119),
+        (19.416239798574416, 1.4551134923013125, -0.9366626862027638, 23.99096003906574),
+    ],
+)
+def test_rounded_gev_endpoint_exterior(mu: float, eta: float, xi: float, q: float) -> None:
+    kernel = _estimated(PosteriorFamily.GEV, xi).kernel((mu, eta))
+    assert kernel.logpdf(q) == -inf
+    assert kernel.logcdf(q) == 0.0
+    assert kernel.logsf(q) == -inf
+    assert kernel.cdf(q) == 1.0
+    assert kernel.sf(q) == 0.0
+
+
+def test_unresolved_interior_endpoint() -> None:
+    gev = _estimated(PosteriorFamily.GEV, -0.5).kernel((1.0, 1e-17))
+    lp3 = replace(_estimated(PosteriorFamily.LP3, 1.0), reference_discharge=10.0).kernel((2.0, 0.0))
+    for kernel, q in ((gev, 3.0), (lp3, nextafter(10.0, inf))):
+        with pytest.raises(PosteriorBindingError, match="interior"):
+            kernel.logpdf(q)
+        with pytest.raises(PosteriorBindingError, match="interior"):
+            kernel.sf(q)
+
+
+def test_small_covariance_symmetry() -> None:
+    model = _estimated(PosteriorFamily.GEV, 0.0)
+    with pytest.raises(PosteriorBindingError, match="symmetric"):
+        replace(model, prior=replace(model.prior, covariance=((1e-18, 1e-15), (0.0, 1e-18))))
+    valid = replace(model, prior=replace(model.prior, covariance=((1e-18, 1e-19), (1e-19, 1e-18))))
+    assert valid.prior.logpdf(valid.prior.means) > 0
+    with pytest.raises(PosteriorBindingError, match="finite"):
+        replace(synthetic_model(PosteriorFamily.GEV, 0.0), fixed_log_scale=inf)

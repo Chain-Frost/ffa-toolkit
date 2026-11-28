@@ -29,6 +29,20 @@ for D=diag(c,1). LP3 coordinates are unchanged if r'=cr. A further change of phy
 reference r to b r shifts mu by -ln b. The raw data likelihood gains c^(-n) for n exact
 years. Those constants cancel in normalized posterior expectations.
 
+## Finite support in numerical evaluation
+
+Likelihood, CDF and survival queries standardize each observed flow before applying the WP03
+unit-scale law. Work from the exact binary64 inputs, enclose exp(eta) and the two LP3 logarithms
+with adjacent 80-digit decimals, and propagate the enclosures with rational arithmetic. Compare
+the resulting interval with the exact standardized endpoint. This preserves distinct neighboring
+flows when ordinary subtraction of logarithms rounds to zero. It also distinguishes a proven
+exterior point from an interior point whose log probability underflows. Reject an unresolved
+standardized coordinate or an interior distance within 32 spacings of the rounded statistic:
+in that range even a one-spacing error consumes at least about 3% of the distance at the cutoff.
+This guard applies to bound evaluations, independently of sample weight. Inverse kernel evaluations
+use the existing WP03 conditional quantiles. Finite-sample raw-quantile aggregation and output
+precision admission remain outside the estimated-scale binding.
+
 ## Propriety, moments and precision
 
 All admitted standardized densities have a finite maximum M at fixed shape. Let n be the
