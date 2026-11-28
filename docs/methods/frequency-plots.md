@@ -17,7 +17,9 @@ consecutive ranks ordered by ascending year; this is a project presentation deci
 a native convention or an additional statistical estimator. Each source record and rank is retained.
 
 The horizontal coordinate is proportional to -log10(AEP), with 100% at the left
-and rarer events to the right. The vertical axis is linear in the supplied discharge unit
+and rarer events to the right. For spans of up to three decades, intermediate 2/5-decade
+AEP labels aid reading; open fitted markers keep coincident observed points visible.
+The vertical axis is linear in the supplied discharge unit
 and includes zero and signed fitted quantiles; it does not clip nonphysical predictions.
 The graph shows only the actual requested deterministic fitted quantiles; line segments
 are visual guides, not interpolated calculations. No confidence, probability or

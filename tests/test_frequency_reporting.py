@@ -1,6 +1,7 @@
 """Verify the opt-in presentation against independent plotting coordinates and report values."""
 
 import csv
+import io
 import json
 from dataclasses import replace
 from math import ceil, isclose, log10
@@ -164,3 +165,22 @@ def test_non_deterministic_estimand_rejected() -> None:
     posterior = replace(result, values=(replace(result.values[0], meaning=ResultMeaning.POSTERIOR_PREDICTIVE_QUANTILE),))
     with pytest.raises(ValueError, match="deterministic fitted quantiles"):
         render_frequency_files(posterior, settings=settings, raw_ams=raw_ams, report_text="")
+
+
+def test_intermediate_aep_ticks_and_coincident_marker_visibility() -> None:
+    raw_ams = (EXAMPLES / "ordinary-ams.csv").read_bytes()
+    result, settings = calculate_from_bytes(raw_ams, (EXAMPLES / "ordinary-settings.json").read_bytes())
+    # Synthetic coincidence checks the renderer, not the calculated model.
+    coincident = replace(result, values=(replace(result.values[0], value=2.0), *result.values[1:]))
+    files = render_frequency_files(coincident, settings=settings, raw_ams=raw_ams, report_text="")
+    rows = list(csv.DictReader(io.StringIO(files["frequency-coordinates.csv"])))
+    observed, fitted = rows[1], rows[3]
+    assert float(observed["AEP"]) == float(fitted["AEP"]) == 0.5
+    assert observed["svg_x"] == fitted["svg_x"]
+    assert observed["svg_y"] == fitted["svg_y"]
+    coords = f'cx="{observed["svg_x"]}" cy="{observed["svg_y"]}"'
+    svg = files["frequency.svg"]
+    assert ">50%</text>" in svg
+    assert ">20%</text>" in svg
+    assert f'<circle data-series="observed" {coords} r="4" fill="#202c39">' in svg
+    assert f'<circle data-series="fitted" {coords} r="5.5" fill="none" stroke="#1767a0"' in svg

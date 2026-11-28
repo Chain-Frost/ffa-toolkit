@@ -112,6 +112,15 @@ def _axis_svg(scale: PlotScale, unit: str) -> list[str]:
         x = _LEFT + (_RIGHT - _LEFT) * decade / scale.decades
         lines.append(f'<path d="M{x} {_TOP} V{_BOTTOM}" stroke="#d5dbe2"/>')
         lines.append(f'<text x="{x}" y="469" text-anchor="middle">{10.0 ** (2 - decade):g}%</text>')
+    # For short log ranges, label the engineering-relevant intermediate AEPs.
+    # Avoid crowding labels when the requested tail spans many decades.
+    if scale.decades <= 3:
+        for decade in range(scale.decades):
+            for multiplier in (5, 2):
+                aep = multiplier * 10.0 ** (-decade - 1)
+                x = _LEFT + (_RIGHT - _LEFT) * (-log10(aep) / scale.decades)
+                lines.append(f'<path d="M{x} {_TOP} V{_BOTTOM}" stroke="#edf0f3"/>')
+                lines.append(f'<text x="{x}" y="469" text-anchor="middle">{100 * aep:g}%</text>')
     for index in range(6):
         fraction = index / 5
         y = _BOTTOM - (_BOTTOM - _TOP) * fraction
@@ -154,17 +163,22 @@ def _svg(points: tuple[PlotPoint, ...], scale: PlotScale, unit: str, notice: str
         lines.append(f'<polyline points="{coords}" fill="none" stroke="#1767a0" stroke-width="2"/>')
     for point in points:
         x, y = scale.xy(point)
-        color = "#202c39" if point.series == "observed" else "#1767a0"
+        # Open fitted markers leave coincident observed points visible.
+        style = (
+            'r="4" fill="#202c39"'
+            if point.series == "observed"
+            else 'r="5.5" fill="none" stroke="#1767a0" stroke-width="1.7"'
+        )
         label = f"{point.series}: year={point.year}, AEP={point.aep!r}, Q={point.discharge!r} {unit}"
         lines.append(
-            f'<circle data-series="{point.series}" cx="{x}" cy="{y}" r="4" fill="{color}">'
+            f'<circle data-series="{point.series}" cx="{x}" cy="{y}" {style}>'
             f"<title>{escape(label)}</title></circle>"
         )
     lines.extend(
         (
             '<circle cx="120" cy="522" r="4" fill="#202c39"/>',
             '<text x="132" y="526">Observed Cunnane positions</text>',
-            '<circle cx="370" cy="522" r="4" fill="#1767a0"/>',
+            '<circle cx="370" cy="522" r="5.5" fill="none" stroke="#1767a0" stroke-width="1.7"/>',
             '<text x="382" y="526">Requested fitted quantiles (segments are guides)</text>',
             '<text x="110" y="545">No intervals; independent mathematical fit, not native-qualified.</text>',
             f'<text x="110" y="563" font-size="11">{escape(notice)}</text>',
