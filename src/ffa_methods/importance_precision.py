@@ -12,6 +12,8 @@ from typing import Literal
 
 from ffa_methods.bayesian_outputs import ImportanceParticles, predictive_quantile, weighted_quantile
 from ffa_methods.contracts import EvidenceStatus, ObservationKind, ResultMeaning, RunProvenance
+from ffa_methods.importance_ratio_envelope import RatioEnvelopeError, normalized_log_ratio_bound
+from ffa_methods.importance_reflection_reference import has_reflection_symmetry
 from ffa_methods.importance_sampling import (
     ExplicitNormalProposal,
     ExplicitSamplingControls,
@@ -259,7 +261,7 @@ class ScalarCheck:
     interval: Bounds | None
     positive: SideResolution
     negative: SideResolution
-    reference: float
+    reference: float | None
     reason: str | None = None
 
 
@@ -286,7 +288,7 @@ def _weighted_mean(particles: ImportanceParticles, values: tuple[float, ...]) ->
 def _scalar_check(
     particles: ImportanceParticles,
     values: tuple[float, ...],
-    reference: float,
+    reference: float | None,
     plan: PrecisionPlan,
     critical: float,
 ) -> ScalarCheck:
@@ -414,6 +416,46 @@ def _admit(
     return NormalAdmission(mean, variance, sigma, reference, log_bound)
 
 
+@dataclass(frozen=True, slots=True)
+class ReflectionAdmission:
+    """Independently exact scalar references from posterior reflection."""
+
+    reference_discharge: float
+    log_ratio_bound: float
+
+    def reference(self, request: PrecisionRequest) -> float | None:
+        if request.meaning == "parameter_mean":
+            return 0.0
+        if request.discharge == self.reference_discharge:
+            if request.meaning in (_CDF, _AEP):
+                return 0.5
+            if request.meaning == _PERIOD:
+                return 2.0
+        if request.non_exceedance == 0.5 and request.meaning in (_AT_MEAN, _MEDIAN, _PREDICTIVE):
+            return self.reference_discharge
+        return None
+
+
+def _reflection_admit(
+    model: ClassifiedLognormalPosterior,
+    proposal: ExplicitNormalProposal,
+    plan: PrecisionPlan,
+    requests: tuple[PrecisionRequest, ...],
+) -> ReflectionAdmission:
+    if not has_reflection_symmetry(model):
+        msg = "independent production reference is unavailable for this censored or estimated-scale model"
+        raise PrecisionUnavailableError(msg)
+    bound = normalized_log_ratio_bound(model, proposal)
+    if bound > plan.maximum_log_ratio:
+        msg = "normalized ratio envelope exceeds the explicit ceiling"
+        raise PrecisionUnavailableError(msg)
+    admission = ReflectionAdmission(model.reference_discharge, bound)
+    if not any(admission.reference(request) is not None for request in requests):
+        msg = "independent reference for the requested outputs is unavailable"
+        raise PrecisionUnavailableError(msg)
+    return admission
+
+
 def _reference_value(request: PrecisionRequest, admission: NormalAdmission) -> float:
     if request.meaning in (_CDF, _AEP, _PERIOD):
         probability = admission.probability(_discharge(request), survival=request.meaning != _CDF)
@@ -497,6 +539,8 @@ def _sample_quantile_output(
     elif request.meaning == _AT_MEAN:
         values = tuple(draw[0] for draw in particles.draws)
         mean = _weighted_mean(particles, values)
+        if model.fixed_log_sd is None and request.non_exceedance == 0.5:
+            return SampleOutput(_positive(exp(log(model.reference_discharge) + mean)), values)
         return SampleOutput(_positive(model.kernel((mean,)).ppf(_level(request.non_exceedance))), values)
     else:
         values = tuple(_positive(model.kernel(draw).ppf(_level(request.non_exceedance))) for draw in particles.draws)
@@ -536,7 +580,7 @@ def _bracket_check(
     request: PrecisionRequest,
     sample: SampleOutput,
     window: Bounds,
-    admission: NormalAdmission,
+    admission: NormalAdmission | ReflectionAdmission,
     plan: PrecisionPlan,
     critical: float,
 ) -> AuditDecision:
@@ -555,12 +599,16 @@ def _bracket_check(
                 values = _probability_values(model, particles, bound, survival=survival)
             else:
                 values = tuple(float(value > bound if survival else value <= bound) for value in sample.values)
-            reference = admission.inverse_probability(request, bound, survival=survival)
+            reference = (
+                admission.inverse_probability(request, bound, survival=survival)
+                if isinstance(admission, NormalAdmission)
+                else None
+            )
             check = _scalar_check(particles, values, reference, plan, critical)
         except PrecisionUnavailableError as exc:
             return AuditDecision(tuple(checks), False, indeterminate_reason=str(exc))
         checks.append(check)
-        if check.interval is None:
+        if check.interval is None or reference is None:
             decisions.append(False)
             continue
         # CDF: H(L)<b<H(U); SF: K(L)>1-b>K(U).
@@ -570,6 +618,10 @@ def _bracket_check(
             decisions.append(reference <= check.interval.upper < target)
         else:
             decisions.append(reference >= check.interval.lower > target)
+    if isinstance(admission, ReflectionAdmission):
+        return AuditDecision(
+            tuple(checks), False, indeterminate_reason="independent inverse endpoint probability bounds unavailable"
+        )
     return AuditDecision(tuple(checks), all(decisions))
 
 
@@ -632,7 +684,9 @@ def _sd_check(
     return AuditDecision(checks, accepted, interval)
 
 
-def _transform_interval(request: PrecisionRequest, interval: Bounds, admission: NormalAdmission) -> Bounds:
+def _transform_interval(
+    request: PrecisionRequest, interval: Bounds, admission: NormalAdmission | ReflectionAdmission
+) -> Bounds:
     if request.meaning == _PERIOD:
         if interval.lower <= 0:
             msg = "expected-AEP interval is not strictly positive"
@@ -642,7 +696,11 @@ def _transform_interval(request: PrecisionRequest, interval: Bounds, admission: 
     elif request.meaning == _AT_MEAN:
         # Known scale: the conditional design quantile is strictly increasing
         # in the sole free coordinate. Transform its scalar mean interval.
-        offset = admission.log_design_offset(request)
+        offset = (
+            admission.log_design_offset(request)
+            if isinstance(admission, NormalAdmission)
+            else log(admission.reference_discharge)
+        )
         lower = nextafter(_positive(exp(interval.lower + offset)), -inf)
         upper = nextafter(_positive(exp(interval.upper + offset)), inf)
     else:
@@ -659,15 +717,17 @@ def _expectation_check(
     sample: SampleOutput,
     reference: float,
     window: Bounds,
-    admission: NormalAdmission,
+    admission: NormalAdmission | ReflectionAdmission,
     plan: PrecisionPlan,
     critical: float,
 ) -> AuditDecision:
     scalar_reference = reference
     if request.meaning == _PERIOD:
-        scalar_reference = admission.probability(_discharge(request), survival=True)
+        scalar_reference = (
+            admission.probability(_discharge(request), survival=True) if isinstance(admission, NormalAdmission) else 0.5
+        )
     elif request.meaning == _AT_MEAN:
-        scalar_reference = admission.mean
+        scalar_reference = admission.mean if isinstance(admission, NormalAdmission) else 0.0
     check = _scalar_check(particles, sample.values, scalar_reference, plan, critical)
     if check.interval is None:
         return AuditDecision((check,), False)
@@ -687,7 +747,7 @@ def _audit_output(
     model: ClassifiedLognormalPosterior,
     particles: ImportanceParticles,
     request: PrecisionRequest,
-    admission: NormalAdmission,
+    admission: NormalAdmission | ReflectionAdmission,
     plan: PrecisionPlan,
     critical: float,
     primary: OutputCheck | None,
@@ -698,11 +758,25 @@ def _audit_output(
     sample: SampleOutput | None = None
     window: Bounds | None = None
     try:
-        reference = _reference_value(request, admission)
+        if isinstance(admission, NormalAdmission):
+            reference = _reference_value(request, admission)
+        else:
+            reference = admission.reference(request)
+            if reference is None:
+                return _unavailable(request, model, "independent reference for this output is unavailable")
         sample = _sample_output(model, particles, request)
         if is_primary:
             window = _window(sample.estimate, request.absolute_tolerance)
             state = PrecisionState.CONDITIONAL_PASS if window.contains(reference) else PrecisionState.CRITERIA_NOT_MET
+            if isinstance(admission, ReflectionAdmission) and request.meaning in _INVERSES:
+                return OutputCheck(
+                    request,
+                    PrecisionState.INDETERMINATE,
+                    sample.estimate,
+                    reference,
+                    window,
+                    reason="independent inverse endpoint probability bounds unavailable",
+                )
             return OutputCheck(request, state, sample.estimate, reference, window, centering_mean=sample.centering_mean)
         if primary is None or primary.window is None:
             return OutputCheck(
@@ -716,7 +790,7 @@ def _audit_output(
         window = primary.window
         if request.meaning in _INVERSES:
             decision = _bracket_check(model, particles, request, sample, window, admission, plan, critical)
-        elif request.log_moment == "standard_deviation":
+        elif isinstance(admission, NormalAdmission) and request.log_moment == "standard_deviation":
             decision = _sd_check(particles, request, sample, primary, admission, window, plan, critical)
         else:
             decision = _expectation_check(particles, request, sample, reference, window, admission, plan, critical)
@@ -778,7 +852,7 @@ class PrecisionAudit:
     provenance: RunProvenance
     plan: PrecisionPlan
     requests: tuple[PrecisionRequest, ...]
-    admission: NormalAdmission | None
+    admission: NormalAdmission | ReflectionAdmission | None
     reserved_evaluations: int
     critical_value: float
     attempts: tuple[Attempt, ...]
@@ -884,9 +958,8 @@ def audit_lognormal_precision(
 ) -> PrecisionAudit:
     """Execute one fixed primary and every scheduled audit stream; no adaptive stopping.
 
-    Only the known-scale exact-record model receives the analytical moment/tail
-    admission implemented here. Unsupported models do not acquire precision
-    merely because the sampled weights look healthy.
+    The exact fixed-scale route and the restricted reflection route require
+    independent analytical references and a normalized ratio envelope.
     """
     reserved, critical = plan.preflight(requests)
     if (
@@ -896,10 +969,17 @@ def audit_lognormal_precision(
     ):
         msg = "audit provenance or proposal does not identify the bound source model"
         raise ValueError(msg)
-    admission: NormalAdmission | None = None
+    admission: NormalAdmission | ReflectionAdmission | None = None
     try:
-        admission = _admit(model, proposal, plan)
-    except (PrecisionUnavailableError, ArithmeticError) as exc:
+        if model.fixed_log_sd is None or any(
+            row.kind not in (ObservationKind.EXACT, ObservationKind.MISSING, ObservationKind.EXCLUDED)
+            for row in model.series.annual
+        ):
+            admission = _reflection_admit(model, proposal, plan, requests)
+        else:
+            admission = _admit(model, proposal, plan)
+    except (PrecisionUnavailableError, RatioEnvelopeError, ArithmeticError) as exc:
+        admission = None
         outputs = tuple(_unavailable(request, model, str(exc)) for request in requests)
         attempts = tuple(
             Attempt(seed, plan.primary.draw_count, None, False, None, None, None, outputs, str(exc))
@@ -916,7 +996,7 @@ def _run_attempts(
     provenance: RunProvenance,
     plan: PrecisionPlan,
     requests: tuple[PrecisionRequest, ...],
-    admission: NormalAdmission,
+    admission: NormalAdmission | ReflectionAdmission,
     critical: float,
 ) -> tuple[Attempt, ...]:
     attempts: list[Attempt] = []
@@ -929,7 +1009,9 @@ def _run_attempts(
             )
         except (ArithmeticError, ValueError) as exc:
             failed = tuple(
-                OutputCheck(request, PrecisionState.EXECUTION_FAILED, None, None, None, reason=str(exc))
+                _unavailable(request, model, str(exc))
+                if model.fixed_log_sd is None and request.meaning == _MEAN and _level(request.non_exceedance) > 0.5
+                else OutputCheck(request, PrecisionState.EXECUTION_FAILED, None, None, None, reason=str(exc))
                 for request in requests
             )
             attempts.append(Attempt(seed, controls.draw_count, None, True, None, None, None, failed, str(exc)))

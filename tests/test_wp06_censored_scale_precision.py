@@ -1,4 +1,4 @@
-"""Independent censored/free-scale reference checks; no production precision admission."""
+"""Independent censored/free-scale numerical and production admission checks."""
 
 from dataclasses import replace
 from hashlib import sha256
@@ -19,6 +19,7 @@ from ffa_methods.contracts import (
 )
 from ffa_methods.importance_moment_domain import MomentState, assess_lognormal_moments
 from ffa_methods.importance_precision import PrecisionPlan, PrecisionRequest, PrecisionState, audit_lognormal_precision
+from ffa_methods.importance_ratio_envelope import RatioEnvelopeError, normalized_log_ratio_bound
 from ffa_methods.importance_sampling import (
     ExplicitNormalProposal,
     ExplicitSamplingControls,
@@ -179,8 +180,7 @@ def _reference(
                 cells.append((mass, _weight(mu, eta), values))
     normalizer = fsum(mass * weight for mass, weight, _ in cells)
     means = tuple(
-        fsum(mass * weight * values[k] for mass, weight, values in cells) / normalizer
-        for k in range(len(cells[0][2]))
+        fsum(mass * weight * values[k] for mass, weight, values in cells) / normalizer for k in range(len(cells[0][2]))
     )
     variances = tuple(
         fsum(mass * weight**2 * (values[k] - mean) ** 2 for mass, weight, values in cells) / normalizer**2
@@ -296,3 +296,75 @@ def test_correlated_covariance_requires_matrix_not_marginal_dominance() -> None:
     assert assess_lognormal_moments(model, proposal, request).scalar_second_moments == MomentState.UNESTABLISHED
     proposal = replace(proposal, covariance=((1.0, 0.75), (0.75, 1.0)))
     assert assess_lognormal_moments(model, proposal, request).scalar_second_moments == MomentState.FINITE
+
+
+@pytest.mark.parametrize("free", [False, True])
+def test_reflection_admits_only_independently_known_outputs(*, free: bool) -> None:
+    model = _model(free=free)
+    model = replace(
+        model,
+        series=replace(
+            model.series,
+            annual=(
+                _row(2000, ObservationKind.LEFT_CENSORED, upper=1.0),
+                _row(2001, ObservationKind.RIGHT_CENSORED, lower=1.0),
+            ),
+        ),
+    )
+    proposal = replace(_proposal(model), means=model.prior.means)
+    mean = PrecisionRequest(meaning="parameter_mean", absolute_tolerance=0.1)
+    aep = PrecisionRequest(
+        meaning=ResultMeaning.EXPECTED_ANNUAL_EXCEEDANCE_PROBABILITY, discharge=1.0, absolute_tolerance=0.02
+    )
+    period = replace(aep, meaning=ResultMeaning.RETURN_PERIOD_FROM_EXPECTED_AEP, absolute_tolerance=0.1)
+    at_mean = PrecisionRequest(
+        meaning=ResultMeaning.QUANTILE_AT_EXPECTED_PARAMETERS, non_exceedance=0.5, absolute_tolerance=0.1
+    )
+    unsupported = replace(aep, discharge=1.25)
+    upper = replace(at_mean, meaning=ResultMeaning.POSTERIOR_MEAN_QUANTILE, non_exceedance=0.9)
+    median = replace(at_mean, meaning=ResultMeaning.POSTERIOR_MEDIAN_QUANTILE)
+    requests = (mean, aep, period, at_mean, unsupported, upper, median)
+    plan = _plan()
+    audit = audit_lognormal_precision(
+        model=model, proposal=proposal, provenance=_provenance(model), plan=plan, requests=requests
+    )
+    assert audit.attempted_count == audit.completed_count == len(plan.seeds)
+    assert audit.states == (
+        *((PrecisionState.CONDITIONAL_PASS,) * 4),
+        PrecisionState.INDETERMINATE,
+        PrecisionState.UNDEFINED if free else PrecisionState.INDETERMINATE,
+        PrecisionState.INDETERMINATE,
+    )
+    for attempt in audit.attempts[1:]:
+        assert tuple(output.reference for output in attempt.outputs[:4]) == (0.0, 0.5, 2.0, 1.0)
+        assert all(output.integration_interval is not None for output in attempt.outputs[:4])
+        inverse = attempt.outputs[-1]
+        assert inverse.reference == 1.0
+        assert len(inverse.scalar_checks) == 2
+        assert all(check.reference is None for check in inverse.scalar_checks)
+        assert inverse.reason == "independent inverse endpoint probability bounds unavailable"
+
+    rejected = audit_lognormal_precision(
+        model=model,
+        proposal=proposal,
+        provenance=_provenance(model),
+        plan=replace(plan, maximum_log_ratio=0.01),
+        requests=requests,
+    )
+    assert rejected.attempted_count == 0
+    assert rejected.attempts[0].reason == "normalized ratio envelope exceeds the explicit ceiling"
+
+
+@pytest.mark.parametrize(("free", "ideal_cap"), [(False, 6.67354), (True, 8.79755)])
+def test_outward_ratio_bound_and_exact_covariance_gate(*, free: bool, ideal_cap: float) -> None:
+    model = _model(free=free)
+    proposal = _proposal(model)
+    cap = normalized_log_ratio_bound(model, proposal)
+    # Independently computed box using the sharper Gaussian mass and density
+    # constants in the worked example. The implemented upper bound is looser.
+    assert ideal_cap < cap < 11.0
+    displaced = replace(proposal, means=(0.01, *proposal.means[1:]))
+    with pytest.raises(RatioEnvelopeError, match="strict Gaussian ratio"):
+        normalized_log_ratio_bound(model, displaced)
+    wider = replace(displaced, covariance=tuple(tuple(2 * v for v in row) for row in proposal.covariance))
+    assert normalized_log_ratio_bound(model, wider) > cap

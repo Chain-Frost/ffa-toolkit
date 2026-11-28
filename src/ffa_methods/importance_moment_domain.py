@@ -44,9 +44,7 @@ def _positive_definite(matrix: tuple[tuple[Fraction, ...], ...]) -> bool:
 def _second_moment_envelope(prior: tuple[tuple[float, ...], ...], proposal: tuple[tuple[float, ...], ...]) -> bool:
     p = tuple(tuple(Fraction(v) for v in row) for row in prior)
     g = tuple(tuple(Fraction(v) for v in row) for row in proposal)
-    difference = tuple(
-        tuple(2 * gv - pv for gv, pv in zip(gr, pr, strict=True)) for gr, pr in zip(g, p, strict=True)
-    )
+    difference = tuple(tuple(2 * gv - pv for gv, pv in zip(gr, pr, strict=True)) for gr, pr in zip(g, p, strict=True))
     return _positive_definite(p) and _positive_definite(g) and _positive_definite(difference)
 
 

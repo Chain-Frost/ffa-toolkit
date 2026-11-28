@@ -2,7 +2,7 @@
 
 Refs [#5](https://github.com/Chain-Frost/ffa-toolkit/issues/5), #3, #4, #6 and #7.
 Base: merged PR #31, `affc0315e96978c22930cdb0776f90fca2f9528b`.
-This is an additive verification candidate, not general runtime admission.
+Runtime admission covers the restricted reflection case described below.
 
 ## Global sufficient moment condition
 
@@ -120,7 +120,7 @@ repository sampler; it does not substitute for executing the committed
 tests. No production precision acceptance is claimed.
 
 
-## Normalized density-ratio envelope: proposed next admission step
+## Normalized density-ratio envelope
 
 A separate sufficient bound is available without estimating a normalizer
 from the sampled weights. Write the target as a constant times
@@ -165,17 +165,57 @@ log determinants, quadratic form, lower box mass and likelihood bounds;
 withhold admission if the declared ceiling or rounding cannot be
 established. This is not a change to the approved exact-record audit.
 
+## Implemented rounding and independent reference
+
+The envelope forms the tilted mean, determinants and quadratic form exactly
+from the stored binary64 parameters. The likelihood box uses a radius of
+one marginal SD rounded upwards and a Gaussian box probability lower bound
+of one third. On [0,1], the alternating exponential series gives
+exp(-x?/2) >= 1 - x?/2 + x?/8 - x?/48. Integrating and using
+sqrt(2 pi) < 51/20 gives marginal probability greater than two thirds.
+A union bound handles either dimension and permits correlation. The censor
+density bound uses sqrt(2 pi) < 3 and an inward-rounded event subinterval.
+A private ceiling-rounded Decimal context and adjacent Decimal values for
+correctly rounded transcendental operations bound the total log ratio.
+The bound applies to the real-arithmetic model and proposal specified by
+the stored parameters. The sampler retains its separate numerical
+resolution guards.
+
+Reflection admission requires zero prior mean in mu and, at estimated
+scale, zero cross-covariance with eta. Each included exact observation or
+censor event must match its reflection Q -> R?/Q with equal multiplicity
+around reference discharge R. The check uses rational representations of
+stored flows. This transforms left censoring to right censoring and
+reverses finite interval endpoints. The likelihood, including its exact
+flow Jacobian factors, is even in mu at every eta. Thus E[mu] = 0 and the
+predictive F and SF at R both equal 1/2. The reciprocal expected AEP at R
+equals 2. The conditional median at the expected parameters equals
+R exp(E[mu]); its scale coefficient is zero in either model. The audit
+uses the existing reciprocal and monotone discharge transformations,
+scalar centering, simultaneous critical value, and scheduled streams.
+It requires the explicit ratio ceiling and an exact reference for the
+requested quantity before running an admitted audit.
+
+For a reproducible example use R = 1, one left and one right censored
+annual maximum at R, a zero Gaussian prior mean, mu variance 0.16,
+and either fixed log-SD zero or independent eta variance 0.0144. Use
+the prior as the proposal. The committed reflection test executes seeds
+51, 52 and 53 with 4,000 draws each, verifies the exact scalar reference
+values above and checks that unsupported quantities remain unresolved.
+A conditional pass describes agreement within the specified integration
+tolerance for that output and schedule. The posterior flood uncertainty
+is a separate quantity.
+
 ## Remaining gates
 
-Review this sufficient condition and numerical reference independently.
-Run the actual repository tests and endpoint quality/build/installed
-checks. Extend the existing audit only after an explicit normalized
-ratio envelope, independently bounded reference or separately justified
-audit policy, and per-output numerical resolution are established.
-Preserve current seeds/tolerances and failure/attempt handling.
-A nonlinear two-coordinate expected-parameter transform, centered
-log-SD interval and inverse brackets for production must be reviewed
-with the existing #5 contract; never turn finite moments into an
-automatic conditional pass. Coordinate the typed CLI/report bridge
-with #6/#7. No historical/grouped, rating-error, other family, native,
-release or publishing scope is implied.
+General asymmetric fixed-scale censoring needs integration of the
+deterministic reference enclosures being developed in PR #33. General
+estimated-scale output references require independently bounded
+integration over both coordinates. These references must precede
+acceptance of two-coordinate expected-parameter transforms, nonzero
+scale-dependent log moments and fixed-point predictive or posterior
+inverse endpoints. Exact symmetry can locate some inverse medians, but
+it supplies no numerical values at the audit window endpoints. Where
+reflection gives an exact median, the audit retains its two endpoint
+scalar diagnostics and withholds an inverse precision pass.
+Divergent free-scale upper design means retain the undefined state.

@@ -398,7 +398,7 @@
         "Explicit gamma scaling: correlated covariance and Normal log-density identities, gamma=1 equivalence, representability and scaled builder-to-sampler posterior checks",
         "Exact CSV lognormal execution against analytic predictive probability; estimated-scale censored execution against independent quadrature, seeded replay, and independent censor, unit and prior checks",
         "Bounded known-scale exact-record precision audit against conjugate Normal reference outputs, centered residual MCSE, simultaneous inverse and transformed intervals, reproducibility and retained unsuccessful attempts",
-        "Candidate censored and estimated-scale scalar reference tests and strict Gaussian covariance moment-existence check; runtime precision admission remains pending"
+        "Censored and estimated-scale scalar regressions, strict Gaussian moment conditions, and bounded normalized-ratio admission for exactly reflected records with independently known scalar references"
       ],
       "evidence_gaps": [
         "Independent local curvature, explicit full covariance scaling, Normal importance draws, explicit lognormal binding and a bounded known-scale exact-record precision audit are internal components; broader model/exposure precision admission and installed Bayesian fitting remain outstanding.",
