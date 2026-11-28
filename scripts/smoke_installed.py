@@ -284,6 +284,18 @@ def _check_bayesian_installed(console: Path, output: Path, env: dict[str, str]) 
             msg = "installed Bayesian same-environment seeded replay differs"
             raise RuntimeError(msg)
         _invoke(args, cwd=output, env=env, expected_code=2)
+        plotted = output / f"bayesian-{kind}-frequency-report"
+        _invoke(
+            [*args[:-1], str(plotted), "--frequency-report"],
+            cwd=output,
+            env=env,
+            expected_code=0 if kind == "fixed" else 2,
+        )
+        if kind == "fixed":
+            _check_frequency_files(plotted, destination)
+        elif plotted.exists():
+            msg = "censored Bayesian frequency request created an unsupported report bundle"
+            raise RuntimeError(msg)
     bad_ams = output / "bayesian-invalid-ams.csv"
     bad_ams.write_bytes(b"Year,AMS\n2000,0\n")
     invalid_destination = output / "bayesian-invalid-report"

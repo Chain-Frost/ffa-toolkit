@@ -800,8 +800,18 @@ def write_report_bundle(
         if source_inputs is None:
             msg = "frequency report requires immutable source inputs"
             raise ValueError(msg)
+        # The plotted precision states must be the canonical numerical report states,
+        # including any primary-estimate mismatch; do not recompute them in the renderer.
+        document = cast(dict[str, object], json.loads(files["results.json"]))
+        numerical_rows = cast(list[dict[str, object]], document["results"])
         files.update(
-            render_frequency_files(result, settings=settings, raw_ams=source_inputs[0], report_text=files["report.txt"])
+            render_frequency_files(
+                result,
+                settings=settings,
+                raw_ams=source_inputs[0],
+                report_text=files["report.txt"],
+                numerical_rows=numerical_rows,
+            )
         )
     target = validate_output_path(destination)
     staging = Path(tempfile.mkdtemp(prefix=f".{target.name}-", dir=target.parent))

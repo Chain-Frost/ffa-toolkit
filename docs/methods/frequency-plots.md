@@ -23,9 +23,9 @@ and rarer events to the right. For spans of up to three decades, intermediate 2/
 AEP labels aid reading; open fitted markers keep coincident observed points visible.
 The vertical axis is linear in the supplied discharge unit
 and includes zero and signed fitted quantiles; it does not clip nonphysical predictions.
-The graph shows only the actual requested deterministic fitted quantiles; line segments
-are visual guides, not interpolated calculations. No confidence, probability or
-prediction intervals are calculated. Support warnings remain visible; refer to the full
+The deterministic graph shows only the actual requested fitted quantiles; line segments
+are visual guides, not interpolated calculations. The point-fit route calculates no intervals.
+The exact-record Bayesian route presents already calculated posterior intervals as described below. Support warnings remain visible; refer to the full
 analysis and check assumptions before adopting a design discharge.
 
 ## Offline worked examples
@@ -62,12 +62,12 @@ Without the flag, previous outputs and schemas remain unchanged.
 
 ## Admission and limitations
 
-Only the existing explicit deterministic ordinary and fixed-H GEV schemas and complete,
-consecutive, positive exact systematic annual maxima are supported. The caller's classification,
+The existing explicit deterministic ordinary and fixed-H GEV schemas, and the explicit
+lognormal Bayesian Year,AMS schema, require complete, consecutive, positive exact systematic annual maxima. The caller's classification,
 year definition and unit remain assertions. The plot refuses unresolved gaps rather than treating
 them as measured exposure or non-exceedances. Existing unplotted fits are not restricted further.
-No missing, zero, historical, grouped, censored, rating-error, POT, posterior or interval plot
-is admitted here. An annual-maxima GP fit is not a POT workflow. Independence, stationarity,
+No missing, zero, historical, grouped, censored, rating-error or POT plot is admitted here.
+Selected-H and parametric-bootstrap visualization remain separate pending work. An annual-maxima GP fit is not a POT workflow. Independence, stationarity,
 physical support, model selection, data quality, rating error and engineering adoption still
 require review. No native labels or defaults are inferred.
 
@@ -76,3 +76,42 @@ require review. No native labels or defaults are inferred.
 DOI 10.1016/0022-1694(78)90017-3 (publisher abstract reviewed; full paper not obtained).
 Use `ffa references ARR3` and `ffa references CUNNANE1978`.
 Independent numeric and installed checks are required before acceptance; native qualification is separate.
+
+## Exact-record Bayesian frequency reporting
+
+The installed explicit lognormal Bayesian schema `ffa-lognormal-bayesian/1` supports
+`--frequency-report` for `source_format: year_ams_csv` and consecutive positive exact
+systematic annual maxima. Classified-systematic CSV (including censored records) is
+intentionally not admitted by this increment. A quantile request is required;
+probability-at-flow-only output remains a numerical table.
+
+The renderer consumes the typed quantile results and their canonical report rows, without
+running another fit, sampling additional draws or substituting different estimands.
+The separately labelled series are quantile at expected source-coordinate parameters,
+posterior mean of quantiles, posterior median of quantiles, and posterior predictive
+quantile (the inverse averaged CDF). Undefined posterior means remain absent; segments
+do not bridge missing requested values. The exact recorded lower and upper central
+posterior quantile probability limits are vertical intervals at their own requested F.
+These are parameter-induced uncertainty in the model quantile, not predictive intervals,
+simultaneous bands, bootstrap intervals or numerical Monte Carlo error. Interval
+mass and construction, source unit, canonical one-based result-row identity and each
+reported numerical precision state are retained in the coordinate CSV and HTML.
+No new precision claim follows from a plot. The other Bayesian probability and
+return-period quantities remain in the complete numerical report.
+
+Run the bundled synthetic fixed-scale example (copy the two resources from the wheel
+as for the deterministic examples):
+~~~console
+ffa fit --ams bayesian-fixed-ams.csv --settings bayesian-fixed-settings.json --output bayesian-plot --frequency-report
+~~~
+For its three log flows 1,2,3, normal prior N(0,1) and known log SD 0 (SD=1),
+the independent posterior log-location reference is N(1.5,1/4). At F=0.9 and
+z=Phi^-1(F), the at-expected-parameter quantile is exp(1.5+z), the posterior
+mean quantile exp(1.5+z+0.125), the posterior median quantile exp(1.5+z), and
+the predictive quantile exp(1.5+sqrt(1.25)*z). The central 80% posterior
+quantile interval endpoints are exp(1.5+z+0.5*Phi^-1(0.1)) and
+exp(1.5+z+0.5*Phi^-1(0.9)). These analytical values are reference quantities;
+the plotted values are the actual finite seeded importance-sampling outputs.
+The configured AEP precision audit does not qualify those quantile points.
+See `ffa explain quantile-estimands --format markdown` and the installed Bayesian
+workflow guidance for the source method and limitations. Native qualification remains separate.
