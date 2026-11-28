@@ -240,6 +240,16 @@ class Lognormal(_LogFlowKernel):
     def _frozen(self) -> _FrozenContinuous:
         return cast(_FrozenContinuous, norm(loc=self.log.natural_mean, scale=math.exp(self.log.natural_log_sd)))
 
+    def cdf(self, discharge: float) -> float:
+        # Predictive inversion calls CDF repeatedly across a potentially large
+        # particle set. Pass the same parameters without cloning a distribution.
+        discharge = _point(discharge)
+        if discharge <= 0.0:
+            return 0.0
+        return float(
+            norm.cdf(self._to_statistic(discharge), loc=self.log.natural_mean, scale=math.exp(self.log.natural_log_sd))
+        )
+
 
 def _gamma_upper_fraction(shape: float, x: float) -> float:
     """Continued-fraction correction for the upper incomplete gamma Q."""
@@ -553,6 +563,29 @@ class GEV(_ContinuousKernel):
         _finite(self.location, "location")
         _scale(self.log_scale)
         _finite(self.xi, "xi")
+
+    def logsf(self, discharge: float) -> float:
+        discharge = _point(discharge)
+        if math.isinf(discharge):
+            return -math.inf if discharge > 0.0 else 0.0
+        z = (discharge - self.location) / math.exp(self.log_scale)
+        if self.xi == 0.0:
+            log_intensity = -z
+        else:
+            offset = self.xi * z
+            if offset <= -1.0:
+                return 0.0 if self.xi > 0.0 else -math.inf
+            log_intensity = -z if abs(offset) < 1e-16 else -math.log1p(offset) / self.xi
+        # S = 1 - exp(-intensity). At this cutoff the correction to
+        # log(intensity) is smaller than one binary64 ulp.
+        if log_intensity <= -36.0:
+            return log_intensity
+        if log_intensity >= 7.0:
+            return 0.0
+        intensity = math.exp(log_intensity)
+        if intensity >= math.log(2.0):
+            return math.log1p(-math.exp(-intensity))
+        return math.log(-math.expm1(-intensity))
 
     def _frozen(self) -> _FrozenContinuous:
         return cast(

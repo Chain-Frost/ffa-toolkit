@@ -161,7 +161,7 @@ def test_independent_fixed_budget_all_admitted_outputs_against_conjugate_oracle(
         exp(1.5 + z + 0.5 * z),
         1 / normal.cdf(1.5 - 0.5 * z - 2),
     )
-    assert result.admission is not None
+    assert isinstance(result.admission, importance_precision.NormalAdmission)
     assert isclose(result.admission.mean, 1.5, abs_tol=1e-14)
     assert isclose(result.admission.variance, 0.25, abs_tol=1e-14)
     assert isclose(result.admission.log_ratio_bound, log(2), abs_tol=1e-14)

@@ -364,6 +364,7 @@ def test_negative_gumbel_limit_is_preserved_with_explicit_physical_warning() -> 
     q = quantile_outputs(p, 0.8, kernel, interval_mass=0.9)
     assert q.probability_limits[0] < 0 < q.probability_limits[1]
     assert q.at_expected_parameters > 0
+    assert q.mean_of_quantiles is not None
     assert q.mean_of_quantiles > 0
     assert q.median_of_quantiles > 0
     assert q.predictive_quantile > 0

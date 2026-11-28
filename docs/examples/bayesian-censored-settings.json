@@ -1,0 +1,70 @@
+{
+  "schema_version": "ffa-lognormal-bayesian/1",
+  "estimator": "lognormal_bayesian",
+  "source_format": "classified_systematic_csv",
+  "source": "synthetic two exact and two censored annual maxima",
+  "source_classification": "caller_asserted_classified_systematic_annual_maxima",
+  "discharge_unit": "m3/s",
+  "year_definition": "synthetic calendar year",
+  "reference_discharge": 1,
+  "fixed_log_sd": null,
+  "prior": {
+    "mode": "supplied",
+    "source": "synthetic Gaussian prior for independent example only",
+    "coordinates": [
+      "lognormal.mean_loge_flow",
+      "lognormal.loge_sd_loge_flow"
+    ],
+    "means": [
+      0,
+      0
+    ],
+    "covariance": [
+      [
+        0.16,
+        0
+      ],
+      [
+        0,
+        0.0144
+      ]
+    ]
+  },
+  "proposal": {
+    "start": [
+      0,
+      0
+    ],
+    "gamma": 1,
+    "scales": [
+      0.4,
+      0.12
+    ],
+    "initial_step": 0.01,
+    "max_refinements": 8,
+    "max_iterations": 30,
+    "gradient_tolerance": 0.00001,
+    "mode_tolerance": 0.00001,
+    "curvature_tolerance": 0.0001,
+    "max_condition": 100000
+  },
+  "sampling": {
+    "rng": "python_random_gauss",
+    "draw_count": 4000,
+    "random_seed": 87,
+    "minimum_effective_size": 3000,
+    "maximum_single_weight": 0.01
+  },
+  "outputs": {
+    "non_exceedance_probabilities": [
+      0.9
+    ],
+    "discharges": [
+      1.4190675485932571
+    ],
+    "interval_mass": 0.9
+  },
+  "precision": {
+    "mode": "not_assessed"
+  }
+}

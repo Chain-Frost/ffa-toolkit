@@ -4,12 +4,17 @@ These types are internal composition boundaries for the supported CLI, not a sep
 supported Python API. WP02 owns parsing and source custody; WP03 owns numerical kernels.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import StrEnum
 from math import isfinite
-from typing import Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 
 from ffa_methods.gev_support import GEVFittedSupport
+
+if TYPE_CHECKING:
+    from ffa_methods.importance_precision import PrecisionAudit
 
 
 class ExposureKind(StrEnum):
@@ -252,3 +257,4 @@ class AnalysisResult:
     warnings: tuple[str, ...] = ()
     diagnostics: tuple[RunDiagnostic, ...] = ()
     fitted_gev_support: GEVFittedSupport | None = None
+    precision_audit: PrecisionAudit | None = None

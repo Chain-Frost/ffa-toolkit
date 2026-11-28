@@ -6,13 +6,13 @@ an issue is active merely because it is listed. The package/import names remain 
 
 The installed deterministic paths include fixed-H GEV L/LH with exact fitted-support reporting and
 ordinary L-moment Gumbel, lognormal, LP3 and explicit fixed/free-location GP fits. Internal lognormal
-posterior execution and explicit proposal scaling do not make Bayesian fitting available in the CLI.
+posterior execution and explicit proposal scaling are composed by the issue #6 Bayesian CLI workflow under review.
 
 ## Remaining software requirements
 
 - Complete standardized Wang diagnostics, optimized H selection and declared uncertainty.
-- Deliver installed explicitly configured lognormal Bayesian orchestration; internal binding and
-  proposal covariance scaling are implemented, while output-specific precision/stopping remains pending.
+- Complete review and clean-wheel endpoint acceptance of the explicitly configured lognormal Bayesian workflow.
+  Broader output-specific precision and adaptive stopping remain separate outstanding work.
 - Extend explicit posterior bindings to other families, historical/grouped exposure and shared rating error.
 - Deliver scientific reports, static plots, accessible method explanations and offline worked examples.
 - Complete independent whole-cohort external comparisons, archive identity review and a settings-matched
