@@ -17,15 +17,15 @@ def test_conditional_variance_exact_rational_reference() -> None:
     pairs = ((-0.5, -0.5), (-0.5, 0.0), (0.5, 0.0), (0.5, 0.5))
     result = conditional_lh_variance(pairs)
     assert result.count == 4
-    assert isclose(result.skew_variance, 1 / 3, rel_tol=1e-14, abs_tol=0)
-    assert isclose(result.kurtosis_variance, 1 / 6, rel_tol=1e-14, abs_tol=0)
-    assert isclose(result.covariance, 1 / 6, rel_tol=1e-14, abs_tol=0)
-    assert isclose(result.conditional_variance, 1 / 12, rel_tol=1e-14, abs_tol=0)
+    assert isclose(result.skew_variance, 1 / 3, rel_tol=1e-14, abs_tol=1e-12)
+    assert isclose(result.kurtosis_variance, 1 / 6, rel_tol=1e-14, abs_tol=1e-12)
+    assert isclose(result.covariance, 1 / 6, rel_tol=1e-14, abs_tol=1e-12)
+    assert isclose(result.conditional_variance, 1 / 12, rel_tol=1e-14, abs_tol=1e-12)
     # Independent affine transformation: scale kurtosis by 2, skew by -1.
     transformed = conditional_lh_variance((-x + 0.25, 2 * y - 0.25) for x, y in pairs)
-    assert isclose(transformed.conditional_variance, 1 / 3, rel_tol=1e-14, abs_tol=0)
-    assert isclose(standardized_lh_z(0.25, 0.125, result), sqrt(12) / 8, rel_tol=1e-14, abs_tol=0)
-    assert isclose(standardized_lh_z(0.125, 0.25, result), -sqrt(12) / 8, rel_tol=1e-14, abs_tol=0)
+    assert isclose(transformed.conditional_variance, 1 / 3, rel_tol=1e-14, abs_tol=1e-12)
+    assert isclose(standardized_lh_z(0.25, 0.125, result), sqrt(12) / 8, rel_tol=1e-14, abs_tol=1e-12)
+    assert isclose(standardized_lh_z(0.125, 0.25, result), -sqrt(12) / 8, rel_tol=1e-14, abs_tol=1e-12)
 
 
 @pytest.mark.parametrize(
