@@ -65,8 +65,8 @@ operation against a directory inserted between the final check and rename.
 
 ## Mathematical basis and independent references
 
-See ARR Book 3 v4.2 Chapter 2 Â§Â§2.6.3.6â€“7, Eqs 3.2.52â€“54 and 3.2.56;
-Kuczera (1999), p. 1554, Eqs (16)â€“(17);
+See ARR Book 3 v4.2 Chapter 2 §§2.6.3.6–7, Eqs 3.2.52–54 and 3.2.56;
+Kuczera (1999), p. 1554, Eqs (16)–(17);
 [importance sampling](methods/importance-sampling-reference.md),
 [lognormal binding](wp06-lognormal-binding.md),
 [output precision](wp06-output-precision.md), and the
