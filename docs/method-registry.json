@@ -403,7 +403,7 @@
       ],
       "evidence_gaps": [
         "Independent local curvature, explicit full covariance scaling, Normal importance draws, explicit lognormal binding and a bounded known-scale exact-record precision audit are composed in the issue #6 CLI implementation; installed acceptance, broader model/exposure precision admission and native comparison remain outstanding.",
-        "The internal API also supports explicitly configured fixed-scale censored parameter mean and expected CDF/direct AEP using complete deterministic enclosures. An additional route admits exactly reflected fixed- or estimated-scale lognormal records for independently known scalars. General censored transformed/inverse outputs, broad estimated-scale precision remain outstanding.",
+        "The internal API also supports explicitly configured fixed-scale censored parameter mean and expected CDF/direct AEP using complete deterministic enclosures. An additional route admits exactly reflected fixed- or estimated-scale lognormal records for independently known scalars. General censored transformed/inverse outputs and broad estimated-scale precision remain outstanding.",
         "GEV and LP3 posterior bindings cover location-only inference with explicit fixed log-scale and shape. See wp06-fixed-family-posterior.md for evidence and remaining limitations.",
         "Actual native Flike optimizer/proposal, random controls, stopping and output interpolation are not established; external native qualification remains separate.",
         "ESS, approximate mean Monte Carlo standard error, and independent seeds do not by themselves validate extreme-tail flood estimates or native equivalence."
@@ -666,6 +666,35 @@
         "Plotting-position and axis conventions",
         "Replay metadata and reference keys",
         "No unsupported qualification claims"
+      ]
+    },
+    {
+      "method_id": "frequency-plots",
+      "title": "Exact systematic annual maxima frequency plots",
+      "kind": "output_documentation",
+      "scope": "mvp",
+      "implementation_status": "partial_independent_exact_systematic_cli",
+      "qualification_status": "not_started",
+      "work_packages": [
+        "WP08"
+      ],
+      "source_keys": [
+        "ARR3",
+        "CUNNANE1978"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 section 2.6.2 equations 3.2.35–3.2.36, printed pp. 35–36",
+      "purpose": "Display ranked exact systematic annual maxima and requested deterministic fitted quantiles without altering the calculation",
+      "key_assumptions": [
+        "Consecutive exact positive annual maxima only",
+        "Descending ranks, Cunnane AEP; ascending year breaks ties as an explicit presentation rule",
+        "Log AEP axis, linear signed discharge; no interval or engineering adoption claim"
+      ],
+      "documentation": "methods/frequency-plots.md",
+      "validation_required": [
+        "Independent rank and plot-coordinate checks",
+        "Identical quantile values and source hashes",
+        "Reject unresolved exposure and unsupported estimands",
+        "Installed offline report and guidance checks"
       ]
     },
     {
