@@ -13,7 +13,11 @@ from typing import Literal
 from ffa_methods.bayesian_outputs import ImportanceParticles, predictive_quantile, weighted_quantile
 from ffa_methods.contracts import EvidenceStatus, ObservationKind, ResultMeaning, RunProvenance
 from ffa_methods.importance_ratio_envelope import RatioEnvelopeError, normalized_log_ratio_bound
-from ffa_methods.importance_reflection_reference import has_reflection_symmetry
+from ffa_methods.importance_reflection_reference import (
+    has_reflection_symmetry,
+    reflected_discharge,
+    reflected_discharge_bounds,
+)
 from ffa_methods.importance_sampling import (
     ExplicitNormalProposal,
     ExplicitSamplingControls,
@@ -377,13 +381,17 @@ class NormalAdmission:
         )
 
 
+def _needs_nonconjugate_admission(model: ClassifiedLognormalPosterior) -> bool:
+    return model.fixed_log_sd is None or any(
+        row.kind not in (ObservationKind.EXACT, ObservationKind.MISSING, ObservationKind.EXCLUDED)
+        for row in model.series.annual
+    )
+
+
 def _admit(
     model: ClassifiedLognormalPosterior, proposal: ExplicitNormalProposal, plan: PrecisionPlan
 ) -> NormalAdmission:
-    if model.fixed_log_sd is None or any(
-        row.kind not in (ObservationKind.EXACT, ObservationKind.MISSING, ObservationKind.EXCLUDED)
-        for row in model.series.annual
-    ):
+    if model.fixed_log_sd is None or _needs_nonconjugate_admission(model):
         msg = "precision admission currently requires known log-SD and exact included observations"
         raise PrecisionUnavailableError(msg)
     if model.coordinates != proposal.coordinates:
@@ -431,8 +439,11 @@ class ReflectionAdmission:
                 return 0.5
             if request.meaning == _PERIOD:
                 return 2.0
-        if request.non_exceedance == 0.5 and request.meaning in (_AT_MEAN, _MEDIAN, _PREDICTIVE):
-            return self.reference_discharge
+        if request.non_exceedance == 0.5:
+            if request.meaning in (_AT_MEAN, _MEDIAN, _PREDICTIVE):
+                return self.reference_discharge
+            if request.meaning == _LOG and request.log_moment == "mean" and self.reference_discharge == 1:
+                return 0.0
         return None
 
 
@@ -530,17 +541,23 @@ def _sample_quantile_output(
         # exponentiation is unnecessary and can overflow/underflow even when
         # the requested logarithmic moment is representable.
         if model.fixed_log_sd is None:
-            msg = "logarithmic precision requires admitted known log-SD"
-            raise PrecisionUnavailableError(msg)
-        offset = fsum(
-            (log(model.reference_discharge), exp(model.fixed_log_sd) * _NORMAL.inv_cdf(_level(request.non_exceedance)))
-        )
+            if request.non_exceedance != 0.5:
+                msg = "scale-dependent logarithmic precision requires an independent reference"
+                raise PrecisionUnavailableError(msg)
+            offset = log(model.reference_discharge)
+        else:
+            offset = fsum(
+                (
+                    log(model.reference_discharge),
+                    exp(model.fixed_log_sd) * _NORMAL.inv_cdf(_level(request.non_exceedance)),
+                )
+            )
         values = tuple(fsum((offset, draw[0])) / log(10) for draw in particles.draws)
     elif request.meaning == _AT_MEAN:
         values = tuple(draw[0] for draw in particles.draws)
         mean = _weighted_mean(particles, values)
-        if model.fixed_log_sd is None and request.non_exceedance == 0.5:
-            return SampleOutput(_positive(exp(log(model.reference_discharge) + mean)), values)
+        if request.non_exceedance == 0.5 and _needs_nonconjugate_admission(model):
+            return SampleOutput(_positive(reflected_discharge(model.reference_discharge, mean)), values)
         return SampleOutput(_positive(model.kernel((mean,)).ppf(_level(request.non_exceedance))), values)
     else:
         values = tuple(_positive(model.kernel(draw).ppf(_level(request.non_exceedance))) for draw in particles.draws)
@@ -696,13 +713,12 @@ def _transform_interval(
     elif request.meaning == _AT_MEAN:
         # Known scale: the conditional design quantile is strictly increasing
         # in the sole free coordinate. Transform its scalar mean interval.
-        offset = (
-            admission.log_design_offset(request)
-            if isinstance(admission, NormalAdmission)
-            else log(admission.reference_discharge)
-        )
-        lower = nextafter(_positive(exp(interval.lower + offset)), -inf)
-        upper = nextafter(_positive(exp(interval.upper + offset)), inf)
+        if isinstance(admission, ReflectionAdmission):
+            lower, upper = reflected_discharge_bounds(admission.reference_discharge, interval.lower, interval.upper)
+        else:
+            offset = admission.log_design_offset(request)
+            lower = nextafter(_positive(exp(interval.lower + offset)), -inf)
+            upper = nextafter(_positive(exp(interval.upper + offset)), inf)
     else:
         return interval
     if not isfinite(lower) or not isfinite(upper) or lower <= 0 or lower >= upper:
@@ -733,7 +749,7 @@ def _expectation_check(
         return AuditDecision((check,), False)
     try:
         interval = _transform_interval(request, check.interval, admission)
-    except (PrecisionUnavailableError, OverflowError) as exc:
+    except (PrecisionUnavailableError, ArithmeticError) as exc:
         return AuditDecision((check,), False, indeterminate_reason=str(exc))
     accepted = (
         check.interval.contains(scalar_reference)
@@ -771,7 +787,7 @@ def _audit_output(
             if isinstance(admission, ReflectionAdmission) and request.meaning in _INVERSES:
                 return OutputCheck(
                     request,
-                    PrecisionState.INDETERMINATE,
+                    PrecisionState.INDETERMINATE if window.contains(reference) else PrecisionState.CRITERIA_NOT_MET,
                     sample.estimate,
                     reference,
                     window,
@@ -971,10 +987,7 @@ def audit_lognormal_precision(
         raise ValueError(msg)
     admission: NormalAdmission | ReflectionAdmission | None = None
     try:
-        if model.fixed_log_sd is None or any(
-            row.kind not in (ObservationKind.EXACT, ObservationKind.MISSING, ObservationKind.EXCLUDED)
-            for row in model.series.annual
-        ):
+        if _needs_nonconjugate_admission(model):
             admission = _reflection_admit(model, proposal, plan, requests)
         else:
             admission = _admit(model, proposal, plan)

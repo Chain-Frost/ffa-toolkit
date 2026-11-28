@@ -20,6 +20,7 @@ from ffa_methods.contracts import (
 from ffa_methods.importance_moment_domain import MomentState, assess_lognormal_moments
 from ffa_methods.importance_precision import PrecisionPlan, PrecisionRequest, PrecisionState, audit_lognormal_precision
 from ffa_methods.importance_ratio_envelope import RatioEnvelopeError, normalized_log_ratio_bound
+from ffa_methods.importance_reflection_reference import reflected_discharge, reflected_discharge_bounds
 from ffa_methods.importance_sampling import (
     ExplicitNormalProposal,
     ExplicitSamplingControls,
@@ -323,21 +324,22 @@ def test_reflection_admits_only_independently_known_outputs(*, free: bool) -> No
     unsupported = replace(aep, discharge=1.25)
     upper = replace(at_mean, meaning=ResultMeaning.POSTERIOR_MEAN_QUANTILE, non_exceedance=0.9)
     median = replace(at_mean, meaning=ResultMeaning.POSTERIOR_MEDIAN_QUANTILE)
-    requests = (mean, aep, period, at_mean, unsupported, upper, median)
+    log_mean = replace(at_mean, meaning=ResultMeaning.LOG10_QUANTILE_POSTERIOR_MOMENT, log_moment="mean")
+    requests = (mean, aep, period, at_mean, log_mean, unsupported, upper, median)
     plan = _plan()
     audit = audit_lognormal_precision(
         model=model, proposal=proposal, provenance=_provenance(model), plan=plan, requests=requests
     )
     assert audit.attempted_count == audit.completed_count == len(plan.seeds)
     assert audit.states == (
-        *((PrecisionState.CONDITIONAL_PASS,) * 4),
+        *((PrecisionState.CONDITIONAL_PASS,) * 5),
         PrecisionState.INDETERMINATE,
         PrecisionState.UNDEFINED if free else PrecisionState.INDETERMINATE,
         PrecisionState.INDETERMINATE,
     )
     for attempt in audit.attempts[1:]:
-        assert tuple(output.reference for output in attempt.outputs[:4]) == (0.0, 0.5, 2.0, 1.0)
-        assert all(output.integration_interval is not None for output in attempt.outputs[:4])
+        assert tuple(output.reference for output in attempt.outputs[:5]) == (0.0, 0.5, 2.0, 1.0, 0.0)
+        assert all(output.integration_interval is not None for output in attempt.outputs[:5])
         inverse = attempt.outputs[-1]
         assert inverse.reference == 1.0
         assert len(inverse.scalar_checks) == 2
@@ -368,3 +370,10 @@ def test_outward_ratio_bound_and_exact_covariance_gate(*, free: bool, ideal_cap:
         normalized_log_ratio_bound(model, displaced)
     wider = replace(displaced, covariance=tuple(tuple(2 * v for v in row) for row in proposal.covariance))
     assert normalized_log_ratio_bound(model, wider) > cap
+
+
+@pytest.mark.parametrize("reference", [1e-300, 1e300])
+def test_reflection_discharge_encloses_exact_identity_at_zero(reference: float) -> None:
+    assert reflected_discharge(reference, 0.0) == reference
+    lower, upper = reflected_discharge_bounds(reference, 0.0, 0.0)
+    assert lower < reference < upper

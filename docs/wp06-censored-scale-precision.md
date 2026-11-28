@@ -190,7 +190,9 @@ reverses finite interval endpoints. The likelihood, including its exact
 flow Jacobian factors, is even in mu at every eta. Thus E[mu] = 0 and the
 predictive F and SF at R both equal 1/2. The reciprocal expected AEP at R
 equals 2. The conditional median at the expected parameters equals
-R exp(E[mu]); its scale coefficient is zero in either model. The audit
+R exp(E[mu]); its scale coefficient is zero in either model. The discharge
+transform encloses this expression directly with directed Decimal bounds.
+For R = 1 the mean of log10 q at p = 1/2 is also exactly zero. The audit
 uses the existing reciprocal and monotone discharge transformations,
 scalar centering, simultaneous critical value, and scheduled streams.
 It requires the explicit ratio ceiling and an exact reference for the
