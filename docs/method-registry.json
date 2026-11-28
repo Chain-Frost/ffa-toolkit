@@ -398,10 +398,11 @@
         "Explicit gamma scaling: correlated covariance and Normal log-density identities, gamma=1 equivalence, representability and scaled builder-to-sampler posterior checks",
         "Exact CSV lognormal execution against analytic predictive probability; estimated-scale censored execution against independent quadrature, seeded replay, and independent censor, unit and prior checks",
         "Bounded known-scale exact-record precision audit against conjugate Normal reference outputs, centered residual MCSE, simultaneous inverse and transformed intervals, reproducibility and retained unsuccessful attempts",
-        "Fixed-scale/fixed-shape GEV and LP3 location-only binding with independent density/censor and posterior quadrature regression cases"
+        "Fixed-scale/fixed-shape GEV and LP3 location-only binding with independent density/censor and posterior quadrature regression cases",
+        "Fixed-shape GEV and LP3 estimated log-scale: joint supplied Gaussian, six independent 2D references for evidence, means, covariance and expected AEP, moving support, tied years and unit/reference transforms"
       ],
       "evidence_gaps": [
-        "Independent local curvature, explicit full covariance scaling, Normal importance draws, explicit lognormal binding and a bounded known-scale exact-record precision audit are internal components; broader model/exposure precision admission and installed Bayesian fitting remain outstanding. See wp06-fixed-family-posterior.md for the bounded GEV/LP3 scope, validation record and remaining limitations.",
+        "Independent local curvature, explicit full covariance scaling, Normal importance draws, explicit lognormal binding and a bounded known-scale exact-record precision audit are internal components; broader model/exposure precision admission and installed Bayesian fitting remain outstanding. See wp06-fixed-family-posterior.md and wp06-estimated-scale.md for the bounded GEV/LP3 scope, validation record and remaining limitations.",
         "Actual native Flike optimizer/proposal, random controls, stopping and output interpolation are not established; external native qualification remains separate.",
         "ESS, approximate mean Monte Carlo standard error, and independent seeds do not by themselves validate extreme-tail flood estimates or native equivalence."
       ],
