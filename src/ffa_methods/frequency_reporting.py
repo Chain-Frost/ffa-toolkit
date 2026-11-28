@@ -286,6 +286,9 @@ def render_frequency_files(
     ):
         msg = "frequency report requires an admitted deterministic systematic-AMS settings schema"
         raise ValueError(msg)
+    if "bootstrap_status" in settings:
+        msg = "frequency report requires a point fit without a bootstrap request"
+        raise ValueError(msg)
     if any(
         not (0x20 <= ord(char) <= 0xD7FF or 0xE000 <= ord(char) <= 0xFFFD or 0x10000 <= ord(char) <= 0x10FFFF)
         for char in unit

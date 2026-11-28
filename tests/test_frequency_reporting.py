@@ -97,6 +97,30 @@ def test_fixed_gev_frequency_report_custody(tmp_path: Path, shift: int) -> None:
     assert "GEV support:" in (plotted / "frequency.svg").read_text(encoding="utf-8")
 
 
+def test_frequency_report_refuses_a_refused_bootstrap(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    ams = EXAMPLES / "ordinary-ams.csv"
+    config = tmp_path / "settings.json"
+    settings = cast(dict[str, object], json.loads((EXAMPLES / "ordinary-settings.json").read_text(encoding="utf-8")))
+    settings["bootstrap"] = {
+        "replications": 4,
+        "seed": 42,
+        "confidence": 0.8,
+        "maximum_failure_fraction": 0.0,
+        "endpoint_tolerance": 1.0,
+    }
+    config.write_text(json.dumps(settings), encoding="utf-8")
+    plain, plotted = tmp_path / "plain", tmp_path / "plotted"
+    assert _run(ams, config, plain, plot=False) == 2
+    result = json.loads((plain / "results.json").read_text(encoding="utf-8"))
+    assert result["settings"]["bootstrap_status"] == "refused"
+    assert result["settings"]["bootstrap_attempted"] == 4
+    with pytest.raises(SystemExit) as exc:
+        _run(ams, config, plotted)
+    assert exc.value.code == 2
+    assert "without a bootstrap request" in capsys.readouterr().err
+    assert not plotted.exists()
+
+
 def test_ties_and_unordered_source_keep_every_row(tmp_path: Path) -> None:
     ams = tmp_path / "ams.csv"
     ams.write_bytes(b"Year,AMS\n2002,4\n2000,4\n2001,1\n")
