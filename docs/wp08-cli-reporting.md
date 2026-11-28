@@ -117,8 +117,8 @@ default bundle and result schemas are unchanged. The plot is restricted to conse
 exact positive systematic annual maxima and the already admitted deterministic fits.
 Cunnane AEP (descending ranks), F, units, tie decision, signed quantiles, the absence of
 intervals and fitted-support warnings are explicit. See [frequency plot guidance](methods/frequency-plots.md).
-Censored/historical exposure, Bayesian estimands and interval plots, full offline HTML manual,
-independent review and full qualification remain outside this increment.
+Bayesian series, pointwise intervals and censored/historical plotting remain open under issue #7.
+Native qualification is deferred. Software review is recorded on PR #36.
 
 The packaged HTML method manual is available with `ffa manual > method-manual.html`.
 It includes a runnable synthetic example for each installed deterministic configuration
