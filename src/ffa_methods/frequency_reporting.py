@@ -1,4 +1,4 @@
-"""Static frequency presentation of already computed, admitted deterministic fits."""
+"""Static frequency presentation of already computed, admitted fits."""
 
 import csv
 from collections.abc import Mapping, Sequence
@@ -373,16 +373,25 @@ def _bayesian_legend(rows: tuple[QuantilePlotRow, ...]) -> list[str]:
                     f'<text x="570" y="{y + 4}">{label}</text>',
                 )
             )
-    if any(row.point.meaning == ResultMeaning.POSTERIOR_MEAN_QUANTILE for row in rows):
-        note = "An absent posterior mean is undefined where omitted by the calculation; no substitute is plotted."
+    requested = {row.f for row in rows}
+    mean_probabilities = {row.f for row in rows if row.point.meaning == ResultMeaning.POSTERIOR_MEAN_QUANTILE}
+    if mean_probabilities == requested:
+        note = "Posterior mean quantiles are defined at every requested probability."
+    elif mean_probabilities:
+        note = "Undefined posterior means are omitted; no substitute is plotted."
     else:
         note = "Posterior mean quantiles are undefined at the requested probabilities; no substitute is plotted."
+    precision = (
+        "All plotted numerical precision states are unassessed; see full report."
+        if all(row.precision_state == "not_assessed" for row in rows)
+        else "Numerical precision states are specific to each result; see full report."
+    )
     lines.extend(
         (
             '<text x="110" y="620">Only requested quantiles; segments are visual guides. Not native-qualified.</text>',
             '<text x="110" y="642">Intervals are pointwise; not predictive intervals, simultaneous bands or MC error.</text>',
             f'<text x="110" y="664" font-size="12">{escape(note)}</text>',
-            '<text x="110" y="686" font-size="12">Numerical precision states and omitted quantities: see the full report.</text>',
+            f'<text x="110" y="686" font-size="12">{escape(precision)}</text>',
         )
     )
     return lines
@@ -423,6 +432,8 @@ def _deterministic_description(
                 '<text x="110" y="664">Endpoint Monte Carlo diagnostics and refit attempt ledger: see report.</text>',
             )
         )
+    if mass is None:
+        legend.append('<text x="110" y="642">No uncertainty intervals were requested.</text>')
     legend.append(f'<text x="110" y="686" font-size="12">{escape(_support_notice(result))}</text>')
     explanation = (
         f"{fit_label}. {summary} The numerical report preserves all candidate diagnostics and, "

@@ -1,4 +1,4 @@
-"""Validate the report-backed Bayesian quantile series without performing inference."""
+"""Validate report-backed quantile series and intervals without performing inference."""
 
 import json
 from collections.abc import Mapping, Sequence
@@ -85,12 +85,14 @@ def _plot_row(
         or point.unit != unit
         or not isfinite(point.value)
     ):
-        msg = "Bayesian plot result has an invalid probability, unit or discharge"
+        msg = "Plot result has an invalid probability, unit or discharge"
         raise ValueError(msg)
     expected: dict[str, object] = {
         "meaning": point.meaning.value,
         "value": point.value,
         "unit": point.unit,
+        "input_probability": f,
+        "input_probability_kind": ProbabilityKind.NON_EXCEEDANCE.value,
         "input_non_exceedance_probability": f,
         "input_annual_exceedance_probability": 1.0 - f,
         "reported_probability_level": point.confidence_level,
@@ -98,9 +100,12 @@ def _plot_row(
         "probability_limit_construction": point.probability_limit_construction,
     }
     if any(record.get(key) != value for key, value in expected.items()):
-        msg = "Bayesian plot result does not match its canonical numerical report row"
+        msg = "Plot result does not match its canonical numerical report row"
         raise ValueError(msg)
-    if not require_precision and "precision_state" not in record:
+    if not require_precision:
+        if "precision_state" in record:
+            msg = "deterministic plot cannot claim a Bayesian per-result precision state"
+            raise ValueError(msg)
         return QuantilePlotRow(index, point, f, "")
     precision = record.get("precision_state")
     if not isinstance(precision, str) or not precision:

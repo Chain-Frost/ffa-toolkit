@@ -23,7 +23,9 @@ physical support before using results in design. Native Flike qualification and 
 remain separate from the independent calculations described here.</p>
 <nav aria-label="Contents">
 <a href="#inputs">Inputs</a> &middot; <a href="#fits">Methods</a> &middot;
-<a href="#examples">Worked examples</a> &middot; <a href="#outputs">Reading a report</a> &middot;
+<a href="#examples">Point-fit examples</a> &middot;
+<a href="#bayesian-example">Bayesian example</a> &middot; <a href="#bootstrap-example">Bootstrap examples</a> &middot;
+<a href="#outputs">Reading a report</a> &middot;
 <a href="#references">References and further guidance</a>
 </nav>
 <h2 id="inputs">Prepare the analysis</h2>
@@ -200,7 +202,7 @@ diagnostics. Use the fitted distribution to estimate event probability.</li>
 <li>Review the detailed fitted-support diagnostics, including GEV observations outside the
 support and observations exactly at the endpoint. Negative mathematical quantiles are
 retained and flagged. These warnings can affect whether a fit is suitable for design.</li>
-<li>These reports have deterministic point estimates. A quantile at expected parameters,
+<li>A deterministic point fit reports fitted quantiles. A quantile at expected parameters,
 posterior mean or median of quantiles, and quantile of the predictive mixture have distinct
 meanings. A pointwise posterior quantile interval describes parameter-induced uncertainty
 at one F. Its width is distinct from a predictive interval, a simultaneous band, or Monte Carlo error.

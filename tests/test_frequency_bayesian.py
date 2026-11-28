@@ -29,9 +29,16 @@ def _result_rows(document: dict[str, object]) -> list[dict[str, object]]:
     return cast(list[dict[str, object]], document["results"])
 
 
-def test_bayesian_quantile_plot_keeps_report_identity(tmp_path: Path) -> None:
+@pytest.mark.parametrize("probabilities", [(0.9,), (0.5, 0.9, 0.99)])
+def test_bayesian_quantile_plot_keeps_report_identity(tmp_path: Path, probabilities: tuple[float, ...]) -> None:
     ams = EXAMPLES / "bayesian-fixed-ams.csv"
-    settings = EXAMPLES / "bayesian-fixed-settings.json"
+    settings = tmp_path / "settings.json"
+    config = cast(dict[str, object], json.loads(_settings()))
+    if probabilities != (0.9,):
+        outputs = cast(dict[str, object], config["outputs"])
+        outputs["non_exceedance_probabilities"] = list(probabilities)
+        config["precision"] = {"mode": "not_assessed"}
+    settings.write_text(json.dumps(config), encoding="utf-8")
     plain, plotted = tmp_path / "plain", tmp_path / "plotted"
     args = ["fit", "--ams", str(ams), "--settings", str(settings), "--output"]
     assert main([*args, str(plain)]) == 0
@@ -42,7 +49,7 @@ def test_bayesian_quantile_plot_keeps_report_identity(tmp_path: Path) -> None:
     canonical = _result_rows(document)
     with (plotted / "frequency-coordinates.csv").open(encoding="utf-8", newline="") as stream:
         rows = list(csv.DictReader(stream))
-    assert len(rows) == 9
+    assert len(rows) == 3 + 6 * len(probabilities)
     assert [float(row["AEP"]) for row in rows[:3]] == pytest.approx([3 / 16, 1 / 2, 13 / 16])
     assert [int(row["year"]) for row in rows[:3]] == [2003, 2002, 2001]
     svg = (plotted / "frequency.svg").read_text(encoding="utf-8")
@@ -64,7 +71,7 @@ def test_bayesian_quantile_plot_keeps_report_identity(tmp_path: Path) -> None:
             assert row["probability_limit_side"] == source["probability_limit_side"]
             assert row["probability_limit_construction"] == source["probability_limit_construction"]
     assert svg.strip() in html
-    assert 'data-interval="posterior_quantile"' in svg
+    assert svg.count('data-interval="posterior_quantile"') == len(probabilities)
     assert "not predictive intervals" in html
 
 
@@ -84,9 +91,7 @@ def test_bayesian_series_contract_rejects_bad_rows() -> None:
             unit="m3/s",
             numerical_rows=canonical,
         )
-    incomplete = replace(
-        result, values=tuple(p for p in result.values if p.probability_limit_side != "upper")
-    )
+    incomplete = replace(result, values=tuple(p for p in result.values if p.probability_limit_side != "upper"))
     with pytest.raises(ValueError, match="incomplete or duplicate"):
         bayesian_quantile_rows(
             incomplete,

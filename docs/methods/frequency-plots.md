@@ -54,7 +54,7 @@ numerical records; their requested probabilities, discharge values and units are
 The opt-in report adds `frequency.svg` (standalone vector graphic), `frequency-coordinates.csv`
 (full numeric F, AEP, Q, row, year and rank plus SVG pixel coordinates), and `report.html`
 (self-contained, printable, with the full numerical text report and systematic data table).
-It also retains byte-exact input and settings snapshots for both deterministic schemas.
+It also retains byte-exact input and settings snapshots for the plotted workflows.
 Use an existing, user-controlled parent and a new output directory. Files are staged before
 publication. On POSIX the final existence check and rename are separate operations, so concurrent
 external creation of an empty directory at the same destination is outside the safety guarantee.
@@ -67,7 +67,8 @@ lognormal Bayesian Year,AMS schema, require complete, consecutive, positive exac
 year definition and unit remain assertions. The plot refuses unresolved gaps rather than treating
 them as measured exposure or non-exceedances. Existing unplotted fits are not restricted further.
 No missing, zero, historical, grouped, censored, rating-error or POT plot is admitted here.
-Selected-H plots require a successfully selected candidate; bootstrap plots require completed intervals. An annual-maxima GP fit is not a POT workflow. Independence, stationarity,
+Selected-H plots require a successfully selected candidate; bootstrap plots require completed intervals.
+An annual-maxima GP fit is not a POT workflow. Independence, stationarity,
 physical support, model selection, data quality, rating error and engineering adoption still
 require review. No native labels or defaults are inferred.
 
@@ -201,3 +202,29 @@ print(root)
 These synthetic budgets, tolerances and confidence levels are validation examples,
 not adopted engineering settings. The selected-H calibration is provisional.
 See the GEV method page and the separate bootstrap evidence for the numerical basis.
+
+## Outstanding historical and censored plotting-position admission
+
+ARR Book 3 v4.2 section 2.6.2, printed pages 35–36 (PDF pages 52–53),
+was rechecked directly. It specifies the Cunnane formula for gauged annual
+maxima, warns that historical and censored plotting positions can be inaccurate,
+and directs the reader to Stedinger et al. (1993). Section 2.6.3.3 provides
+censored likelihood terms, not an empirical plotting-position formula.
+Hirsch and Stedinger (1987), *Plotting positions for historical floods and their
+precision*, DOI [10.1029/WR023i004p00715](https://doi.org/10.1029/WR023i004p00715),
+and Hirsch (1987), *Probability plotting position formulas for flood records with
+historical information*, DOI [10.1016/0022-1694(87)90152-1](https://doi.org/10.1016/0022-1694(87)90152-1),
+identify partially censored sampling as the relevant model. The abstracts
+were inspected, not the full primary derivations. They are candidates for
+method admission, not authorization to implement an assumed formula.
+
+Before enabling historical/censored empirical points, pin the source formula
+and applicable sampling experiment (including perception thresholds, complete
+systematic/historical exposure, equality and ties, and grouped or interval
+records). Independently reproduce source examples and limiting cases. Do not
+rank only the remaining exact observations as though censored years were absent,
+assign threshold discharges as observations, infer non-exceedance years from
+gaps, or assume the first historical flood establishes the record length.
+Coordinate exposure admission with #9. Until these gates pass, the existing
+plot refusal remains intentional; the fitted numerical report is available
+without the plot flag.
