@@ -9,6 +9,7 @@ from enum import StrEnum
 from hashlib import sha256
 from math import isfinite
 from re import fullmatch
+from sys import float_info
 
 from ffa_methods import __version__
 from ffa_methods.compatibility import LEGACY_FLIKE_PROFILE
@@ -144,6 +145,9 @@ class ClassifiedFixedFamilyPosterior:
             msg = "fixed log-scale and shape must be finite"
             raise PosteriorBindingError(msg)
         if self.family == PosteriorFamily.GEV:
+            if 0.0 < abs(self.fixed_shape) < float_info.min:
+                message = "GEV EVT xi must be zero or have a normal binary64 magnitude"
+                raise PosteriorBindingError(message)
             if self.reference_discharge is not None or self.fixed_shape <= -1.0:
                 msg = "GEV requires no log reference and EVT xi > -1 for this bounded binding"
                 raise PosteriorBindingError(msg)

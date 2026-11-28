@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 from hashlib import sha256
-from math import exp, fsum, inf, isclose, log, sqrt
+from math import exp, fsum, inf, isclose, log, log1p, sqrt
 from statistics import NormalDist
 
 import pytest
@@ -147,10 +147,7 @@ def _reference(
     normalizer = fsum(density * width for density, _, _ in cells)
     means = tuple(fsum(density * values[k] * width for density, _, values in cells) / normalizer for k in range(2))
     variances = tuple(
-        fsum(
-            (density / normalizer) ** 2 / g * (values[k] - means[k]) ** 2 * width
-            for density, g, values in cells
-        )
+        fsum((density / normalizer) ** 2 / g * (values[k] - means[k]) ** 2 * width for density, g, values in cells)
         for k in range(2)
     )
     return means, variances
@@ -233,8 +230,8 @@ def test_exact_csv_and_unsupported_sources(family: PosteriorFamily, shape: float
         replace(model, source_classification="native")
     with pytest.raises(PosteriorBindingError, match="zero-threshold"):
         replace(model, series=replace(model.series, zero_threshold=0.0))
+    row = replace(model.series.annual[0], exposure=ExposureKind.HISTORICAL)
     with pytest.raises(PosteriorBindingError, match="systematic"):
-        row = replace(model.series.annual[0], exposure=ExposureKind.HISTORICAL)
         replace(model, series=replace(model.series, annual=(row,)))
     with pytest.raises(ValueError, match="overlapping"):
         replace(model, series=replace(model.series, annual=(model.series.annual[0],) * 2))
@@ -247,6 +244,8 @@ def test_shape_and_reference_admission() -> None:
     lp3 = _model(PosteriorFamily.LP3, 1.0)
     with pytest.raises(PosteriorBindingError, match="EVT xi"):
         replace(gev, fixed_shape=-1.0)
+    with pytest.raises(PosteriorBindingError, match="normal binary64 magnitude"):
+        replace(gev, fixed_shape=5e-324)
     with pytest.raises(PosteriorBindingError, match="no log reference"):
         replace(gev, reference_discharge=1.0)
     for shape in (-2.0, 2.0, 1e-6):
@@ -289,3 +288,20 @@ def test_interval_intersecting_support(family: PosteriorFamily, shape: float) ->
     model = replace(model, series=replace(model.series, annual=(row,)))
     mass = _law(family, shape, mu, high)[0] - _law(family, shape, mu, low)[0]
     assert isclose(model.log_likelihood((mu,)), log(mass), rel_tol=0, abs_tol=2e-12)
+
+
+@pytest.mark.parametrize(
+    ("shape", "lower", "expected"),
+    [
+        (0.0, 1000.0, -1000.0),
+        (0.0, 740.0, -740.0),
+        (0.01, 10_000_000.0, -100.0 * log1p(100_000.0)),
+        (-0.01, 99.999, 100.0 * log(1e-5)),
+        (-0.01, 101.0, -inf),
+    ],
+)
+def test_gev_right_censor_log_survival(shape: float, lower: float, expected: float) -> None:
+    model = _model(PosteriorFamily.GEV, shape)
+    row = _row(2000, ObservationKind.RIGHT_CENSORED, lower=lower)
+    model = replace(model, series=replace(model.series, annual=(row,)))
+    assert isclose(model.log_likelihood((0.0,)), expected, rel_tol=0.0, abs_tol=1e-8)

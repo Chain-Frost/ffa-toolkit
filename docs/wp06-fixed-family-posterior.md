@@ -1,8 +1,8 @@
 # WP06 — Initial GEV and LP3 posterior bindings
 
 Partial implementation for [issue #8](https://github.com/Chain-Frost/ffa-toolkit/issues/8).
-Base: `affc0315e96978c22930cdb0776f90fca2f9528b`. This is a draft internal component, not an installed workflow, native
-equivalence claim, or admission under the output-specific precision contract in #5.
+Base: `affc0315e96978c22930cdb0776f90fca2f9528b`. This internal binding has independent mathematical regression cases. Installed family workflows, native
+comparisons and admission under the output-specific precision contract in #5 remain open.
 
 ## Mathematical contract and source
 
@@ -29,6 +29,8 @@ distribution on positivity; the source must actually represent the annual
 maxima, not a selected positive subset. Outside-support observations have
 zero density. The restriction xi > -1 removes the endpoint-singular and
 discontinuous-density cases from this initial location-only binding.
+Nonzero subnormal xi is rejected because the shared GEV density and
+probability operations can lose the defining product xi*z there.
 
 LP3 uses Y = ln(Q/r), with mean mu, SD s = exp(eta) and skew g. For
 nonzero g, a = 4/g^2, edge = mu - 2*s/g, b = s*abs(g)/2, and
@@ -98,7 +100,7 @@ gave the following refined values; no Toolkit implementation was invoked.
 | LP3 +1 | 0.099631883791495 | 0.175092737225691 |
 | LP3 -1 | -0.012192784371186 | 0.147699344282007 |
 
-The proposed regression tests compare individual density/censor terms
+The regression tests compare individual density/censor terms
 for both signs and run the actual curvature/sampler for positive GEV
 and negative LP3. They compare weighted estimates to independently
 integrated posterior values using six reference asymptotic standard
@@ -111,10 +113,70 @@ is checked to exceed half the Gaussian prior variance. Tests also cover
 source/coordinate rejection, zero limits, nonunit scales, intervals
 intersecting support and out-of-support exact data.
 
-**Validation pending:** repository tests, Ruff/format, strict Pyright,
-Python 3.11/3.14 full quality/build/distribution/installed smoke,
-and independent final-head review have not run in this environment.
-The reference arithmetic above is not a software acceptance result.
+The GEV censor tests also cover a subnormal survival probability, deep
+representable log survival for both shape signs and the Gumbel limit, and
+a threshold above the finite upper endpoint. See the log-survival
+calculation in [distribution kernels](distribution-kernels.md). Exact
+check results and independent review are recorded on [PR #35](https://github.com/Chain-Frost/ffa-toolkit/pull/35).
+
+## Estimated scale and shape assessment
+
+Start with fixed shape and estimated `eta = ln(scale)` in an explicitly
+correlated two-coordinate prior, using independent two-dimensional
+quadrature for exact and censored reference cases. For shape estimation,
+define a joint density and its support in the exact model coordinates
+before choosing a sampler. A prior supplied in physical scale gains
+the log-Jacobian `eta`. Converting ARR kappa to EVT xi reverses its
+covariances with other coordinates and has unit absolute Jacobian.
+Fixing a coordinate of a regional joint prior requires an explicit
+conditional or other declared prior law. A first estimated-shape model
+can use bounded nonsingular shape support. A continuous LP3 skew prior
+crossing zero needs a verified near-normal kernel across the current
+nonzero approximation band.
+
+At a moving finite endpoint, the density is proportional locally to
+`d^(a-1)` for distance `d` inside support, with `a=-1/xi` for upper-endpoint
+GEV and `a=4/g^2` for LP3. With `m` exact observations tied there and
+remaining likelihood factors, prior and proposal tending to positive
+finite limits, the local posterior integral requires `m*(a-1)>-1`.
+The local second moment of the importance weight requires
+`2*m*(a-1)>-1`. Censor factors that vanish at the same endpoint change the
+total exponent. Finite-difference curvature also needs boundary tests
+for nonsingular shapes. These local criteria follow from the density
+forms above. Posterior propriety requires a global check for the chosen
+prior and data. See [Northrop and Attalides (2016)](https://www3.stat.sinica.edu.tw/statistica/oldpdf/A26n215.pdf)
+for GEV prior-specific propriety results under their assumptions.
+
+- LP3 fixed-probability quantile `q_p = r*exp(mu + exp(eta)*k_p(g))` has
+  divergent positive raw posterior moments under a joint Gaussian with
+  unbounded log-scale if an admitted interior skew interval has positive
+  standardized quantile `k_p(g)`. On a bounded location strip and such
+  an interval, the systematic likelihood decays at most exponentially
+  in eta as eta grows, and the quantile grows double-exponentially.
+  A bounded log-scale prior changes this result and defines a different
+  model. LP3 raw predictive order `k>0` separately requires
+  `1-k*exp(eta)*g/2>0` wherever the posterior has mass, plus integrability
+  of the conditional moment under the mixture.
+- GEV fixed-probability quantile `q_p = mu + exp(eta)*k_p(xi)` has finite
+  absolute polynomial posterior moments for compact nonsingular shape
+  support and Gaussian free coordinates, assuming positive posterior
+  normalizing mass. The standardized density is uniformly bounded on
+  such support, so exact observations cost at most an exponential
+  factor in eta and censor probabilities are bounded by one. Predictive
+  absolute order `k>0` also needs `xi<1/k` and an integrable mixture near
+  that boundary. Log-discharge quantile summaries need posterior
+  positivity and separate log-moment checks.
+
+Issue #5 owns per-output precision and the proposal-weight moment
+checks. With a Gaussian base prior covariance P, compact nonsingular
+shape support and Gaussian proposal covariance G, a sufficient tail
+condition for order-r weights is positive definiteness of
+`r*P^(-1) - (r-1)*G^(-1)`, using the exact-density bound above.
+This permits bounded AEP integrands and single-exponential log-scale
+growth. It cannot establish LP3 raw quantile moments in the divergent
+case. Issue #6 owns CLI schema and report routing. A future family path
+should carry named prior coordinates, declared support and explicit
+availability per estimand through that shared workflow.
 
 ## Remaining #8 scope
 
