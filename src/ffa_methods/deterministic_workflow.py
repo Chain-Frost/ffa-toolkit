@@ -233,7 +233,9 @@ def calculate_fixed_gev_from_files(
     """Fit the admitted independent mathematical model and return typed report inputs."""
     raw_ams = ams_path.read_bytes()
     raw_settings = settings_path.read_bytes()
-    return _calculate_fixed_gev(raw_ams, raw_settings, load_fixed_gev_settings(raw_settings))
+    values = _settings_object(raw_settings)
+    bootstrap = _bootstrap_settings(values.pop("bootstrap")) if "bootstrap" in values else None
+    return _calculate_fixed_gev(raw_ams, raw_settings, _fixed_gev_settings(values), bootstrap)
 
 
 def _calculate_fixed_gev(

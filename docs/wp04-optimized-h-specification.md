@@ -102,6 +102,11 @@ variance. The polynomial was lower in 14 of 15 n=60 cells. Thus matching the pol
 is not the acceptance criterion for direct calibration at n=60. The 100,000-record
 prototype exceeded the precision target on the predeclared seed grid, so the
 production candidate doubles the budget without relaxing that target.
+At 200,000 records, 199 of 200 calibration runs met the criterion on n=20,30,50,60,
+k=-0.8,-0.3,0,0.3,0.6 and H=0–4 with base seeds 20261128 and 20261129. The largest
+accepted relative half-width was 1.879%. The n=20, k=-0.8, H=4 result at base seed
+20261128 failed at 2.040%. These runs exercised the precision gate without changing
+the seed or replacing a failure.
 
 A held-out experiment used 100,000 new records at each n/shape cell, with n=20,30,60
 and true k=-0.3,0,0.3. Independent order-statistic weights and population beta-density
@@ -161,3 +166,7 @@ and bootstrap settings and settings-matched comparisons remain unqualified.
   [Book 3](https://www.arr-software.org/pdfs/ARR_190514_Book3_V4.2.pdf).
 
 Independent original implementation; no third-party code ported or licence change.
+Calibration imports the NumPy runtime already required by SciPy. The checked NumPy
+2.4.6 wheel declares BSD-3-Clause with bundled components under 0BSD, MIT, Zlib and
+CC0-1.0. Toolkit distributions depend on that runtime separately and carry no copied
+NumPy code or data.

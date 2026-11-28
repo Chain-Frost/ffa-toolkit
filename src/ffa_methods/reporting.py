@@ -549,9 +549,8 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
     )
     stream = StringIO(newline="")
     writer = csv.writer(stream, lineterminator="\n")
-    support = doc.get("gev_fitted_support")
-    support_header = ("gev_fitted_support_json",) if support is not None else ()
-    support_cell = (json.dumps(support, ensure_ascii=False, allow_nan=False),) if support is not None else ()
+    support_keys = tuple(key for key in ("gev_fitted_support", "candidate_gev_support") if key in doc)
+    support_cells = tuple(json.dumps(doc[key], ensure_ascii=False, allow_nan=False) for key in support_keys)
     writer.writerow(
         (
             "method_id",
@@ -560,11 +559,12 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
             "legacy_comparison_status",
             "reference_evidence_status",
             *keys,
-            *support_header,
+            *(f"{key}_json" for key in support_keys),
         )
     )
     provenance = cast(dict[str, object], doc["provenance"])
-    for point in typed_points:
+    # A no-pass selected-H run still carries support evidence and has no quantile.
+    for point in typed_points or [{}]:
         writer.writerow(
             (
                 provenance["method_id"],
@@ -572,8 +572,8 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
                 doc["method_qualification"],
                 doc["legacy_comparison_status"],
                 provenance["reference_evidence_status"],
-                *("" if point[key] is None else str(point[key]) for key in keys),
-                *support_cell,
+                *("" if point.get(key) is None else str(point[key]) for key in keys),
+                *support_cells,
             )
         )
     method_guidance = cast(dict[str, object], doc["method_guidance"])

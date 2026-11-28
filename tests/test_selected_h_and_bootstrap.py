@@ -1,5 +1,6 @@
 """Synthetic order-statistic, report and bootstrap checks independent of native data."""
 
+import csv
 import json
 from math import comb, isclose, log
 from pathlib import Path
@@ -84,8 +85,16 @@ def test_bootstrap_gates_refuse_failed_and_imprecise_results() -> None:
         )
 
 
-@pytest.mark.parametrize("schema", ["ffa-gev-selected-h/1", "ffa-ordinary-lmoments/1", "ffa-gev-fixed-h/1"])
-def test_cli_candidate_and_bootstrap_reports(tmp_path: Path, schema: str) -> None:
+@pytest.mark.parametrize(
+    ("schema", "cutoff"),
+    [
+        ("ffa-gev-selected-h/1", 1.96),
+        ("ffa-gev-selected-h/1", 1e-6),
+        ("ffa-ordinary-lmoments/1", None),
+        ("ffa-gev-fixed-h/1", None),
+    ],
+)
+def test_cli_candidate_and_bootstrap_reports(tmp_path: Path, schema: str, cutoff: float | None) -> None:
     raw_ams = tmp_path / "annual.csv"
     raw_ams.write_text(
         "Year,AMS\n" + "\n".join(f"{1950 + i},{20 - log(-log((i - 0.35) / 50.3))}" for i in range(1, 51)),
@@ -100,7 +109,7 @@ def test_cli_candidate_and_bootstrap_reports(tmp_path: Path, schema: str) -> Non
         "non_exceedance_probabilities": [0.9],
     }
     if schema == "ffa-gev-selected-h/1":
-        settings.update(estimator="gev_lh_selected_h", critical_z=1.96, calibration_seed=7)
+        settings.update(estimator="gev_lh_selected_h", critical_z=cutoff, calibration_seed=7)
     else:
         if schema == "ffa-gev-fixed-h/1":
             settings.update(estimator="gev_lh_fixed_h", lh_shift=1)
@@ -119,9 +128,15 @@ def test_cli_candidate_and_bootstrap_reports(tmp_path: Path, schema: str) -> Non
     report = cast(dict[str, object], json.loads((target / "results.json").read_text(encoding="utf-8")))
     values = cast(list[dict[str, object]], report["results"])
     if schema == "ffa-gev-selected-h/1":
-        assert set(cast(dict[str, object], report["candidate_gev_support"])) == set("01234")
-        assert cast(dict[str, object], report["settings"])["lh_shift"] == 0
-        assert len(values) == 1
+        candidate_support = cast(dict[str, object], report["candidate_gev_support"])
+        assert set(candidate_support) == set("01234")
+        with (target / "results.csv").open(encoding="utf-8", newline="") as stream:
+            row = next(csv.DictReader(stream))
+        assert json.loads(row["candidate_gev_support_json"]) == candidate_support
+        expected_h = 0 if cutoff == 1.96 else None
+        assert cast(dict[str, object], report["settings"])["lh_shift"] == expected_h
+        assert len(values) == int(expected_h is not None)
+        assert bool(row["meaning"]) == (expected_h is not None)
     else:
         assert [value["probability_limit_side"] for value in values] == [None, "lower", "upper"]
         assert values[1]["meaning"] == "quantile_parametric_bootstrap_percentile_limit"

@@ -18,8 +18,8 @@ def make_parser() -> argparse.ArgumentParser:
         allow_abbrev=False,
         description="FFA Toolkit: independent flood frequency analysis CLI.",
         epilog=(
-            "Explicit settings for complete positive annual maxima support ordinary L-moments, "
-            "fixed-H and selected-H GEV, and parametric bootstrap."
+            "Explicit settings for complete positive annual maxima support fixed-H GEV and ordinary L-moment fits, "
+            "selected-H GEV and parametric bootstrap."
         ),
     )
     parser.add_argument(
