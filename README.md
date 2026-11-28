@@ -13,12 +13,15 @@ python -m pip install .
 ffa --help
 ffa explain lh-moments-gev
 ffa explain l-moments --format markdown
-ffa fit --ams docs/examples/fixed-gev-ams.csv --settings docs/examples/fixed-gev-settings.json --output example-result
+ffa manual > method-manual.html
+ffa fit --ams docs/examples/fixed-gev-ams.csv --settings docs/examples/fixed-gev-settings.json --output example-result --frequency-report
 ffa fit --ams docs/examples/ordinary-ams.csv --settings docs/examples/ordinary-settings.json --output ordinary-result
 ffa fit --ams docs/examples/bayesian-fixed-ams.csv --settings docs/examples/bayesian-fixed-settings.json --output bayesian-result
 ```
 
-The example uses generated annual maxima. The installed calculation path supports explicit-settings,
+The examples use generated annual maxima. The CLI also offers provisional selected-H GEV and
+explicit parametric bootstrap. The optional [static frequency report](docs/methods/frequency-plots.md)
+covers fixed-H GEV and ordinary L-moment point fits. The installed calculation path supports explicit-settings,
 complete positive annual maxima, fixed-H GEV L/LH fitting and ordinary Gumbel, LN2, LP3 and fixed/free-location GP L-moment fits. See [ordinary L-moment guidance](docs/methods/l-moments.md). Other mathematical components include five
 distribution kernels, ordinary L-moment estimators, likelihoods, priors, shared rating errors, low-flow
 screening, importance proposals and sampling, and weighted Bayesian outputs. Internal components are

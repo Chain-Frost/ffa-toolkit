@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FFA Toolkit method manual</title>
+<style>
+body { max-width: 58rem; margin: 2rem auto; padding: 0 1rem; font: 1rem/1.55 system-ui, sans-serif; color: #202c39 }
+h2 { margin-top: 2rem; break-after: avoid-page }
+pre { background: #edf2f6; padding: 1rem; white-space: pre-wrap; overflow-wrap: anywhere }
+table { border-collapse: collapse; width: 100% }
+th, td { border-bottom: 1px solid #a0aab5; padding: .5rem; text-align: left; vertical-align: top }
+tr { break-inside: avoid }
+@media print { body { margin: 0 } }
+</style>
+</head>
+<body>
+<main>
+<h1>FFA Toolkit method manual</h1>
+<p>Use the installed command to fit an explicitly configured model to annual maximum discharges.
+Review stationarity, independence, record completeness, gauging and rating quality, and the fit's
+physical support before using results in design. Native Flike qualification and engineering adoption
+remain separate from the independent calculations described here.</p>
+<nav aria-label="Contents">
+<a href="#inputs">Inputs</a> &middot; <a href="#fits">Methods</a> &middot;
+<a href="#examples">Worked examples</a> &middot; <a href="#outputs">Reading a report</a> &middot;
+<a href="#references">References and further guidance</a>
+</nav>
+<h2 id="inputs">Prepare the analysis</h2>
+<ol>
+<li>Supply a UTF-8 CSV with the exact header <code>Year,AMS</code> and one finite positive
+maximum per year. Record the annual-period definition and a consistent discharge unit in settings.
+Frequency plots require consecutive years. Missing, censored, historical, zero and rating-error
+observations require separate analysis methods and explicit exposure.</li>
+<li>Choose the settings schema, estimator and all required method fields. Provide strictly increasing
+non-exceedance probabilities F in (0, 1). For an annual maximum, F=0.99 corresponds to AEP=0.01,
+a 1% chance of exceeding that model quantile in a year under the model assumptions.</li>
+<li>Run <code>ffa fit --ams INPUT.csv --settings SETTINGS.json --output NEW_FOLDER --frequency-report</code>.
+Use an existing, user-controlled parent for the new output folder.</li>
+</ol>
+<h2 id="fits">Choose a deterministic fit</h2>
+<table>
+<thead><tr><th scope="col">Method</th><th scope="col">Configuration and interpretation</th></tr></thead>
+<tbody>
+<tr><th scope="row">Fixed-H GEV</th><td>Use <code>ffa-gev-fixed-h/1</code> and <code>gev_lh_fixed_h</code>.
+Set <code>lh_shift</code> to 0 for ordinary L-moments or 1 to 4 to emphasise larger observations.
+Higher H needs more data. H is supplied explicitly.
+The reported shape is ARR/Hosking k, with finite endpoint u + alpha/k for k unequal to zero.
+Positive k has an upper endpoint and negative k a lower endpoint.</td></tr>
+<tr><th scope="row">Gumbel</th><td>Use <code>ffa-ordinary-lmoments/1</code> and
+<code>gumbel_lmoments</code>. Raw-discharge L1 and L2 determine location and positive scale.
+The model can yield negative mathematical quantiles at common probabilities.</td></tr>
+<tr><th scope="row">Two-parameter lognormal</th><td>Use the ordinary schema and
+<code>lognormal_lmoments</code>. Supply positive <code>reference_discharge</code> in the source unit.
+Raw L1 and L2 determine the parameters. The report states mean of ln(Q/reference) and the natural
+log of that log-discharge standard deviation.</td></tr>
+<tr><th scope="row">Log-Pearson III</th><td>Use the ordinary schema and <code>lp3_lmoments</code>.
+Supply positive <code>reference_discharge</code>. The first three L-moments of ln(Q/reference)
+fit its mean, standard deviation and signed skew. The reported spread coordinate is ln(SD).
+At zero skew the log-coordinate fit has its normal limit.</td></tr>
+<tr><th scope="row">Generalized Pareto</th><td>Use the ordinary schema and <code>gp_lmoments</code>.
+Set <code>gp_location_mode</code> to <code>fixed</code> with explicit <code>gp_location</code> to
+fit two raw L-moments, or <code>free</code> to fit three. Reported EVT shape xi is the negative of
+ARR/Hosking kappa. These settings model the annual maxima supplied. They do not estimate
+a peaks-over-threshold arrival rate.</td></tr>
+</tbody>
+</table>
+<h2 id="examples">Run all ten synthetic configurations</h2>
+<p>Save the following as <code>run_examples.py</code> and run <code>python run_examples.py</code>
+in an environment with the installed wheel. Each run creates a fresh directory with its settings,
+inputs and ten report bundles. The source samples are synthetic.</p>
+<pre><code>import json
+import subprocess
+import sys
+import tempfile
+from importlib.resources import files
+from pathlib import Path
+
+resources = files("ffa_methods").joinpath("resources", "examples")
+root = Path(tempfile.mkdtemp(prefix="ffa-examples-", dir=Path.cwd()))
+for prefix in ("fixed-gev", "ordinary"):
+    filename = f"{prefix}-ams.csv"
+    (root / filename).write_bytes(resources.joinpath(filename).read_bytes())
+
+def run(name, prefix, **changes):
+    settings = json.loads(resources.joinpath(f"{prefix}-settings.json").read_bytes())
+    settings.update(changes)
+    config = root / f"{name}.json"
+    config.write_text(json.dumps(settings), encoding="utf-8")
+    subprocess.run(
+        [sys.executable, "-m", "ffa_methods", "fit", "--ams", f"{prefix}-ams.csv",
+         "--settings", config.name, "--output", name, "--frequency-report"],
+        cwd=root, check=True,
+    )
+
+for h in range(5):
+    run(f"gev-h{h}", "fixed-gev", lh_shift=h)
+run("gumbel", "ordinary")
+run("ln2", "ordinary", estimator="lognormal_lmoments", reference_discharge=2)
+run("lp3", "ordinary", estimator="lp3_lmoments", reference_discharge=2)
+run("gp-fixed", "ordinary", estimator="gp_lmoments", gp_location_mode="fixed", gp_location=0.25)
+run("gp-free", "ordinary", estimator="gp_lmoments", gp_location_mode="free")
+print(root)</code></pre>
+<p>For the three ordinary discharges (1, 2, 4), raw L1=7/3 and L2=1.
+Descending Cunnane positions are 3/16, 1/2 and 13/16. The free-location GP
+median is 1/3 + 2 ln(2). For each GEV example, check a reported quantile from
+Q(F)=u+alpha/k [1-(-ln F)<sup>k</sup>] or its limit u-alpha ln(-ln F) at k=0.
+Compare each result at the requested probability against its plotted marker and table row.</p>
+<h2 id="outputs">Read the report</h2>
+<ul>
+<li>Observe the dark Cunnane markers and hollow fitted markers. The horizontal axis is log AEP
+with values shown in percent. The numeric tables show probability fractions. The vertical
+axis is linear in the declared discharge unit. The ordinate can include signed model quantiles.</li>
+<li>Check the requested fitted quantiles and warnings first. Segments connect requested outputs
+as visual guides. Cunnane AEP=(rank-0.4)/(n+0.2) uses the greatest observation as rank 1.
+Ties are displayed in ascending year order. These dependent rank positions are empirical
+diagnostics. Use the fitted distribution to estimate event probability.</li>
+<li>Review the detailed fitted-support diagnostics, including GEV observations outside the
+support and observations exactly at the endpoint. Negative mathematical quantiles are
+retained and flagged. These warnings can affect whether a fit is suitable for design.</li>
+<li>These reports have deterministic point estimates. A quantile at expected parameters,
+posterior mean or median of quantiles, and quantile of the predictive mixture have distinct
+meanings. A pointwise posterior quantile interval describes parameter-induced uncertainty
+at one F. Its width is distinct from a predictive interval, a simultaneous band, or Monte Carlo error.
+The current plotting workflow has no posterior or interval series.</li>
+<li>Retain <code>results.json</code>, <code>results.csv</code>, <code>report.txt</code>,
+<code>frequency-coordinates.csv</code> and both source snapshots. Source and settings hashes
+identify the analysed bytes. Replay with the same package and dependency versions using the
+command in the report. Consult the SVG or printable HTML without a network connection.</li>
+</ul>
+<h2 id="references">References and further guidance</h2>
+<p>Use <code>ffa references ARR3</code> for ARR 2019 Book 3 v4.2, sections 2.6.2 and 2.6.4,
+and <code>ffa references CUNNANE1978</code> for the plotting-position reference.
+Use <code>ffa explain l-moments --format markdown</code>,
+<code>ffa explain lh-moments-gev --format markdown</code> and
+<code>ffa explain frequency-plots --format markdown</code> for the full estimator identities,
+boundary cases and validation limits. <code>ffa explain</code> lists broader mathematical components
+and their status. Registered components may have no installed fitting path.</p>
+</main>
+</body>
+</html>

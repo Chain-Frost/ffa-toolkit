@@ -35,6 +35,7 @@ def _check_installed_method_pages(console: Path, output: Path, env: dict[str, st
         "importance-sampling-reference",
         "lh-moments-gev",
         "l-moments",
+        "frequency-plots",
     ):
         page = _invoke(
             [str(console), "explain", method_id, "--format", "markdown"],
@@ -47,6 +48,11 @@ def _check_installed_method_pages(console: Path, output: Path, env: dict[str, st
             raise RuntimeError(msg)
     _invoke([str(console), "explain", "--format", "markdown"], cwd=output, env=env, expected_code=2)
     _invoke([str(console), "explain", "lp3", "--format", "markdown"], cwd=output, env=env, expected_code=2)
+
+    manual = _invoke([str(console), "manual"], cwd=output, env=env, expected_code=0)
+    if not manual.stdout.startswith("<!doctype html>") or 'id="examples"' not in manual.stdout:
+        msg = "installed wheel lacks the offline HTML method manual"
+        raise RuntimeError(msg)
 
 
 def _ordinary_reference(
@@ -161,6 +167,36 @@ def _check_ordinary_installed(console: Path, output: Path, env: dict[str, str]) 
         )
         expected, quantiles = _ordinary_reference(estimator, extra, probabilities)
         _check_ordinary_result(destination, settings_bytes, ams_bytes, expected, quantiles, probabilities)
+        plotted = output / f"{name}-frequency-report"
+        _invoke(
+            [
+                str(console),
+                "fit",
+                "--ams",
+                str(ams),
+                "--settings",
+                str(settings_path),
+                "--output",
+                str(plotted),
+                "--frequency-report",
+            ],
+            cwd=output,
+            env=env,
+            expected_code=0,
+        )
+        _check_frequency_files(plotted, destination)
+
+
+def _check_frequency_files(plotted: Path, plain: Path) -> None:
+    """Check installed static report output and identity of existing numerical files."""
+    for name in ("results.json", "results.csv", "report.txt"):
+        if (plotted / name).read_bytes() != (plain / name).read_bytes():
+            msg = f"frequency report changed {name}"
+            raise RuntimeError(msg)
+    for name in ("frequency.svg", "frequency-coordinates.csv", "report.html", "source-ams.csv", "source-settings.json"):
+        if not (plotted / name).is_file():
+            msg = f"installed frequency report missing {name}"
+            raise RuntimeError(msg)
 
 
 def _check_gev_support_report(console: Path, output: Path, env: dict[str, str]) -> None:
@@ -268,6 +304,72 @@ def _check_bayesian_installed(console: Path, output: Path, env: dict[str, str]) 
     )
     if invalid_destination.exists():
         msg = "invalid installed Bayesian input created an output bundle"
+        raise RuntimeError(msg)
+
+
+def _check_selected_h_installed(console: Path, output: Path, env: dict[str, str], settings: dict[str, object]) -> None:
+    ams = output / "selected-h-ams.csv"
+    ams.write_text(
+        "Year,AMS\n" + "\n".join(f"{1950 + i},{20 - log(-log((i - 0.35) / 50.3))}" for i in range(1, 51)),
+        encoding="utf-8",
+    )
+    settings.pop("lh_shift")
+    settings.update(
+        schema_version="ffa-gev-selected-h/1",
+        estimator="gev_lh_selected_h",
+        critical_z=1.96,
+        calibration_seed=7,
+        non_exceedance_probabilities=[0.9],
+        bootstrap={
+            "replications": 24,
+            "seed": 42,
+            "confidence": 0.5,
+            "maximum_failure_fraction": 0.25,
+            "endpoint_tolerance": 2.0,
+        },
+    )
+    config = output / "selected-h-settings.json"
+    config.write_text(json.dumps(settings), encoding="utf-8")
+    target = output / "selected-h-report"
+    _invoke(
+        [str(console), "fit", "--ams", str(ams), "--settings", str(config), "--output", str(target)],
+        cwd=output,
+        env=env,
+        expected_code=0,
+    )
+    report = json.loads((target / "results.json").read_text(encoding="utf-8"))
+    attempts = json.loads(report["settings"]["bootstrap_attempts"])
+    if (
+        report["settings"]["lh_shift"] != 0
+        or set(report["candidate_gev_support"]) != set("01234")
+        or [point["probability_limit_side"] for point in report["results"]] != [None, "lower", "upper"]
+        or len(attempts) != 24
+    ):
+        msg = "installed selected-H CLI did not report five fitted supports, H=0, bootstrap limits and all attempts"
+        raise RuntimeError(msg)
+
+    settings["bootstrap"] = {
+        "replications": 4,
+        "seed": 42,
+        "confidence": 0.8,
+        "maximum_failure_fraction": 0.0,
+        "endpoint_tolerance": 1.0,
+    }
+    config.write_text(json.dumps(settings), encoding="utf-8")
+    target = output / "selected-h-bootstrap-refused"
+    _invoke(
+        [str(console), "fit", "--ams", str(ams), "--settings", str(config), "--output", str(target)],
+        cwd=output,
+        env=env,
+        expected_code=2,
+    )
+    report = json.loads((target / "results.json").read_text(encoding="utf-8"))
+    if (
+        report["settings"]["bootstrap_refusal_code"] != "endpoint_count"
+        or [point["probability_limit_side"] for point in report["results"]] != [None]
+        or [attempt["selected_h"] for attempt in json.loads(report["settings"]["bootstrap_attempts"])] != [0] * 4
+    ):
+        msg = "installed selected-H CLI failed to retain the point fit and four reselections on interval refusal"
         raise RuntimeError(msg)
 
 
@@ -403,9 +505,15 @@ for name in ("fixed-gev-ams.csv", "fixed-gev-settings.json", "ordinary-ams.csv",
             msg = "installed wheel fixed-H mathematical fit has invalid quantities or provenance"
             raise RuntimeError(msg)
         _invoke(fit_args, cwd=output, env=env, expected_code=2)
+        plotted = output / "fixed-gev-frequency-report"
+        _invoke([*fit_args[:-1], str(plotted), "--frequency-report"], cwd=output, env=env, expected_code=0)
+        _check_frequency_files(plotted, destination)
         _check_ordinary_installed(console, output, env)
         _check_gev_support_report(console, output, env)
         _check_bayesian_installed(console, output, env)
+        _check_selected_h_installed(
+            console, output, env, json.loads((output / "fixed-gev-settings.json").read_text(encoding="utf-8"))
+        )
         reference = _invoke([str(console), "references", "ARR3"], cwd=output, env=env, expected_code=0)
         if "### ARR3" not in reference.stdout or "2.6.3.6" not in reference.stdout:
             msg = "installed offline reference register lacks the pinned ARR citation"

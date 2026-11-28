@@ -866,7 +866,7 @@
     },
     {
       "id": "OUTPUT-PLOT-POSITIONS",
-      "method_id": "quantile-estimands",
+      "method_id": "frequency-plots",
       "family": "unresolved",
       "estimator": "bayesian_importance_sampling",
       "observations": "annual_maxima",
@@ -884,7 +884,7 @@
         "synthetic_repeatability"
       ],
       "evidence": {},
-      "qualification_gap": "Verify F versus AEP, parameter coordinate, print rounding and interval semantics"
+      "qualification_gap": "Verify native F/AEP, rank, tie, exposure and axis conventions for admitted record types"
     },
     {
       "id": "REPORT-CLI",
