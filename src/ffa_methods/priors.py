@@ -7,7 +7,9 @@ known; those selections intentionally fail closed rather than inventing one.
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from decimal import Context, Decimal, localcontext
 from enum import StrEnum
+from fractions import Fraction
 from math import fsum, isclose, isfinite, log, log1p, pi, sqrt
 
 from ffa_methods.contracts import ParameterCoordinate
@@ -48,6 +50,7 @@ class JointGaussianPrior:
     source: str
     mode: LegacyPriorMode
     site_in_regional_estimate: bool | None = None
+    _conditional_slope: Fraction | None = field(init=False, default=None, repr=False, compare=False)
     _factor: tuple[tuple[float, ...], ...] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
@@ -68,7 +71,12 @@ class JointGaussianPrior:
         if not all(isfinite(value) for value in self.means):
             msg = "prior means must be finite"
             raise PriorEvidenceError(msg)
-        object.__setattr__(self, "_factor", _cholesky(self.covariance))
+        factor = _cholesky(self.covariance)
+        object.__setattr__(self, "_factor", factor)
+        if n == 2 and self.covariance[1][0] != 0:
+            object.__setattr__(
+                self, "_conditional_slope", Fraction(self.covariance[1][0]) / Fraction(self.covariance[0][0])
+            )
 
     def logpdf(self, values: Sequence[float]) -> float:
         """Log density in *exactly* the source's vector order and coordinates."""
@@ -78,9 +86,20 @@ class JointGaussianPrior:
             raise PriorEvidenceError(msg)
         factor = self._factor
         residuals: list[float] = []
-        for i in range(n):
-            solved = values[i] - self.means[i] - fsum(factor[i][j] * residuals[j] for j in range(i))
-            residuals.append(solved / factor[i][i])
+        if self._conditional_slope is not None:
+            # A rounded regression coefficient or a rounded first residual can
+            # consume the conditional variation in an almost dependent pair.
+            first = Fraction(values[0]) - Fraction(self.means[0])
+            second = Fraction(values[1]) - Fraction(self.means[1]) - self._conditional_slope * first
+            try:
+                residuals.extend((float(first / Fraction(factor[0][0])), float(second / Fraction(factor[1][1]))))
+            except OverflowError:
+                # Its squared standardized residual is also outside binary64.
+                return -float("inf")
+        else:
+            for i in range(n):
+                solved = values[i] - self.means[i] - fsum(factor[i][j] * residuals[j] for j in range(i))
+                residuals.append(solved / factor[i][i])
         quadratic = fsum(value * value for value in residuals)
         return -0.5 * (n * log(2.0 * pi) + 2.0 * fsum(log(factor[i][i]) for i in range(n)) + quadratic)
 
@@ -123,6 +142,23 @@ class JointGaussianPrior:
         return self.logpdf(source_values) + fsum(log_jacobians)
 
 
+def _bivariate_cholesky(matrix: tuple[tuple[float, ...], ...]) -> tuple[tuple[float, ...], ...]:
+    a, b, d = Fraction(matrix[0][0]), Fraction(matrix[1][0]), Fraction(matrix[1][1])
+    determinant = a * d - b * b
+    if a <= 0 or determinant <= 0:
+        msg = "covariance must be positive definite"
+        raise PriorEvidenceError(msg)
+    conditional_variance = determinant / a
+    # The variance can underflow binary64 even when its SD is representable.
+    with localcontext(Context(prec=80)):
+        sd = float((Decimal(conditional_variance.numerator) / Decimal(conditional_variance.denominator)).sqrt())
+    if not sd:
+        msg = "conditional prior standard deviation is not representable"
+        raise PriorEvidenceError(msg)
+    first_sd = sqrt(matrix[0][0])
+    return ((first_sd, 0.0), (matrix[1][0] / first_sd, sd))
+
+
 def _cholesky(matrix: tuple[tuple[float, ...], ...]) -> tuple[tuple[float, ...], ...]:
     """Dependency-free Cholesky: retain *all* covariance off-diagonal entries."""
     n = len(matrix)
@@ -132,6 +168,8 @@ def _cholesky(matrix: tuple[tuple[float, ...], ...]) -> tuple[tuple[float, ...],
     if any(not isclose(matrix[i][j], matrix[j][i], rel_tol=1e-12, abs_tol=1e-14) for i in range(n) for j in range(i)):
         msg = "covariance must be symmetric"
         raise PriorEvidenceError(msg)
+    if n == 2 and matrix[1][0] != 0:
+        return _bivariate_cholesky(matrix)
     rows: list[list[float]] = [[0.0] * n for _ in range(n)]
     for i in range(n):
         for j in range(i + 1):

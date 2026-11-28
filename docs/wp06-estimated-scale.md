@@ -14,7 +14,9 @@ x=(mu, eta) for Y=ln(Q/r), mu=E[Y], sigma=SD[Y]=exp(eta), fixed |g|<2.
 The inherited binary64 shape exclusions also apply. Use the exact zero limits.
 The normalized posterior density with respect to dmu deta is L(x) phi_P(x)/Z,
 where P is the supplied positive definite covariance, including the signed cross term,
-and Z is its integral. The parameter Jacobian is one in these named prior coordinates.
+and Z is its integral. The binding checks symmetry exactly. For correlated pairs the prior
+uses the exact binary64-input determinant and conditional regression residual. This distinguishes
+singular matrices from their adjacent positive definite neighbors before taking the conditional SD. The parameter Jacobian is one in these named prior coordinates.
 A density on raw scale would require a factor exp(eta) and defines a different input contract.
 For each LP3 exact observation the data Jacobian is 1/Q. Censor probabilities already
 integrate the density. The moving GEV boundary is mu-exp(eta)/xi. The moving LP3 boundary
