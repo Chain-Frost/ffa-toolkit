@@ -472,7 +472,7 @@
       "key_assumptions": [
         "Complete, exact, positive annual maxima with explicitly asserted annual-record classification, units and year definition",
         "Gumbel and LN2 match raw discharge moments; LP3 matches natural-log relative discharge moments; GP location is explicitly fixed or free",
-        "Deterministic point estimates only; no threshold exposure, priors, censoring or bootstrap"
+        "Point fitting and optional parametric percentile bootstrap for complete exact annual maxima"
       ],
       "documentation": "methods/l-moments.md",
       "validation_required": [
@@ -485,7 +485,7 @@
       "implementation_status": "partial_independent_core_with_explicit_ordinary_cli",
       "qualification_status": "not_started",
       "implementation_evidence": "wp04-ordinary-lmoments-evidence.md",
-      "remaining_work": "Explicit H=0 Gumbel, raw-flow LN2, log-flow LP3 and fixed/free-location GP annual-maxima CLI paths use the mathematical core. Declared uncertainty and optimized-H diagnostics remain separate software requirements. Native variants, defaults and matched family runs remain unqualified."
+      "remaining_work": "Explicit H=0 Gumbel, raw-flow LN2, log-flow LP3 and fixed/free-location GP annual-maxima CLI paths use the mathematical core. Optional declared parametric percentile bootstrap reports every attempt and withholds limits on failure or finite-simulation endpoint refusal. Native variants, defaults and matched family runs remain unqualified."
     },
     {
       "method_id": "lh-moments-gev",
@@ -517,7 +517,7 @@
       "implementation_status": "partial_independent_core_with_explicit_fixed_h_cli",
       "qualification_status": "not_started",
       "implementation_evidence": "wp04-fixed-h-gev-evidence.md",
-      "remaining_work": "Explicit fixed-H GEV H=0..4 mathematical CLI and complete positive Year/AMS validation include fitted support and distinct endpoint/outside observations in all report formats. Active: independently verify Wang conditional LH variance and implement standardized diagnostics/explicit mathematical H-selection; extend supported deterministic workflows. Deferred native qualification: exact native Flike selection/uncertainty controls, matched runs and source-specific variants. See wp04-optimized-h-specification.md."
+      "remaining_work": "Explicit fixed-H GEV H=0..4 mathematical CLI and complete positive Year/AMS validation include fitted support and distinct endpoint/outside observations in all report formats. Provisional direct simulation uses all-five-domain, numerical rank and Monte Carlo precision gates. A complete evaluation can report no passing H. Optional parametric bootstrap retains all attempts and publishes conditional limits only when its failure and endpoint gates pass. Independent qualification remains open. Deferred native qualification: exact native Flike selection/uncertainty controls, matched runs and source-specific variants. See wp04-optimized-h-specification.md."
     },
     {
       "method_id": "correlated-rating-error",

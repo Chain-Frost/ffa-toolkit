@@ -10,7 +10,7 @@ posterior execution and explicit proposal scaling are composed by the issue #6 B
 
 ## Remaining software requirements
 
-- Complete standardized Wang diagnostics, optimized H selection and declared uncertainty.
+- Complete operational qualification of the provisional direct Wang calibration, selected H and declared bootstrap.
 - Complete review and clean-wheel endpoint acceptance of the explicitly configured lognormal Bayesian workflow.
   Broader output-specific precision and adaptive stopping remain separate outstanding work.
 - Extend explicit posterior bindings to other families, historical/grouped exposure and shared rating error.

@@ -19,8 +19,8 @@ def make_parser() -> argparse.ArgumentParser:
         allow_abbrev=False,
         description="FFA Toolkit: independent flood frequency analysis CLI.",
         epilog=(
-            "Explicit-settings, complete-positive-AMS fixed-H GEV and ordinary L-moment fits are available; "
-            "explicit lognormal Bayesian fitting is available; no optimized-H selection or native Flike qualification."
+            "Explicit settings for complete positive annual maxima support fixed-H GEV and ordinary L-moment fits, "
+            "selected-H GEV and parametric bootstrap. Explicit lognormal Bayesian fitting is also available."
         ),
     )
     parser.add_argument(
@@ -88,6 +88,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         except OSError as exc:
             print(f"ffa: fit I/O failure: {exc}", file=sys.stderr)
             return 1
+        if settings.get("bootstrap_status") == "refused":
+            print(
+                f"ffa: {settings['bootstrap_refusal_detail']}. Point fit and attempt ledger: {paths[0].parent}",
+                file=sys.stderr,
+            )
+            return 2
         mode = "lognormal Bayesian" if settings["schema_version"] == BAYESIAN_SCHEMA else "deterministic"
         print(f"Independent {mode} mathematical fit only — not native Flike-qualified. Reports: {paths[0].parent}")
         return 0
