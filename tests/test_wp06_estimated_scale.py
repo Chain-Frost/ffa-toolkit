@@ -1,6 +1,7 @@
 """Two-dimensional quadrature using direct GEV, Normal and Erlang-4 laws."""
 
 from dataclasses import replace
+from fractions import Fraction
 from hashlib import sha256
 from math import erf, exp, expm1, fsum, inf, isclose, log, log1p, nextafter, pi, sqrt
 
@@ -21,7 +22,7 @@ from ffa_methods.family_posterior import (
 from ffa_methods.importance_proposal import CurvatureControls
 from ffa_methods.importance_sampling import ExplicitNormalProposal, ExplicitSamplingControls
 from ffa_methods.lognormal_posterior import PosteriorBindingError
-from ffa_methods.priors import LegacyPriorMode
+from ffa_methods.priors import LegacyPriorMode, PriorEvidenceError
 from tests.family_posterior_cases import synthetic_flow, synthetic_model
 
 CASES = [(PosteriorFamily.GEV, x) for x in (0.2, 0.0, -0.2)] + [(PosteriorFamily.LP3, x) for x in (1.0, 0.0, -1.0)]
@@ -327,3 +328,19 @@ def test_small_covariance_symmetry() -> None:
     assert valid.prior.logpdf(valid.prior.means) > 0
     with pytest.raises(PosteriorBindingError, match="finite"):
         replace(synthetic_model(PosteriorFamily.GEV, 0.0), fixed_log_scale=inf)
+
+
+def test_exact_covariance_pivot_and_conditional_density() -> None:
+    model = _estimated(PosteriorFamily.GEV, 0.0)
+    for d in (0.5, nextafter(0.5, 0.0)):
+        with pytest.raises(PriorEvidenceError, match="positive definite"):
+            replace(model.prior, covariance=((0.5, 0.5), (0.5, d)))
+    d = nextafter(0.5, inf)
+    prior = replace(model.prior, means=(0.0, 0.0), covariance=((0.5, 0.5), (0.5, d)))
+    # Exact inverse of [[a,b],[b,d]], with one observation off the y=x ridge.
+    u, v = Fraction(1.0), Fraction(1 + 2**-26)
+    det = (Fraction(d) - Fraction(0.5)) / 2
+    quad = (Fraction(d) * u * u - u * v + v * v / 2) / det
+    center = -log(2 * pi) - log(float(det)) / 2
+    assert isclose(prior.logpdf(prior.means), center, abs_tol=1e-14, rel_tol=0)
+    assert isclose(prior.logpdf((float(u), float(v))), center - float(quad) / 2, abs_tol=1e-14, rel_tol=0)
