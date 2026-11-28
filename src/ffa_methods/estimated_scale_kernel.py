@@ -85,12 +85,18 @@ class EstimatedScaleKernel:
         if not resolved:
             msg = "unresolved standardized family coordinate"
             raise PosteriorBindingError(msg)
+        self._check_interior(z)
+        return z
+
+    def _check_interior(self, z: float) -> None:
+        if isinstance(self.raw, GEV) and not isfinite(self.raw.xi * z):
+            msg = "interior GEV shape times standardized discharge is not representable"
+            raise PosteriorBindingError(msg)
         if self._edge is not None and abs(Fraction(z) - self._edge) <= 32 * Fraction(ulp(z)):
             # Even a correctly rounded z cannot resolve the small interior
             # distance used by the binary64 standardized density and tails.
             msg = "unresolved interior moving-endpoint distance"
             raise PosteriorBindingError(msg)
-        return z
 
     @staticmethod
     def _log_result(value: float) -> float:

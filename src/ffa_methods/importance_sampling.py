@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from math import fsum, hypot, isfinite, log, pi, sqrt, ulp
 from random import Random
 from sys import version
-from typing import TypeAlias
+from typing import ClassVar, Protocol, TypeAlias
 
 from .bayesian_outputs import ImportanceParticles, PosteriorMoments, require_weight_adequacy
 from .contracts import EvidenceStatus, RunProvenance
@@ -66,6 +66,18 @@ def _scaled_euclidean_norm(components: Iterable[float]) -> float:
     return scale * sqrt(sum_squares)
 
 
+class IndependentProposal(Protocol):
+    @property
+    def coordinates(self) -> tuple[str, ...]: ...
+    @property
+    def source(self) -> str: ...
+
+    algorithm: ClassVar[str]
+
+    def draw(self, rng: Random) -> tuple[float, ...]: ...
+    def logpdf(self, values: tuple[float, ...]) -> float: ...
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ExplicitNormalProposal:
     """Full multivariate Normal density in named original/source coordinates.
@@ -75,6 +87,7 @@ class ExplicitNormalProposal:
     introduced. Covariance is an SPD matrix, not a vector of variances.
     """
 
+    algorithm: ClassVar[str] = "independent multivariate-normal self-normalized importance sampling"
     coordinates: tuple[str, ...]
     means: tuple[float, ...]
     covariance: tuple[tuple[float, ...], ...]
@@ -219,7 +232,7 @@ class IndependentSamplingResult:
 
 def independent_importance_sample(
     *,
-    proposal: ExplicitNormalProposal,
+    proposal: IndependentProposal,
     target: ExplicitPosteriorTarget,
     controls: ExplicitSamplingControls,
     provenance: RunProvenance,
@@ -293,6 +306,7 @@ def independent_importance_sample(
         moments=moments,
         controls=controls,
         approximate_mean_mcse=mcse,
+        algorithm=proposal.algorithm,
     )
 
 

@@ -1,0 +1,66 @@
+{
+  "schema_version": "ffa-bounded-shape-bayesian/1",
+  "estimator": "lp3_bayesian",
+  "source_format": "classified_systematic_csv",
+  "source": "synthetic tied exact and classified censor observations",
+  "source_classification": "caller_asserted_classified_systematic_annual_maxima",
+  "discharge_unit": "m3/s",
+  "year_definition": "synthetic calendar year",
+  "reference_discharge": 2.0,
+  "prior": {
+    "law": "gaussian_scaled_logit",
+    "source": "synthetic correlated latent Gaussian",
+    "coordinates": [
+      "lp3.mean_loge_flow",
+      "lp3.loge_sd_loge_flow",
+      "lp3.logit_skew_fraction"
+    ],
+    "means": [
+      0,
+      0,
+      0
+    ],
+    "lower_factor": [
+      [
+        0.25,
+        0,
+        0
+      ],
+      [
+        0.08,
+        0.14,
+        0
+      ],
+      [
+        0.2,
+        -0.15,
+        0.6
+      ]
+    ],
+    "shape_bounds": [
+      0.55,
+      1.25
+    ]
+  },
+  "proposal": {
+    "law": "scaled_prior_innovations",
+    "gamma": 1
+  },
+  "sampling": {
+    "rng": "python_random_gauss",
+    "draw_count": 1600,
+    "random_seed": 87,
+    "minimum_effective_size": 300,
+    "maximum_single_weight": 0.03
+  },
+  "outputs": {
+    "non_exceedance_probabilities": [],
+    "discharges": [
+      5.43656365691809
+    ],
+    "interval_mass": 0.9
+  },
+  "precision": {
+    "mode": "not_assessed"
+  }
+}

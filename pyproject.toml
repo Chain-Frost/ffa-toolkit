@@ -74,7 +74,9 @@ packages = ["src/ffa_methods"]
 "docs/examples/bayesian-fixed-ams.csv" = "ffa_methods/resources/examples/bayesian-fixed-ams.csv"
 "docs/examples/bayesian-fixed-settings.json" = "ffa_methods/resources/examples/bayesian-fixed-settings.json"
 "docs/examples/bayesian-censored-ams.csv" = "ffa_methods/resources/examples/bayesian-censored-ams.csv"
+"docs/examples/bayesian-shape-ams.csv" = "ffa_methods/resources/examples/bayesian-shape-ams.csv"
 "docs/examples/bayesian-censored-settings.json" = "ffa_methods/resources/examples/bayesian-censored-settings.json"
+"docs/examples/bayesian-shape-settings.json" = "ffa_methods/resources/examples/bayesian-shape-settings.json"
 
 "docs/wp08-bayesian-cli.md" = "ffa_methods/resources/wp08-bayesian-cli.md"
 
@@ -96,7 +98,9 @@ include = [
     "/docs/examples/bayesian-fixed-ams.csv",
     "/docs/examples/bayesian-fixed-settings.json",
     "/docs/examples/bayesian-censored-ams.csv",
+    "/docs/examples/bayesian-shape-ams.csv",
     "/docs/examples/bayesian-censored-settings.json",
+    "/docs/examples/bayesian-shape-settings.json",
     "/docs/methods/l-moments.md",
     "/docs/wp08-bayesian-cli.md",
     "/docs/methods/frequency-plots.md",

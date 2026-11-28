@@ -126,6 +126,11 @@ def _log_quantile_moments(output: QuantileOutputs, unit: str) -> tuple[list[Resu
     warnings: list[str] = []
     log_mean = output.mean_log10_quantile
     log_sd = output.standard_deviation_log10_quantile
+    if output.log_undefined_reason:
+        if log_mean is not None or log_sd is not None:
+            msg = "population-undefined log moments cannot carry finite estimates"
+            raise ValueError(msg)
+        return [], [f"WP06 quantile F={f:.17g}: log10 moments undefined because {output.log_undefined_reason}."]
     if output.nonpositive_quantile_weight:
         if log_mean is not None or log_sd is not None:
             msg = "base-10 quantile moments must be undefined when a positive-weight quantile is nonpositive"

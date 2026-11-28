@@ -30,9 +30,11 @@ RESOURCE_FILES: tuple[tuple[str, str], ...] = (
     ("docs/examples/bayesian-fixed-ams.csv", "ffa_methods/resources/examples/bayesian-fixed-ams.csv"),
     ("docs/examples/bayesian-fixed-settings.json", "ffa_methods/resources/examples/bayesian-fixed-settings.json"),
     ("docs/examples/bayesian-censored-ams.csv", "ffa_methods/resources/examples/bayesian-censored-ams.csv"),
+    ("docs/examples/bayesian-shape-ams.csv", "ffa_methods/resources/examples/bayesian-shape-ams.csv"),
     ("docs/examples/bayesian-censored-settings.json", "ffa_methods/resources/examples/bayesian-censored-settings.json"),
     ("docs/methods/frequency-plots.md", "ffa_methods/resources/methods/frequency-plots.md"),
     ("docs/methods/manual.html", "ffa_methods/resources/methods/manual.html"),
+    ("docs/examples/bayesian-shape-settings.json", "ffa_methods/resources/examples/bayesian-shape-settings.json"),
 )
 BLOCKED_COMPONENTS = frozenset({"reference", "legacy-candidates", "private-evidence", "local-evidence"})
 BLOCKED_SUFFIXES = (".fld", ".fid", ".7z")
