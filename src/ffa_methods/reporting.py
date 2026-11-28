@@ -681,7 +681,7 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
         )
     method_guidance = cast(dict[str, object], doc["method_guidance"])
     lines = [
-        "FFA ANALYSIS RESULT â€” UNQUALIFIED FORMATTER OUTPUT",
+        "FFA ANALYSIS RESULT — UNQUALIFIED FORMATTER OUTPUT",
         "This is not a verified legacy Flike comparison or an adopted engineering estimate.",
         f"Compatibility target: {LEGACY_FLIKE_PROFILE.identifier}",
         f"Method: {provenance['method_id']} (algorithm {provenance['method_version']})",
