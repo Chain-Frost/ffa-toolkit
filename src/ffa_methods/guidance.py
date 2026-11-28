@@ -91,6 +91,11 @@ def _offline_page(method: dict[str, object]) -> str:
     return text if text.endswith("\n") else text + "\n"
 
 
+def method_manual() -> str:
+    """Read the self-contained HTML manual included in the distribution."""
+    return _read_resource("methods/manual.html")
+
+
 def explain(method_id: str | None = None, *, output_format: str = "text") -> str:
     """Render method guidance in text or JSON; neither form asserts qualification."""
     if output_format not in ("text", "json", "markdown"):

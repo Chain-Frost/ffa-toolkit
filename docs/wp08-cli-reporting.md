@@ -107,3 +107,36 @@ The bridge checks F/AEP complement consistency, unit/probability domains, centra
 ### Signed mathematical quantiles versus physical discharge
 
 Independent review found that a valid, **untruncated** Gumbel/GEV posterior can yield a **negative lower quantile probability limit** even when the expected-parameter, posterior mean, median and predictive quantiles are positive. WP06 correctly returns the signed mathematical result. The bridge and formatter preserve a **finite negative modelled quantile** and emit a clear nonphysical-discharge warning; they do **not** clip it, discard all other estimates, or fabricate a log10 moment. In contrast, **fixed input discharge** for probability/return-period-at-flow remains constrained nonnegative, with units. A synthetic two-component Gumbel regression specifically protects this distinction. The analyst must evaluate physical support and suitability before adopting a discharge estimate; preservation in an unqualified report is not endorsement of negative flows.
+
+
+## Opt-in frequency reports (issue #7, bounded first increment)
+
+`ffa fit ... --frequency-report` adds a static SVG, coordinate CSV, printable offline
+HTML report and exact input snapshots to the existing numerical bundle. The existing
+default bundle and result schemas are unchanged. The plot is restricted to consecutive
+exact positive systematic annual maxima and the already admitted deterministic fits.
+Cunnane AEP (descending ranks), F, units, tie decision, signed quantiles, the absence of
+intervals and fitted-support warnings are explicit. See [frequency plot guidance](methods/frequency-plots.md).
+Bayesian series, pointwise intervals and censored/historical plotting remain open under issue #7.
+Native qualification is deferred. Software review is recorded on PR #36.
+
+The packaged HTML method manual is available with `ffa manual > method-manual.html`.
+It includes a runnable synthetic example for each installed deterministic configuration
+and interpretation of support warnings and output probabilities.
+
+### Bayesian and non-exact records
+
+Issue #7 remains open. PR #37 introduces explicit lognormal Bayesian result identities.
+After that workflow is integrated, exact consecutive systematic records can use the same
+Cunnane diagnostic. The quantile-at-expected-parameters, posterior median, posterior mean
+when defined, and predictive quantile are separate series. Match any central pointwise
+posterior-quantile limits by F, paired side, unit, construction and interval mass. A posterior
+quantile interval applies at a single probability; it is neither a simultaneous band nor a
+predictive interval or a Monte Carlo precision assessment. The estimated-scale workflow
+may omit a divergent posterior mean at upper design probabilities; there is no valid
+finite substitute for that series at those points.
+
+Systematic censoring in PR #37 establishes likelihood contributions and explicit data
+classification. It does not establish plotting positions. Historical/grouped exposure
+depends on issue #9 and a reviewed plotting-position basis. No exact rank is assigned
+to a threshold or historical event based on the number of uncensored supplied rows.

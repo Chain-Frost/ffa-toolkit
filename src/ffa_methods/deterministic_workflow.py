@@ -7,11 +7,12 @@ This is a deterministic independently specified calculation, not legacy replay.
 """
 
 import json
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import asdict, dataclass, replace
 from hashlib import sha256
-from math import exp, isfinite
+from math import exp, isfinite, sqrt
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast
 
 from ffa_methods import __version__
 from ffa_methods.bayesian_workflow import BAYESIAN_SCHEMA, calculate_bayesian
@@ -28,6 +29,7 @@ from ffa_methods.contracts import (
 )
 from ffa_methods.distributions import GeneralizedPareto, Gumbel, Lognormal, LogPearsonIII
 from ffa_methods.estimators.gev_lh import GEVLHFit, fit_gev_lh
+from ffa_methods.estimators.gev_lh_calibration import evaluate_candidate_h
 from ffa_methods.estimators.ordinary_lmoments import (
     OrdinaryLMomentFit,
     fit_gp_lmoments,
@@ -35,11 +37,20 @@ from ffa_methods.estimators.ordinary_lmoments import (
     fit_lognormal_lmoments,
     fit_lp3_lmoments,
 )
+from ffa_methods.estimators.parametric_bootstrap import (
+    BootstrapEndpoint,
+    BootstrapRefit,
+    BootstrapRefusalError,
+    BootstrapSettings,
+    Quantile,
+    parametric_bootstrap,
+)
 from ffa_methods.gev_support import GEVFittedSupport, GEVSupportObservation, diagnose_gev_support
 from ffa_methods.legacy.models import ObservationKind
 from ffa_methods.legacy.project import parse_ams_csv
 
 SETTINGS_SCHEMA = "ffa-gev-fixed-h/1"
+SELECTED_SCHEMA = "ffa-gev-selected-h/1"
 EXACT_ASSERTION = "caller_asserted_complete_exact_positive_annual_maxima"
 ALGORITHM_VERSION = "arr-wang-gev-fixed-h/1"
 _FIELDS = frozenset(
@@ -145,7 +156,7 @@ def _fixed_gev_settings(values: dict[str, object]) -> FixedGEVSettings:
         raise ValueError(msg)
     shift = values["lh_shift"]
     if type(shift) is not int or shift not in range(5):
-        msg = "lh_shift must be an integer H=0,1,2,3,4; optimized-H is unavailable"
+        msg = "lh_shift must be an integer H=0,1,2,3,4 for the fixed-H schema"
         raise ValueError(msg)
     unit = _source_text(values["discharge_unit"], field="discharge_unit")
     if unit in {"years", "probability"}:
@@ -225,15 +236,38 @@ def calculate_fixed_gev_from_files(
     """Fit the admitted independent mathematical model and return typed report inputs."""
     raw_ams = ams_path.read_bytes()
     raw_settings = settings_path.read_bytes()
-    return _calculate_fixed_gev(raw_ams, raw_settings, load_fixed_gev_settings(raw_settings))
+    values = _settings_object(raw_settings)
+    bootstrap = _bootstrap_settings(values.pop("bootstrap")) if "bootstrap" in values else None
+    return _calculate_fixed_gev(raw_ams, raw_settings, _fixed_gev_settings(values), bootstrap)
 
 
 def _calculate_fixed_gev(
-    raw_ams: bytes, raw_settings: bytes, config: FixedGEVSettings
+    raw_ams: bytes, raw_settings: bytes, config: FixedGEVSettings, bootstrap: BootstrapSettings | None = None
 ) -> tuple[AnalysisResult, dict[str, str | int | float | bool | None]]:
     records = _positive_exact_ams_records(raw_ams)
     values = tuple(record.discharge for record in records)
     fitted = fit_gev_lh(values, shift=config.lh_shift)
+    report, settings = _report_fixed_gev(raw_ams, raw_settings, config, records, fitted)
+    if bootstrap is not None:
+        report = _with_bootstrap(
+            report,
+            settings,
+            bootstrap,
+            config.probabilities,
+            len(records),
+            fitted.quantile,
+            lambda record: fit_gev_lh(record, shift=config.lh_shift).quantile,
+        )
+    return report, settings
+
+
+def _report_fixed_gev(
+    raw_ams: bytes,
+    raw_settings: bytes,
+    config: FixedGEVSettings,
+    records: tuple[GEVSupportObservation, ...],
+    fitted: GEVLHFit,
+) -> tuple[AnalysisResult, dict[str, str | int | float | bool | None]]:
     support = diagnose_gev_support(
         records, location=fitted.location, scale=fitted.scale, shape=fitted.shape, unit=config.discharge_unit
     )
@@ -267,7 +301,7 @@ def _calculate_fixed_gev(
         ),
         parameters=parameters,
         values=points,
-        diagnostics=_fit_diagnostics(fitted, len(values), config.discharge_unit),
+        diagnostics=_fit_diagnostics(fitted, len(records), config.discharge_unit),
         fitted_gev_support=support,
         warnings=(
             "Mathematical fixed-H GEV L/LH fit only: NOT Flike-native, Bayesian, bootstrap or optimized-H.",
@@ -287,6 +321,124 @@ def _calculate_fixed_gev(
         "non_exceedance_probabilities": ",".join(str(p) for p in config.probabilities),
     }
     return result, settings
+
+
+def _calculate_selected_gev(
+    raw_ams: bytes, raw_settings: bytes, settings: dict[str, object], bootstrap: BootstrapSettings | None
+) -> tuple[AnalysisResult, dict[str, str | int | float | bool | None]]:
+    if (
+        frozenset(settings) != (_FIELDS - {"lh_shift"}) | {"critical_z", "calibration_seed"}
+        or settings.get("estimator") != "gev_lh_selected_h"
+    ):
+        msg = "selected-H settings require gev_lh_selected_h, critical_z and calibration_seed in place of lh_shift"
+        raise ValueError(msg)
+    seed = settings["calibration_seed"]
+    if type(seed) is not int or seed < 0:
+        msg = "calibration_seed must be a nonnegative integer"
+        raise ValueError(msg)
+    critical_z = _finite_setting(settings["critical_z"], field="critical_z")
+    fixed_settings = {key: val for key, val in settings.items() if key in _FIELDS}
+    fixed_settings.update(schema_version=SETTINGS_SCHEMA, estimator="gev_lh_fixed_h", lh_shift=0)
+    config = _fixed_gev_settings(fixed_settings)
+    records = _positive_exact_ams_records(raw_ams)
+    values = tuple(record.discharge for record in records)
+    candidates, selected = evaluate_candidate_h(values, critical_z=critical_z, seed=seed)
+    candidate_fit = candidates[0 if selected is None else selected].fit
+    report, report_settings = _report_fixed_gev(
+        raw_ams,
+        raw_settings,
+        replace(config, lh_shift=candidate_fit.shift, probabilities=() if selected is None else config.probabilities),
+        records,
+        candidate_fit,
+    )
+    diagnostics = [RunDiagnostic(name="exact_annual_maxima_count", value=float(len(values)), unit="count")]
+    support: list[GEVFittedSupport] = []
+    for candidate in candidates:
+        fit = candidate.fit
+        calibration = candidate.calibration
+        support.append(
+            diagnose_gev_support(
+                records, location=fit.location, scale=fit.scale, shape=fit.shape, unit=config.discharge_unit
+            )
+        )
+        diagnostics.extend(
+            RunDiagnostic(name=f"h{fit.shift}_{name}", value=value, unit=unit)
+            for name, value, unit in (
+                ("location", fit.location, config.discharge_unit),
+                ("scale", fit.scale, config.discharge_unit),
+                ("shape_k", fit.shape, "dimensionless"),
+                ("sample_skew", fit.sample_moments[2] / fit.sample_moments[1], "dimensionless"),
+                ("fitted_skew", fit.fitted_moments[2] / fit.fitted_moments[1], "dimensionless"),
+                ("sample_kurtosis", fit.sample_moments[3] / fit.sample_moments[1], "dimensionless"),
+                ("fitted_kurtosis", fit.fitted_moments[3] / fit.fitted_moments[1], "dimensionless"),
+                ("skew_variance", calibration.covariance.skew_variance, "dimensionless"),
+                ("kurtosis_variance", calibration.covariance.kurtosis_variance, "dimensionless"),
+                ("skew_kurtosis_covariance", calibration.covariance.covariance, "dimensionless"),
+                ("conditional_variance", calibration.covariance.conditional_variance, "dimensionless"),
+                ("conditional_sd", sqrt(calibration.covariance.conditional_variance), "dimensionless"),
+                ("variance_lower", calibration.variance_lower, "dimensionless"),
+                ("variance_upper", calibration.variance_upper, "dimensionless"),
+                ("calibration_count", float(calibration.covariance.count), "count"),
+                ("z", candidate.z, "dimensionless"),
+                ("passes_cutoff", float(abs(candidate.z) <= critical_z), "indicator"),
+            )
+        )
+    report_settings.update(
+        schema_version=SELECTED_SCHEMA,
+        estimator="gev_lh_selected_h",
+        lh_shift=selected,
+        critical_z=critical_z,
+        calibration_seed=str(seed),
+        calibration_rng="NumPy PCG64 (base seed + H)",
+        non_exceedance_probabilities=",".join(str(p) for p in config.probabilities),
+        probability_count=len(config.probabilities),
+        selection="lowest_passing_h" if selected is not None else "no_pass",
+    )
+    selected_support = None if selected is None else support[selected]
+    report = replace(
+        report,
+        provenance=replace(report.provenance, method_version="wang-direct-lh-selected-h/1"),
+        parameters=() if selected is None else report.parameters,
+        values=() if selected is None else report.values,
+        diagnostics=tuple(diagnostics),
+        fitted_gev_support=selected_support,
+        candidate_gev_support=tuple(support),
+        warnings=(
+            "Provisional independent approximate Wang diagnostic with direct simulation calibration.",
+            "Source classification, year definition and discharge units are caller assertions.",
+            "No candidate passed the declared cutoff."
+            if selected_support is None
+            else f"Lowest passing shift H={selected}.",
+            *(_support_warnings(selected_support) if selected_support is not None else ()),
+        ),
+    )
+    if bootstrap is not None:
+        if selected is None:
+            report_settings.update(
+                bootstrap_status="unavailable_without_selected_fit",
+                bootstrap_replications=bootstrap.replications,
+                bootstrap_attempted=0,
+                bootstrap_successful=0,
+                bootstrap_failed=0,
+                bootstrap_attempts="[]",
+            )
+            report = replace(
+                report,
+                warnings=(*report.warnings, "Bootstrap unavailable because the original record has no selected fit."),
+            )
+        else:
+
+            def refit(record: tuple[float, ...]) -> BootstrapRefit:
+                replicate, selected_h = evaluate_candidate_h(record, critical_z=critical_z, seed=seed)
+                if selected_h is None:
+                    msg = "no bootstrap candidate passed the declared cutoff"
+                    raise ValueError(msg)
+                return BootstrapRefit(replicate[selected_h].fit.quantile, selected_h)
+
+            report = _with_bootstrap(
+                report, report_settings, bootstrap, config.probabilities, len(records), candidate_fit.quantile, refit
+            )
+    return report, report_settings
 
 
 ORDINARY_SCHEMA = "ffa-ordinary-lmoments/1"
@@ -446,7 +598,7 @@ def _ordinary_report_settings(config: OrdinarySettings, moments: str) -> dict[st
 
 
 def _calculate_ordinary(
-    raw_ams: bytes, raw_settings: bytes, config: OrdinarySettings
+    raw_ams: bytes, raw_settings: bytes, config: OrdinarySettings, bootstrap: BootstrapSettings | None = None
 ) -> tuple[AnalysisResult, dict[str, str | int | float | bool | None]]:
     values = _positive_exact_ams(raw_ams)
     fit = _ordinary_fit(values, config)
@@ -489,7 +641,108 @@ def _calculate_ordinary(
         diagnostics=diagnostics,
         warnings=tuple(warnings),
     )
-    return result, _ordinary_report_settings(config, fit.moment_coordinates)
+    settings = _ordinary_report_settings(config, fit.moment_coordinates)
+    if bootstrap is not None:
+        result = _with_bootstrap(
+            result,
+            settings,
+            bootstrap,
+            config.probabilities,
+            len(values),
+            fit.quantile,
+            lambda record: _ordinary_fit(record, config).quantile,
+        )
+    return result, settings
+
+
+def _bootstrap_settings(raw: object) -> BootstrapSettings:
+    expected = {"replications", "seed", "confidence", "maximum_failure_fraction", "endpoint_tolerance"}
+    if not isinstance(raw, dict) or set(cast(dict[object, object], raw)) != expected:
+        msg = f"bootstrap settings require exactly {sorted(expected)}"
+        raise ValueError(msg)
+    values = cast(dict[str, object], raw)
+    replications, seed = values["replications"], values["seed"]
+    confidence = _finite_setting(values["confidence"], field="bootstrap confidence")
+    failures = _finite_setting(values["maximum_failure_fraction"], field="maximum_failure_fraction")
+    tolerance = _finite_setting(values["endpoint_tolerance"], field="endpoint_tolerance")
+    if (
+        type(replications) is not int
+        or not 1 <= replications <= 100_000
+        or type(seed) is not int
+        or seed < 0
+        or not 0 < confidence < 1
+        or not 0 <= failures < 1
+        or tolerance <= 0
+    ):
+        msg = "invalid bootstrap count, seed, confidence, failure fraction or endpoint tolerance"
+        raise ValueError(msg)
+    return BootstrapSettings(replications, seed, confidence, failures, tolerance)
+
+
+def _with_bootstrap(
+    report: AnalysisResult,
+    report_settings: dict[str, str | int | float | bool | None],
+    settings: BootstrapSettings,
+    probabilities: tuple[float, ...],
+    count: int,
+    generate: Quantile,
+    refit: Callable[[tuple[float, ...]], Quantile | BootstrapRefit],
+) -> AnalysisResult:
+    try:
+        result = parametric_bootstrap(generate, refit, count=count, probabilities=probabilities, settings=settings)
+    except BootstrapRefusalError as exc:
+        outcome = exc
+    else:
+        outcome = result
+    failed = sum(number for _, number in outcome.failures)
+    report_settings.update(
+        bootstrap_status="refused" if isinstance(outcome, BootstrapRefusalError) else "completed",
+        bootstrap_replications=settings.replications,
+        bootstrap_attempted=len(outcome.attempts),
+        bootstrap_seed=str(settings.seed),
+        bootstrap_confidence=settings.confidence,
+        bootstrap_maximum_failure_fraction=settings.maximum_failure_fraction,
+        bootstrap_endpoint_tolerance=settings.endpoint_tolerance,
+        bootstrap_successful=settings.replications - failed,
+        bootstrap_failed=failed,
+        bootstrap_failure_reasons=json.dumps(dict(outcome.failures)),
+        bootstrap_attempts=json.dumps([asdict(attempt) for attempt in outcome.attempts], separators=(",", ":")),
+        bootstrap_interval_target="conditional_on_successful_refits",
+    )
+    if isinstance(outcome, BootstrapRefusalError):
+        report_settings.update(bootstrap_refusal_code=outcome.code, bootstrap_refusal_detail=str(outcome))
+        return replace(report, warnings=(*report.warnings, f"Bootstrap intervals refused. {outcome}"))
+    points = list(report.values)
+    diagnostics = list(report.diagnostics)
+    unit = report.values[0].unit
+    for f, (low, high) in zip(probabilities, outcome.endpoints, strict=True):
+        endpoints: tuple[tuple[Literal["lower", "upper"], BootstrapEndpoint], ...] = (("lower", low), ("upper", high))
+        for side, endpoint in endpoints:
+            points.append(
+                ResultPoint(
+                    meaning=ResultMeaning.QUANTILE_BOOTSTRAP_LIMIT,
+                    value=endpoint.estimate,
+                    unit=unit,
+                    input_probability=f,
+                    input_probability_kind=ProbabilityKind.NON_EXCEEDANCE,
+                    confidence_level=settings.confidence,
+                    probability_limit_side=side,
+                    probability_limit_construction="parametric_percentile_type_7_successful_refits",
+                )
+            )
+            diagnostics.extend(
+                RunDiagnostic(name=f"bootstrap_f={f}_{side}_mc_{bound}", value=value, unit=unit)
+                for bound, value in (("lower", endpoint.mc_lower), ("upper", endpoint.mc_upper))
+            )
+    return replace(
+        report,
+        values=tuple(points),
+        diagnostics=tuple(diagnostics),
+        warnings=(
+            *(warning for warning in report.warnings if "fit only" not in warning),
+            "Bootstrap sampling intervals are conditional on successful refits. Endpoint Monte Carlo brackets describe simulation error.",
+        ),
+    )
 
 
 def calculate_from_bytes(
@@ -499,6 +752,9 @@ def calculate_from_bytes(
     values = _settings_object(raw_settings)
     if values.get("schema_version") == BAYESIAN_SCHEMA:
         return calculate_bayesian(raw_ams, raw_settings, values)
+    bootstrap = _bootstrap_settings(values.pop("bootstrap")) if "bootstrap" in values else None
     if values.get("schema_version") == ORDINARY_SCHEMA:
-        return _calculate_ordinary(raw_ams, raw_settings, _ordinary_settings(values))
-    return _calculate_fixed_gev(raw_ams, raw_settings, _fixed_gev_settings(values))
+        return _calculate_ordinary(raw_ams, raw_settings, _ordinary_settings(values), bootstrap)
+    if values.get("schema_version") == SELECTED_SCHEMA:
+        return _calculate_selected_gev(raw_ams, raw_settings, values, bootstrap)
+    return _calculate_fixed_gev(raw_ams, raw_settings, _fixed_gev_settings(values), bootstrap)

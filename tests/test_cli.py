@@ -12,7 +12,9 @@ def test_help_is_successful(capsys: pytest.CaptureFixture[str]) -> None:
     assert exit_info.value.code == 0
     output = capsys.readouterr().out
     assert "FFA Toolkit: independent flood frequency analysis" in output
-    assert "fixed-H GEV and ordinary L-moment fits" in " ".join(output.split())
+    help_text = " ".join(output.split())
+    assert "fixed-H GEV and ordinary L-moment fits" in help_text
+    assert "selected-H GEV and parametric bootstrap" in help_text
 
 
 def test_version_distinguishes_package_and_vendor(capsys: pytest.CaptureFixture[str]) -> None:

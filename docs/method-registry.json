@@ -404,8 +404,8 @@
       ],
       "evidence_gaps": [
         "Independent local curvature, explicit full covariance scaling, Normal importance draws, explicit lognormal binding and a bounded known-scale exact-record precision audit are composed in the installed issue #6 lognormal CLI workflow. Broader model/exposure precision admission and native comparison remain outstanding.",
-        "The internal API also supports explicitly configured fixed-scale censored parameter mean and expected CDF/direct AEP using complete deterministic enclosures. An additional route admits exactly reflected fixed- or estimated-scale lognormal records for independently known scalars. General censored transformed/inverse outputs, broad estimated-scale precision remain outstanding.",
-        "GEV and LP3 posterior bindings cover location-only and estimated-log-scale inference with explicitly fixed shape. See wp06-fixed-family-posterior.md and wp06-estimated-scale.md for evidence and remaining limitations. Installed family workflows and family-specific precision admission are pending.",
+        "The internal API also supports explicitly configured fixed-scale censored parameter mean and expected CDF/direct AEP using complete deterministic enclosures. An additional route admits exactly reflected fixed- or estimated-scale lognormal records for independently known scalars. General censored transformed/inverse outputs and broad estimated-scale precision remain outstanding.",
+        "GEV and LP3 posterior bindings cover location-only inference with explicit fixed log-scale and shape, plus location and estimated log-scale with explicit fixed shape and a supplied bivariate Gaussian prior. See wp06-fixed-family-posterior.md and wp06-estimated-scale.md for evidence and remaining limitations; family-specific precision admission and installed GEV/LP3 workflows remain outstanding.",
         "Actual native Flike optimizer/proposal, random controls, stopping and output interpolation are not established; external native qualification remains separate.",
         "ESS, approximate mean Monte Carlo standard error, and independent seeds do not by themselves validate extreme-tail flood estimates or native equivalence."
       ],
@@ -451,7 +451,7 @@
       "qualification_status": "not_started",
       "evidence_gaps": [
         "Weighted estimands use an explicitly defined empirical interpolation; FLIKE reporting rules and the zero-threshold log10 calculation require native evidence.",
-        "Binary64 generalized inverse is independently tested; issue #6 adds explicit lognormal CLI/report composition with selected-output audit labels and omission of divergent estimated-scale upper design-flood means. Installed acceptance and native interpolation, printed tail limits and solver precision remain unqualified."
+        "Binary64 generalized inverse is independently tested; the installed issue #6 lognormal CLI/report workflow includes selected-output audit labels and omission of divergent estimated-scale upper design-flood means. Broader precision admission and native interpolation, printed tail limits and solver precision remain unqualified."
       ]
     },
     {
@@ -473,7 +473,7 @@
       "key_assumptions": [
         "Complete, exact, positive annual maxima with explicitly asserted annual-record classification, units and year definition",
         "Gumbel and LN2 match raw discharge moments; LP3 matches natural-log relative discharge moments; GP location is explicitly fixed or free",
-        "Deterministic point estimates only; no threshold exposure, priors, censoring or bootstrap"
+        "Point fitting and optional parametric percentile bootstrap for complete exact annual maxima"
       ],
       "documentation": "methods/l-moments.md",
       "validation_required": [
@@ -486,7 +486,7 @@
       "implementation_status": "partial_independent_core_with_explicit_ordinary_cli",
       "qualification_status": "not_started",
       "implementation_evidence": "wp04-ordinary-lmoments-evidence.md",
-      "remaining_work": "Explicit H=0 Gumbel, raw-flow LN2, log-flow LP3 and fixed/free-location GP annual-maxima CLI paths use the mathematical core. Declared uncertainty and optimized-H diagnostics remain separate software requirements. Native variants, defaults and matched family runs remain unqualified."
+      "remaining_work": "Explicit H=0 Gumbel, raw-flow LN2, log-flow LP3 and fixed/free-location GP annual-maxima CLI paths use the mathematical core. Optional declared parametric percentile bootstrap reports every attempt and withholds limits on failure or finite-simulation endpoint refusal. Native variants, defaults and matched family runs remain unqualified."
     },
     {
       "method_id": "lh-moments-gev",
@@ -518,7 +518,7 @@
       "implementation_status": "partial_independent_core_with_explicit_fixed_h_cli",
       "qualification_status": "not_started",
       "implementation_evidence": "wp04-fixed-h-gev-evidence.md",
-      "remaining_work": "Explicit fixed-H GEV H=0..4 mathematical CLI and complete positive Year/AMS validation include fitted support and distinct endpoint/outside observations in all report formats. Active: independently verify Wang conditional LH variance and implement standardized diagnostics/explicit mathematical H-selection; extend supported deterministic workflows. Deferred native qualification: exact native Flike selection/uncertainty controls, matched runs and source-specific variants. See wp04-optimized-h-specification.md."
+      "remaining_work": "Explicit fixed-H GEV H=0..4 mathematical CLI and complete positive Year/AMS validation include fitted support and distinct endpoint/outside observations in all report formats. Provisional direct simulation uses all-five-domain, numerical rank and Monte Carlo precision gates. A complete evaluation can report no passing H. Optional parametric bootstrap retains all attempts and publishes conditional limits only when its failure and endpoint gates pass. Independent qualification remains open. Deferred native qualification: exact native Flike selection/uncertainty controls, matched runs and source-specific variants. See wp04-optimized-h-specification.md."
     },
     {
       "method_id": "correlated-rating-error",
@@ -667,6 +667,35 @@
         "Plotting-position and axis conventions",
         "Replay metadata and reference keys",
         "No unsupported qualification claims"
+      ]
+    },
+    {
+      "method_id": "frequency-plots",
+      "title": "Exact systematic annual maxima frequency plots",
+      "kind": "output_documentation",
+      "scope": "mvp",
+      "implementation_status": "partial_independent_exact_systematic_cli",
+      "qualification_status": "not_started",
+      "work_packages": [
+        "WP08"
+      ],
+      "source_keys": [
+        "ARR3",
+        "CUNNANE1978"
+      ],
+      "source_location": "ARR Book 3 Chapter 2 section 2.6.2 equations 3.2.35–3.2.36, printed pp. 35–36",
+      "purpose": "Display ranked exact systematic annual maxima and requested deterministic fitted quantiles without altering the calculation",
+      "key_assumptions": [
+        "Consecutive exact positive annual maxima only",
+        "Descending ranks, Cunnane AEP; ascending year breaks ties as an explicit presentation rule",
+        "Log AEP axis, linear signed discharge; no interval or engineering adoption claim"
+      ],
+      "documentation": "methods/frequency-plots.md",
+      "validation_required": [
+        "Independent rank and plot-coordinate checks",
+        "Identical quantile values and source hashes",
+        "Reject unresolved exposure and unsupported estimands",
+        "Installed offline report and guidance checks"
       ]
     },
     {
