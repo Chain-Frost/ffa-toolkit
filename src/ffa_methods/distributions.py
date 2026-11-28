@@ -516,6 +516,10 @@ class LogPearsonIII(_LogFlowKernel):
             _ = _GammaPearson3(self.log.natural_mean, math.exp(self.log.natural_log_sd), self.skew)
 
     def _frozen(self) -> _FrozenContinuous:
+        return self.log_flow_law()
+
+    def log_flow_law(self) -> _FrozenContinuous:
+        """Pearson III law in natural-log coordinates before the discharge transform."""
         mean, sd = self.log.natural_mean, math.exp(self.log.natural_log_sd)
         if abs(self.skew) < 1.6e-5:
             return cast(_FrozenContinuous, norm(loc=mean, scale=sd))
