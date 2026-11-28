@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import math
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Protocol, cast
 
 from scipy.stats import gamma, genextreme, genpareto, gumbel_r, norm
@@ -236,15 +236,19 @@ class _LogFlowKernel(_ContinuousKernel):
 @dataclass(frozen=True, slots=True)
 class Lognormal(_LogFlowKernel):
     log: LogCoordinates
-    _normal: _FrozenContinuous = field(init=False, repr=False, compare=False, hash=False)
-
-    def __post_init__(self) -> None:
-        # Posterior predictive inversion evaluates each component repeatedly.
-        distribution = norm(loc=self.log.natural_mean, scale=math.exp(self.log.natural_log_sd))
-        object.__setattr__(self, "_normal", cast(_FrozenContinuous, distribution))
 
     def _frozen(self) -> _FrozenContinuous:
-        return self._normal
+        return cast(_FrozenContinuous, norm(loc=self.log.natural_mean, scale=math.exp(self.log.natural_log_sd)))
+
+    def cdf(self, discharge: float) -> float:
+        # Predictive inversion calls CDF repeatedly across a potentially large
+        # particle set. Pass the same parameters without cloning a distribution.
+        discharge = _point(discharge)
+        if discharge <= 0.0:
+            return 0.0
+        return float(
+            norm.cdf(self._to_statistic(discharge), loc=self.log.natural_mean, scale=math.exp(self.log.natural_log_sd))
+        )
 
 
 def _gamma_upper_fraction(shape: float, x: float) -> float:
