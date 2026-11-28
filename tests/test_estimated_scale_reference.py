@@ -89,7 +89,19 @@ def test_correlated_mixed_reference_and_refinement() -> None:
         ctx.prec = 100
         assert fine.tilted_mean[0].contains(-Decimal.from_float(0.02) * 2)
         assert fine.tilted_mean[1].contains(-Decimal.from_float(0.0144) * 2)
-    assert fine.reserved_cell_terms <= fine.controls.maximum_cell_terms
+    # Independent binary64 cell-range calculation in the method note:
+    # the old ratio interval was approximately [0.1944, 0.6646], while
+    # using both integrals gives approximately [0.2266, 0.5180].
+    aep = fine.values[7].bounds
+    cdf = fine.values[6].bounds
+    assert aep is not None and cdf is not None
+    assert Decimal("0.22") < aep.lower <= aep.upper < Decimal("0.53")
+    assert aep.lower + cdf.lower <= 1 <= aep.upper + cdf.upper
+    assert fine.reserved_cell_terms == 20696 <= fine.controls.maximum_cell_terms
+    # A budget that covers the former single-numerator reservation cannot
+    # silently admit the added complementary integrands.
+    with pytest.raises(CensoredReferenceError, match="cell-term budget"):
+        estimated_scale_reference(inputs, replace(_controls(2), maximum_cell_terms=16600), requests)
 
 
 def test_reflection_and_untruncated_tails() -> None:

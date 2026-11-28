@@ -287,11 +287,28 @@ def _tail(a: _Arithmetic, base: _Base, request: EstimatedScaleRequest, mass: Ref
     return ReferenceBounds(upper.copy_negate() if request.kind in _MEANS else Decimal(0), upper)
 
 
+def _tighten_probability(
+    a: _Arithmetic, value: ReferenceBounds, numerator: ReferenceBounds, complement: ReferenceBounds
+) -> ReferenceBounds:
+    # The two integrals sum to the same positive normalizer. The ratio is
+    # increasing in its numerator and decreasing in its complement.
+    lower = Decimal(0)
+    if numerator.lower > 0:
+        n = _point(numerator.lower)
+        lower = a.div(n, a.add(n, _point(complement.upper))).lower
+    upper = Decimal(1)
+    if complement.lower > 0:
+        n = _point(numerator.upper)
+        upper = a.div(n, a.add(n, _point(complement.lower))).upper
+    return _probability(ReferenceBounds(max(value.lower, lower), min(value.upper, upper)))
+
+
 def _finish(
     a: _Arithmetic,
     base: _Base,
     request: EstimatedScaleRequest,
     total: ReferenceBounds,
+    complement_total: ReferenceBounds | None,
     reason: str | None,
     normalizer: ReferenceBounds,
     omitted: ReferenceBounds,
@@ -299,9 +316,10 @@ def _finish(
     if reason is not None or normalizer.lower <= 0:
         return EstimatedScaleValue(request, None, reason or "positive normalizer lower bound unresolved")
     try:
-        value = a.div(a.add(total, _tail(a, base, request, omitted)), normalizer)
-        if request.kind in _FLOW | _INDICATORS:
-            value = _probability(value)
+        numerator = a.add(total, _tail(a, base, request, omitted))
+        value = a.div(numerator, normalizer)
+        if complement_total is not None:
+            value = _tighten_probability(a, _probability(value), numerator, a.add(complement_total, omitted))
     except (CensoredReferenceError, DecimalException) as exc:
         return EstimatedScaleValue(request, None, f"reference output enclosure unresolved: {exc}")
     return EstimatedScaleValue(request, value)
@@ -312,9 +330,10 @@ def _accumulate(
     base: _Base,
     requests: tuple[EstimatedScaleRequest, ...],
     panels: tuple[tuple[ReferenceBounds, ReferenceBounds], ...],
-) -> tuple[ReferenceBounds, list[ReferenceBounds], list[str | None]]:
+) -> tuple[ReferenceBounds, list[ReferenceBounds], list[ReferenceBounds | None], list[str | None]]:
     normalizer = _ZERO
     totals = [_ZERO for _ in requests]
+    complements = [_ZERO if request.kind in _FLOW | _INDICATORS else None for request in requests]
     reasons: list[str | None] = [None for _ in requests]
     for x in panels:
         for y in panels:
@@ -324,12 +343,16 @@ def _accumulate(
                 if reasons[i] is not None:
                     continue
                 try:
-                    totals[i] = a.add(totals[i], a.mul(cell.mass, _integrand(a, base, request, cell)))
+                    integrand = _integrand(a, base, request, cell)
+                    totals[i] = a.add(totals[i], a.mul(cell.mass, integrand))
+                    complement = complements[i]
+                    if complement is not None:
+                        complements[i] = a.add(complement, a.mul(cell.mass, _probability(a.sub(_ONE, integrand))))
                 except (CensoredReferenceError, DecimalException) as exc:
                     reasons[i] = f"reference output enclosure unresolved: {exc}"
         # Bound memoization to a single outer panel rather than every 2D cell.
         a.sf_cache.clear()
-    return normalizer, totals, reasons
+    return normalizer, totals, complements, reasons
 
 
 def estimated_scale_reference(
@@ -342,8 +365,9 @@ def estimated_scale_reference(
     Cell terms are reserved before density or probability evaluation. The
     omitted region is enclosed analytically; never substitute a truncated target.
     """
+    complement_terms = sum(request.kind in _FLOW | _INDICATORS for request in requests)
     reserved = (
-        controls.cells * (1 + len(inputs.exact_flows) + len(inputs.censor_events) + len(requests))
+        controls.cells * (1 + len(inputs.exact_flows) + len(inputs.censor_events) + len(requests) + complement_terms)
         + 2 * controls.axis_cells
         + len(inputs.exact_flows)
         + 2 * len(inputs.censor_events)
@@ -360,7 +384,7 @@ def estimated_scale_reference(
         a = _Arithmetic()
         base = _base(a, inputs)
         panels = _panels(a, controls)
-        interior, totals, reasons = _accumulate(a, base, requests, panels)
+        interior, totals, complements, reasons = _accumulate(a, base, requests, panels)
         # Two independent standard coordinates; union bound, no correlation assumption on mu/eta.
         omitted = ReferenceBounds(
             Decimal(0), min(Decimal(1), a.mul(_point(4), a.sf(_point(controls.extent))).upper)
@@ -370,7 +394,7 @@ def estimated_scale_reference(
         msg = "estimated-scale partition or base is not representable"
         raise CensoredReferenceError(msg) from exc
     values = tuple(
-        _finish(a, base, request, total, reason, normalizer, omitted)
-        for request, total, reason in zip(requests, totals, reasons, strict=True)
+        _finish(a, base, request, total, complement, reason, normalizer, omitted)
+        for request, total, complement, reason in zip(requests, totals, complements, reasons, strict=True)
     )
     return EstimatedScaleReference(inputs, controls, base.mean, normalizer, omitted, reserved, values)

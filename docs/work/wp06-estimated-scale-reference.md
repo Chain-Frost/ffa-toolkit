@@ -81,10 +81,12 @@ not the omitted-tail proof.
 With extent 4, 64 versus 1024 cells, all ten enclosures narrowed and
 contained the independent references. The normalizer narrowed from
 [0.01118965,0.11382479] to approximately [0.03400252,0.05944271].
-The 1024-cell expected AEP enclosure is still broad, approximately
-[0.19443837,0.66457238]. Do not claim that this grid supplies useful
-engineering precision. The omitted Gaussian mass upper bound is
-0.000126685. The coarse/fine cell-term reservations are 1192 and 16600.
+The original 1024-cell expected AEP enclosure was broad, approximately
+[0.19443837,0.66457238]. The complementary-numerator tightening below
+addresses some of the shared-normalizer dependency. Do not claim that
+this grid supplies useful engineering precision. The omitted Gaussian
+mass upper bound is 0.000126685. The original coarse/fine cell-term
+reservations were 1192 and 16600; the new reservations are 1448 and 20696.
 
 Four focused pytest tests passed in 7.77 seconds on local Python 3.13.5
 against a locally transcribed excerpt of the accepted interval arithmetic,
@@ -94,6 +96,43 @@ Decimal context isolation, exact-only unit scaling and direct rare AEP,
 invalid covariances, duplicate requests, and both resource caps.
 The independent quadrature and this focused harness do not replace
 testing the complete repository on Python 3.11 and 3.14.
+
+## Complementary numerator tightening
+
+For a bounded probability integrand h in [0,1], let N=E*[W h] and
+C=E*[W(1-h)]. They share exactly the same positive normalizer Z=N+C.
+The ratio N/(N+C) is increasing in N and decreasing in C. Given
+nonnegative enclosures [Nlo,Nhi] and [Clo,Chi], it therefore lies in
+
+    [Nlo/(Nlo+Chi), Nhi/(Nhi+Clo)].
+
+Use zero for the lower endpoint if Nlo=0, and one for the upper
+endpoint if Clo=0. Intersect this bound with the existing interval
+N/Z, using the same directed Decimal arithmetic. This is valid
+even if the interval estimates of N and C are dependent: optimizing
+over their containing rectangle is conservative. The primary
+integrand is still evaluated directly (SF for AEP), never as
+1 minus a rounded CDF. The complementary integrand is computed
+from the enclosed primary range with outward subtraction. Both
+omitted contributions are separately in [0,T]; no tail mass is
+discarded. Reserve a further cell term per bounded request per cell
+before evaluating the partition. No new Normal probability calls
+or adaptive refinement are needed.
+
+Independent local binary64 evaluation of the synthetic 1024-cell
+case gives N/Z in [0.194438368,0.664572379] before tightening and
+[0.226602723,0.517987975] after intersecting the complementary ratio:
+a reduction in width of 38.02%, not a claim that the interval is
+sufficient for a requested precision tolerance. A separate local
+exact-Fraction test with 10,000 fixed-seed nonnegative numerator
+and complement intervals verified that their interior ratios lie
+in the derived bounds. The revised committed tests also require
+both the direct AEP and the CDF enclosures to retain the independent
+reference and complement identity, enforce the new resource
+reservation and reject the previous insufficient budget. These
+updated repository tests still require execution and independent
+review; the earlier four-test harness receipt refers to the
+original candidate before this change.
 
 ## Required next checks
 
