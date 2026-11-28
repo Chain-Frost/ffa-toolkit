@@ -5,13 +5,22 @@ not posterior uncertainty, general convergence certification or native defaults.
 """
 
 from dataclasses import dataclass, replace
+from decimal import Decimal
 from enum import StrEnum
 from math import erfc, exp, fsum, hypot, inf, isfinite, log, nextafter, sqrt
 from statistics import NormalDist
 from typing import Literal
 
 from ffa_methods.bayesian_outputs import ImportanceParticles, predictive_quantile, weighted_quantile
+from ffa_methods.censored_reference import (
+    CensoredReferenceError,
+    ReferenceBounds,
+    ReferenceControls,
+    ReferenceKind,
+    ReferenceRequest,
+)
 from ffa_methods.contracts import EvidenceStatus, ObservationKind, ResultMeaning, RunProvenance
+from ffa_methods.importance_censor_reference import BoundFixedScaleReference, bound_fixed_scale_reference
 from ffa_methods.importance_ratio_envelope import RatioEnvelopeError, normalized_log_ratio_bound
 from ffa_methods.importance_reflection_reference import (
     has_reflection_symmetry,
@@ -143,6 +152,7 @@ class PrecisionPlan:
     minimum_side_ess: float
     maximum_log_ratio: float
     criterion_source: str
+    censored_reference_controls: ReferenceControls | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -265,7 +275,7 @@ class ScalarCheck:
     interval: Bounds | None
     positive: SideResolution
     negative: SideResolution
-    reference: float | None
+    reference: float | ReferenceBounds | None
     reason: str | None = None
 
 
@@ -292,7 +302,7 @@ def _weighted_mean(particles: ImportanceParticles, values: tuple[float, ...]) ->
 def _scalar_check(
     particles: ImportanceParticles,
     values: tuple[float, ...],
-    reference: float | None,
+    reference: float | ReferenceBounds | None,
     plan: PrecisionPlan,
     critical: float,
 ) -> ScalarCheck:
@@ -581,6 +591,7 @@ class OutputCheck:
     reason: str | None = None
     centering_mean: float | None = None
     integration_interval: Bounds | None = None
+    reference_interval: ReferenceBounds | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -763,6 +774,24 @@ def _audit_output(
     model: ClassifiedLognormalPosterior,
     particles: ImportanceParticles,
     request: PrecisionRequest,
+    admission: NormalAdmission | ReflectionAdmission | BoundFixedScaleReference,
+    plan: PrecisionPlan,
+    critical: float,
+    primary: OutputCheck | None,
+    *,
+    is_primary: bool,
+) -> OutputCheck:
+    if isinstance(admission, BoundFixedScaleReference):
+        return _audit_censored_scalar(
+            model, particles, request, admission, plan, critical, primary, is_primary=is_primary
+        )
+    return _audit_point_reference(model, particles, request, admission, plan, critical, primary, is_primary=is_primary)
+
+
+def _audit_point_reference(
+    model: ClassifiedLognormalPosterior,
+    particles: ImportanceParticles,
+    request: PrecisionRequest,
     admission: NormalAdmission | ReflectionAdmission,
     plan: PrecisionPlan,
     critical: float,
@@ -824,6 +853,96 @@ def _audit_output(
         return OutputCheck(request, PrecisionState.EXECUTION_FAILED, None, reference, window, reason=str(exc))
 
 
+def _censored_scalar_request(request: PrecisionRequest) -> ReferenceRequest | None:
+    if request.meaning == "parameter_mean":
+        return ReferenceRequest(kind=ReferenceKind.MEAN_MU)
+    if request.meaning in (_AEP, _CDF):
+        kind = ReferenceKind.EXPECTED_AEP if request.meaning == _AEP else ReferenceKind.EXPECTED_F
+        return ReferenceRequest(kind=kind, argument=_discharge(request))
+    return None
+
+
+def _reference_containment(window: Bounds, reference: ReferenceBounds) -> PrecisionState:
+    # These conversions must bypass ambient FloatOperation traps.
+    lower = Decimal.from_float(window.lower)  # noqa: FURB164
+    upper = Decimal.from_float(window.upper)  # noqa: FURB164
+    if lower <= reference.lower and reference.upper <= upper:
+        return PrecisionState.CONDITIONAL_PASS
+    if reference.upper < lower or upper < reference.lower:
+        return PrecisionState.CRITERIA_NOT_MET
+    return PrecisionState.INDETERMINATE
+
+
+def _audit_censored_scalar(
+    model: ClassifiedLognormalPosterior,
+    particles: ImportanceParticles,
+    request: PrecisionRequest,
+    admission: BoundFixedScaleReference,
+    plan: PrecisionPlan,
+    critical: float,
+    primary: OutputCheck | None,
+    *,
+    is_primary: bool,
+) -> OutputCheck:
+    identity = _censored_scalar_request(request)
+    value = next((value for value in admission.reference.values if value.request == identity), None)
+    if value is None or value.bounds is None:
+        reason = value.reason if value is not None else "censored precision route is not admitted"
+        return OutputCheck(request, PrecisionState.INDETERMINATE, None, None, None, reason=reason)
+    reference = value.bounds
+    estimate: float | None = None
+    window = primary.window if primary is not None else None
+    try:
+        sample = _sample_output(model, particles, request)
+        estimate = sample.estimate
+        if is_primary:
+            window = _window(estimate, request.absolute_tolerance)
+            state = _reference_containment(window, reference)
+            reason = (
+                "reference enclosure straddles the precision window" if state == PrecisionState.INDETERMINATE else None
+            )
+            return OutputCheck(request, state, estimate, None, window, reason=reason, reference_interval=reference)
+        if window is None:
+            return OutputCheck(
+                request,
+                PrecisionState.INDETERMINATE,
+                estimate,
+                None,
+                None,
+                reason="primary precision window unavailable",
+                reference_interval=reference,
+            )
+        check = _scalar_check(particles, sample.values, reference, plan, critical)
+        interval = check.interval
+        reason = check.reason
+        state = PrecisionState.INDETERMINATE
+        if interval is not None:
+            state = _reference_containment(interval, reference)
+            if state == PrecisionState.INDETERMINATE:
+                reason = "reference enclosure straddles the stochastic interval"
+            if not (window.contains(interval.lower) and window.contains(interval.upper) and window.contains(estimate)):
+                state = PrecisionState.CRITERIA_NOT_MET
+                reason = None
+        return OutputCheck(
+            request,
+            state,
+            estimate,
+            None,
+            window,
+            (check,),
+            reason=reason,
+            integration_interval=interval,
+            reference_interval=reference,
+        )
+    except PrecisionUnavailableError as exc:
+        state = PrecisionState.INDETERMINATE
+        reason = str(exc)
+    except (ArithmeticError, ValueError) as exc:
+        state = PrecisionState.EXECUTION_FAILED
+        reason = str(exc)
+    return OutputCheck(request, state, estimate, None, window, reason=reason, reference_interval=reference)
+
+
 def _output_decision(
     request: PrecisionRequest, sample: SampleOutput, reference: float, window: Bounds, decision: AuditDecision
 ) -> OutputCheck:
@@ -872,6 +991,7 @@ class PrecisionAudit:
     reserved_evaluations: int
     critical_value: float
     attempts: tuple[Attempt, ...]
+    censored_reference: BoundFixedScaleReference | None = None
 
     @property
     def attempted_count(self) -> int:
@@ -951,6 +1071,23 @@ def _aggregate(states: tuple[PrecisionState, ...]) -> PrecisionState:
     return PrecisionState.CONDITIONAL_PASS
 
 
+def _prepare_censored_reference(
+    model: ClassifiedLognormalPosterior,
+    proposal: ExplicitNormalProposal,
+    plan: PrecisionPlan,
+    controls: ReferenceControls,
+    requests: tuple[PrecisionRequest, ...],
+) -> BoundFixedScaleReference:
+    reference_requests = tuple(
+        dict.fromkeys(mapped for request in requests if (mapped := _censored_scalar_request(request)) is not None)
+    )
+    if not reference_requests:
+        msg = "no requested censored precision route is admitted"
+        raise PrecisionUnavailableError(msg)
+    controls = replace(controls, maximum_log_ratio=min(controls.maximum_log_ratio, plan.maximum_log_ratio))
+    return bound_fixed_scale_reference(model=model, proposal=proposal, controls=controls, requests=reference_requests)
+
+
 def _unavailable(request: PrecisionRequest, model: ClassifiedLognormalPosterior, reason: str) -> OutputCheck:
     if model.fixed_log_sd is None and request.meaning == _MEAN and _level(request.non_exceedance) > 0.5:
         return OutputCheck(
@@ -974,8 +1111,9 @@ def audit_lognormal_precision(
 ) -> PrecisionAudit:
     """Execute one fixed primary and every scheduled audit stream; no adaptive stopping.
 
-    The exact fixed-scale route and the restricted reflection route require
-    independent analytical references and a normalized ratio envelope.
+    Explicit deterministic reference controls select the general fixed-scale censor route.
+    Without those controls, nonconjugate cases require exact reflection. Both routes
+    require a normalized ratio ceiling. Conjugate models use the exact-record gate.
     """
     reserved, critical = plan.preflight(requests)
     if (
@@ -986,21 +1124,43 @@ def audit_lognormal_precision(
         msg = "audit provenance or proposal does not identify the bound source model"
         raise ValueError(msg)
     admission: NormalAdmission | ReflectionAdmission | None = None
+    censored: BoundFixedScaleReference | None = None
+    reason: str | None = None
     try:
-        if _needs_nonconjugate_admission(model):
+        controls = plan.censored_reference_controls
+        if (
+            controls is not None
+            and model.fixed_log_sd is not None
+            and any(
+                row.kind
+                in (ObservationKind.LEFT_CENSORED, ObservationKind.RIGHT_CENSORED, ObservationKind.INTERVAL_CENSORED)
+                for row in model.series.annual
+            )
+        ):
+            censored = _prepare_censored_reference(model, proposal, plan, controls, requests)
+            if not censored.reference.ratio_eligible:
+                reason = censored.reference.ratio_reason or "normalized ratio enclosure unavailable"
+            elif all(value.bounds is None for value in censored.reference.values):
+                reason = "no requested deterministic reference enclosure resolved"
+        elif _needs_nonconjugate_admission(model):
             admission = _reflection_admit(model, proposal, plan, requests)
         else:
             admission = _admit(model, proposal, plan)
-    except (PrecisionUnavailableError, RatioEnvelopeError, ArithmeticError) as exc:
-        admission = None
-        outputs = tuple(_unavailable(request, model, str(exc)) for request in requests)
+    except (PrecisionUnavailableError, CensoredReferenceError, RatioEnvelopeError, ArithmeticError) as exc:
+        reason = str(exc)
+    executable = admission or censored
+    if reason is not None or executable is None:
+        reason = reason or "precision admission unavailable"
+        outputs = tuple(_unavailable(request, model, reason) for request in requests)
         attempts = tuple(
-            Attempt(seed, plan.primary.draw_count, None, False, None, None, None, outputs, str(exc))
+            Attempt(seed, plan.primary.draw_count, None, False, None, None, None, outputs, reason)
             for seed in plan.seeds
         )
     else:
-        attempts = _run_attempts(model, proposal, provenance, plan, requests, admission, critical)
-    return PrecisionAudit(model, proposal, provenance, plan, requests, admission, reserved, critical, attempts)
+        attempts = _run_attempts(model, proposal, provenance, plan, requests, executable, critical)
+    return PrecisionAudit(
+        model, proposal, provenance, plan, requests, admission, reserved, critical, attempts, censored
+    )
 
 
 def _run_attempts(
@@ -1009,7 +1169,7 @@ def _run_attempts(
     provenance: RunProvenance,
     plan: PrecisionPlan,
     requests: tuple[PrecisionRequest, ...],
-    admission: NormalAdmission | ReflectionAdmission,
+    admission: NormalAdmission | ReflectionAdmission | BoundFixedScaleReference,
     critical: float,
 ) -> tuple[Attempt, ...]:
     attempts: list[Attempt] = []
@@ -1022,7 +1182,9 @@ def _run_attempts(
             )
         except (ArithmeticError, ValueError) as exc:
             failed = tuple(
-                _unavailable(request, model, str(exc))
+                _unavailable(request, model, "censored precision route is not admitted")
+                if isinstance(admission, BoundFixedScaleReference) and _censored_scalar_request(request) is None
+                else _unavailable(request, model, str(exc))
                 if model.fixed_log_sd is None and request.meaning == _MEAN and _level(request.non_exceedance) > 0.5
                 else OutputCheck(request, PrecisionState.EXECUTION_FAILED, None, None, None, reason=str(exc))
                 for request in requests
