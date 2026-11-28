@@ -125,3 +125,5 @@ acceptance evidence.
 ## Integration coordination
 
 Base `affc0315e96978c22930cdb0776f90fca2f9528b` includes #31. Concurrent PRs #32/#34/#35 update the registry, #35 updates the calculation matrix, and #36 updates the CLI, formatter, packaging, installed smoke and guidance. Reconcile these shared files against the actual latest main before validation. Preserve #36's deterministic-only plot admission, the Bayesian output-specific audit and both sets of example resources and tests. No existing branch or main has been overwritten.
+
+The same installed `ffa fit` and source-snapshot reporting path also accepts [bounded estimated-shape GEV and LP3 settings](wp06-estimated-shape.md).

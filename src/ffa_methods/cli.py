@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from ffa_methods import __version__
-from ffa_methods.bayesian_workflow import BAYESIAN_SCHEMA
+from ffa_methods.bayesian_workflow import BAYESIAN_SCHEMA, BAYESIAN_SCHEMAS, SHAPE_SCHEMA
 from ffa_methods.deterministic_workflow import ORDINARY_SCHEMA, calculate_from_bytes
 from ffa_methods.guidance import explain, method_manual, references
 from ffa_methods.reporting import validate_output_path, write_report_bundle
@@ -20,7 +20,7 @@ def make_parser() -> argparse.ArgumentParser:
         description="FFA Toolkit: independent flood frequency analysis CLI.",
         epilog=(
             "Explicit settings for complete positive annual maxima support fixed-H GEV and ordinary L-moment fits, "
-            "selected-H GEV and parametric bootstrap. Explicit lognormal Bayesian fitting is also available."
+            "selected-H GEV and parametric bootstrap. Explicit lognormal and bounded-shape GEV/LP3 Bayesian fits are available."
         ),
     )
     parser.add_argument(
@@ -47,7 +47,7 @@ def make_parser() -> argparse.ArgumentParser:
     fit_parser = commands.add_parser(
         "fit",
         allow_abbrev=False,
-        help="Fit explicit deterministic or lognormal Bayesian mathematics (unqualified)",
+        help="Fit explicit deterministic or configured Bayesian mathematics (unqualified)",
         description="Requires explicit JSON settings and admitted annual observations; see ffa explain quantile-estimands.",
     )
     fit_parser.add_argument("--ams", required=True, type=Path, metavar="ANNUAL_OBSERVATIONS_CSV")
@@ -92,7 +92,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             result, settings = calculate_from_bytes(raw_ams, raw_settings)
             source_inputs = (
                 (raw_ams, raw_settings)
-                if args.frequency_report or settings["schema_version"] in (ORDINARY_SCHEMA, BAYESIAN_SCHEMA)
+                if args.frequency_report or settings["schema_version"] in (ORDINARY_SCHEMA, *BAYESIAN_SCHEMAS)
                 else None
             )
             paths = write_report_bundle(
@@ -114,6 +114,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             return 2
         mode = "lognormal Bayesian" if settings["schema_version"] == BAYESIAN_SCHEMA else "deterministic"
+        if settings["schema_version"] == SHAPE_SCHEMA:
+            mode = "bounded-shape Bayesian"
         print(f"Independent {mode} mathematical fit only — not native Flike-qualified. Reports: {paths[0].parent}")
         return 0
     parser.error("no command selected; use fit, explain, references or --help")

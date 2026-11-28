@@ -91,27 +91,17 @@ def _check_censor(row: AnnualObservation) -> None:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class _ClassifiedFamilyPosterior(ABC):
-    """Shared source, fixed-shape and supplied-prior contract."""
+class ClassifiedFamilySource:
+    """Explicitly classified systematic GEV or LP3 annual observations."""
 
-    version: ClassVar[str]
     family: PosteriorFamily
     series: ObservationSeries
     source: str
     source_sha256: str
     source_classification: str
-    fixed_shape: float
     reference_discharge: float | None
-    prior: JointGaussianPrior
 
-    def __post_init__(self) -> None:
-        self._validate_source()
-        self._validate_model()
-        if self.prior.mode != LegacyPriorMode.SUPPLIED or self.prior.coordinates != self.coordinates:
-            msg = "a supplied Gaussian prior must use the exact free family coordinate"
-            raise PosteriorBindingError(msg)
-
-    def _validate_source(self) -> None:
+    def validate_source(self) -> None:
         if (
             self.source_classification != SOURCE_CLASSIFICATION
             or not self.source.strip()
@@ -132,6 +122,20 @@ class _ClassifiedFamilyPosterior(ABC):
             _check_row(row)
         if not any(row.kind not in (ObservationKind.MISSING, ObservationKind.EXCLUDED) for row in self.series.annual):
             msg = "posterior binding requires at least one included observation"
+            raise PosteriorBindingError(msg)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _ClassifiedFamilyPosterior(ClassifiedFamilySource, ABC):
+    version: ClassVar[str]
+    fixed_shape: float
+    prior: JointGaussianPrior
+
+    def __post_init__(self) -> None:
+        self.validate_source()
+        self._validate_model()
+        if self.prior.mode != LegacyPriorMode.SUPPLIED or self.prior.coordinates != self.coordinates:
+            msg = "a supplied Gaussian prior must use the exact free family coordinate"
             raise PosteriorBindingError(msg)
 
     def _validate_model(self) -> None:
@@ -253,7 +257,7 @@ class ClassifiedEstimatedScalePosterior(_ClassifiedFamilyPosterior):
         return EstimatedScaleKernel(self._raw_kernel(*values))
 
 
-def _exact_series(data: bytes, discharge_unit: str, year_definition: str) -> ObservationSeries:
+def exact_family_series(data: bytes, discharge_unit: str, year_definition: str) -> ObservationSeries:
     rows: list[AnnualObservation] = []
     for record in parse_ams_csv(data):
         if record.kind != LegacyObservationKind.EXACT or record.value is None:
@@ -292,7 +296,7 @@ def bind_exact_fixed_family_csv(
     """Read original Year,AMS bytes without dropping or coercing observations."""
     return ClassifiedFixedFamilyPosterior(
         family=family,
-        series=_exact_series(data, discharge_unit, year_definition),
+        series=exact_family_series(data, discharge_unit, year_definition),
         source=source,
         source_sha256=sha256(data).hexdigest(),
         source_classification=source_classification,
@@ -318,7 +322,7 @@ def bind_exact_estimated_scale_csv(
     """Read original Year,AMS bytes without dropping or coercing observations."""
     return ClassifiedEstimatedScalePosterior(
         family=family,
-        series=_exact_series(data, discharge_unit, year_definition),
+        series=exact_family_series(data, discharge_unit, year_definition),
         source=source,
         source_sha256=sha256(data).hexdigest(),
         source_classification=source_classification,

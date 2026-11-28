@@ -124,6 +124,7 @@ class QuantileOutputs:
     lower_limit_effective_size: float
     upper_limit_effective_size: float
     mean_undefined_reason: str | None = None
+    log_undefined_reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -372,6 +373,7 @@ def quantile_outputs(
     *,
     interval_mass: float,
     mean_undefined_reason: str | None = None,
+    log_undefined_reason: str | None = None,
 ) -> QuantileOutputs:
     """Compute separate posterior quantile estimands and explicit log10 warnings."""
     _level(non_exceedance)
@@ -391,7 +393,7 @@ def quantile_outputs(
     lower_limit = weighted_quantile(quantiles, weights, tail)
     upper_limit = weighted_quantile(quantiles, weights, 1.0 - tail)
     nonpositive = fsum(w for w, q in zip(weights, quantiles, strict=True) if q <= 0)
-    if nonpositive:
+    if nonpositive or log_undefined_reason:
         mean_log = sd_log = None
     else:
         log_quantiles = tuple(log10(q) if w > 0 else 0.0 for w, q in zip(weights, quantiles, strict=True))
@@ -413,6 +415,7 @@ def quantile_outputs(
         lower_limit_effective_size=tail_effective_sample_size(weights, quantiles, lower_limit, upper=False),
         upper_limit_effective_size=tail_effective_sample_size(weights, quantiles, upper_limit, upper=True),
         mean_undefined_reason=mean_undefined_reason,
+        log_undefined_reason=log_undefined_reason,
     )
 
 

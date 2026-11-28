@@ -24,6 +24,7 @@ from ffa_methods.contracts import (
     RunDiagnostic,
     RunProvenance,
 )
+from ffa_methods.family_posterior import PosteriorFamily, exact_family_series
 from ffa_methods.importance_precision import PrecisionPlan, PrecisionRequest, audit_lognormal_precision
 from ffa_methods.importance_proposal import CurvatureControls, build_curvature_proposal
 from ffa_methods.importance_sampling import ExplicitSamplingControls, independent_importance_sample
@@ -35,9 +36,12 @@ from ffa_methods.lognormal_posterior import (
     bind_exact_lognormal_csv,
 )
 from ffa_methods.priors import JointGaussianPrior, LegacyPriorMode
+from ffa_methods.shape_posterior import BoundedShapePrior, ClassifiedShapePosterior, execute_shape_posterior
 from ffa_methods.wp06_report_bridge import wp06_output_analysis_result
 
 BAYESIAN_SCHEMA = "ffa-lognormal-bayesian/1"
+SHAPE_SCHEMA = "ffa-bounded-shape-bayesian/1"
+BAYESIAN_SCHEMAS = (BAYESIAN_SCHEMA, SHAPE_SCHEMA)
 METHOD_VERSION = "explicit-lognormal-bayesian-cli/1"
 _FIELDS = frozenset(
     {
@@ -310,20 +314,20 @@ def _precision(
     return AuditSettings(plan, requests, report_reservation)
 
 
-def _csv_flow(token: str) -> float | None:
+def _csv_flow(token: str, *, retained_excluded: bool = False) -> float | None:
     if token == "":
         return None
     if fullmatch(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?", token) is None:
         msg = "classified CSV flow must be a decimal number or an explicitly empty cell"
         raise ValueError(msg)
     value = float(token)
-    if not isfinite(value) or value <= 0:
+    if not isfinite(value) or (value <= 0 and not retained_excluded):
         msg = "classified CSV nonempty flow and bound cells must be strictly positive finite binary64 values"
         raise ValueError(msg)
     return value
 
 
-def _classified_rows(data: bytes) -> tuple[AnnualObservation, ...]:
+def _classified_rows(data: bytes, *, retain_excluded_value: bool = False) -> tuple[AnnualObservation, ...]:
     """Strict explicit per-year classifications; never interpret native flags."""
     if b"\x00" in data:
         msg = "classified CSV contains NUL bytes"
@@ -344,7 +348,9 @@ def _classified_rows(data: bytes) -> tuple[AnnualObservation, ...]:
                     year=int(year),
                     kind=ObservationKind(kind),
                     exposure=ExposureKind.SYSTEMATIC,
-                    value=_csv_flow(value),
+                    value=_csv_flow(
+                        value, retained_excluded=retain_excluded_value and kind == ObservationKind.EXCLUDED
+                    ),
                     lower_bound=_csv_flow(lower),
                     upper_bound=_csv_flow(upper),
                 )
@@ -402,6 +408,8 @@ def calculate_bayesian(
     raw_ams: bytes, raw_settings: bytes, values: dict[str, object]
 ) -> tuple[AnalysisResult, dict[str, str | int | float | bool | None]]:
     """Compose the admitted target, scaled proposal, actual sampler and typed report."""
+    if values.get("schema_version") == SHAPE_SCHEMA:
+        return _calculate_shape(raw_ams, raw_settings, values)
     v = _object(values, _FIELDS, name="Bayesian settings")
     if v["schema_version"] != BAYESIAN_SCHEMA or v["estimator"] != "lognormal_bayesian":
         msg = "explicit Bayesian lognormal schema and estimator are required"
@@ -539,3 +547,145 @@ def calculate_bayesian(
         settings["precision_scheduled_draws_including_report"] = audit.plan.total_draws + sampling.draw_count
         settings["precision_report_scalar_reservation"] = audit_settings.report_scalar_reservation
     return result, settings
+
+
+def _shape_prior(raw: object) -> BoundedShapePrior:
+    v = _object(
+        raw, frozenset({"law", "coordinates", "means", "lower_factor", "shape_bounds", "source"}), name="shape prior"
+    )
+    if v["law"] != "gaussian_scaled_logit":
+        msg = "bounded shape requires a supplied gaussian_scaled_logit law"
+        raise ValueError(msg)
+    bounds = _vector(v["shape_bounds"], name="shape bounds")
+    if len(bounds) != 2:
+        msg = "two shape bounds are required"
+        raise ValueError(msg)
+    return BoundedShapePrior(
+        coordinates=tuple(
+            _text(c, name="prior coordinate") for c in _items(v["coordinates"], name="coordinates", maximum=3)
+        ),
+        means=_vector(v["means"], name="latent means", maximum=3),
+        lower_factor=tuple(
+            _vector(row, name="factor row", maximum=3) for row in _items(v["lower_factor"], name="factor", maximum=3)
+        ),
+        bounds=(bounds[0], bounds[1]),
+        source=_text(v["source"], name="prior source"),
+    )
+
+
+def _shape_model(data: bytes, v: dict[str, object]) -> ClassifiedShapePosterior:
+    estimator = _text(v["estimator"], name="estimator")
+    families = {"gev_bayesian": PosteriorFamily.GEV, "lp3_bayesian": PosteriorFamily.LP3}
+    if estimator not in families:
+        msg = "expected gev_bayesian or lp3_bayesian for bounded-shape inference"
+        raise ValueError(msg)
+    unit = _text(v["discharge_unit"], name="discharge unit")
+    year = _text(v["year_definition"], name="year definition")
+    if v["source_format"] == "classified_systematic_csv":
+        series = ObservationSeries(
+            discharge_unit=unit, year_definition=year, annual=_classified_rows(data, retain_excluded_value=True)
+        )
+    elif v["source_format"] == "year_ams_csv":
+        series = exact_family_series(data, unit, year)
+    else:
+        msg = "unsupported Bayesian source format"
+        raise ValueError(msg)
+    return ClassifiedShapePosterior(
+        family=families[estimator],
+        series=series,
+        source=_text(v["source"], name="source"),
+        source_classification=_text(v["source_classification"], name="source_classification"),
+        source_sha256=sha256(data).hexdigest(),
+        reference_discharge=_optional_number(v["reference_discharge"], name="reference discharge"),
+        prior=_shape_prior(v["prior"]),
+    )
+
+
+def _calculate_shape(
+    data: bytes, raw_settings: bytes, values: dict[str, object]
+) -> tuple[AnalysisResult, dict[str, str | int | float | bool | None]]:
+    v = _object(values, _FIELDS - {"fixed_log_sd"}, name="bounded shape settings")
+    model = _shape_model(data, v)
+    prop = _object(v["proposal"], frozenset({"law", "gamma"}), name="shape proposal")
+    if (
+        prop["law"] != "scaled_prior_innovations"
+        or _object(v["precision"], frozenset({"mode"}), name="shape precision")["mode"] != "not_assessed"
+    ):
+        msg = "shape inference requires scaled_prior_innovations and not_assessed output precision"
+        raise ValueError(msg)
+    gamma = _number(prop["gamma"], name="proposal gamma")
+    sampling = _sampling(v["sampling"])
+    outputs = _outputs(v["outputs"])
+    reasons = tuple(model.raw_mean_undefined_reason(p) for p in outputs.probabilities)
+    run = execute_shape_posterior(
+        model, gamma=gamma, sampling=sampling, settings_sha256=sha256(raw_settings).hexdigest()
+    )
+    warnings = ["Output-specific integration precision is unassessed. Posterior SDs describe parameter uncertainty."]
+    if model.family == PosteriorFamily.LP3:
+        warnings.append("All positive raw predictive discharge moments diverge under this unbounded log-scale prior.")
+    else:
+        warnings.append(
+            f"Predictive absolute moments of order h>0 exist exactly when h times upper EVT shape bound {model.prior.bounds[1]} is at most one."
+        )
+    probabilities = tuple(
+        probability_outputs(run.particles, q, model.kernel, interval_mass=outputs.interval_mass)
+        for q in outputs.discharges
+    )
+    if any(p.expected_aep == 0.0 or p.expected_non_exceedance == 0.0 for p in probabilities):
+        msg = "sampled mixture cannot resolve a mathematically positive expected tail"
+        raise ValueError(msg)
+    result = wp06_output_analysis_result(
+        provenance=run.particles.provenance,
+        parameters=run.moments.parameters,
+        discharge_unit=model.series.discharge_unit,
+        quantiles=tuple(
+            quantile_outputs(
+                run.particles,
+                p,
+                model.kernel,
+                interval_mass=outputs.interval_mass,
+                mean_undefined_reason=reason,
+                log_undefined_reason="the population assigns positive mass to nonpositive GEV design quantiles"
+                if model.family == PosteriorFamily.GEV
+                else None,
+            )
+            for p, reason in zip(outputs.probabilities, reasons, strict=True)
+        ),
+        probabilities=probabilities,
+        warnings=warnings,
+    )
+    diag = [
+        RunDiagnostic(
+            name="log_evidence_estimate", value=run.log_evidence, unit="log likelihood in declared flow units"
+        ),
+        RunDiagnostic(name="importance_effective_sample_size", value=run.moments.effective_sample_size, unit="count"),
+        RunDiagnostic(name="importance_largest_weight", value=run.moments.largest_weight, unit="fraction"),
+    ]
+    diag.extend(
+        RunDiagnostic(
+            name=f"covariance_{name}_{model.coordinates[j]}",
+            value=run.moments.covariance[i][j],
+            unit="product of named coordinate units",
+        )
+        for i, name in enumerate(model.coordinates)
+        for j in range(i, 3)
+    )
+    settings: dict[str, str | int | float | bool | None] = {
+        "schema_version": SHAPE_SCHEMA,
+        "estimator": _text(v["estimator"], name="estimator"),
+        "source": model.source,
+        "source_format": _text(v["source_format"], name="source_format"),
+        "source_classification": model.source_classification,
+        "year_definition": model.series.year_definition,
+        "discharge_unit": model.series.discharge_unit,
+        "reference_discharge": model.reference_discharge,
+        "prior": _json(v["prior"]),
+        "proposal": _json(prop),
+        "sampling": _json(v["sampling"]),
+        "outputs": _json(v["outputs"]),
+        "random_stream": run.particles.random_stream_description,
+        "precision_status": "not_assessed",
+        "source_ams_file": "source-ams.csv",
+        "source_settings_file": "source-settings.json",
+    }
+    return replace(result, diagnostics=tuple(diag)), settings

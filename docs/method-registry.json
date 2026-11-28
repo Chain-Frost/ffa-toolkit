@@ -400,12 +400,13 @@
         "Bounded known-scale exact-record precision audit against conjugate Normal reference outputs, centered residual MCSE, simultaneous inverse and transformed intervals, reproducibility and retained unsuccessful attempts",
         "Censored and estimated-scale scalar regressions, strict Gaussian moment conditions, and bounded normalized-ratio admission for exactly reflected records with independently known scalar references",
         "Fixed-scale/fixed-shape GEV and LP3 location-only binding with independent density/censor and posterior quadrature regression cases",
-        "Fixed-shape GEV and LP3 estimated log-scale: joint supplied Gaussian, six independent 2D references for evidence, means, covariance and expected AEP, moving support, tied years and unit/reference transforms"
+        "Fixed-shape GEV and LP3 estimated log-scale: joint supplied Gaussian, six independent 2D references for evidence, means, covariance and expected AEP, moving support, tied years and unit/reference transforms",
+        "Bounded estimated-shape GEV and LP3 with correlated scaled-logit prior, physical density Jacobian, 36 independent 3D posterior comparisons, CLI and clean installed-wheel evidence"
       ],
       "evidence_gaps": [
         "Independent local curvature, explicit full covariance scaling, Normal importance draws, explicit lognormal binding and a bounded known-scale exact-record precision audit are composed in the installed issue #6 lognormal CLI workflow. Broader model/exposure precision admission and native comparison remain outstanding.",
         "The internal API also supports explicitly configured fixed-scale censored parameter mean and expected CDF/direct AEP using complete deterministic enclosures. An additional route admits exactly reflected fixed- or estimated-scale lognormal records for independently known scalars. General censored transformed/inverse outputs, broad estimated-scale precision remain outstanding.",
-        "GEV and LP3 posterior bindings cover location-only and estimated-log-scale inference with explicitly fixed shape. See wp06-fixed-family-posterior.md and wp06-estimated-scale.md for evidence and remaining limitations. Installed family workflows and family-specific precision admission are pending.",
+        "GEV and LP3 posterior bindings cover location-only and estimated-log-scale inference with explicitly fixed shape. See wp06-fixed-family-posterior.md and wp06-estimated-scale.md for evidence and remaining limitations. The installed bounded-shape workflow is documented in wp06-estimated-shape.md. Fixed-shape installed adapters and family-specific precision admission remain pending.",
         "Actual native Flike optimizer/proposal, random controls, stopping and output interpolation are not established; external native qualification remains separate.",
         "ESS, approximate mean Monte Carlo standard error, and independent seeds do not by themselves validate extreme-tail flood estimates or native equivalence."
       ],

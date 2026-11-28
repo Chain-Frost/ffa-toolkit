@@ -20,6 +20,7 @@ from stat import FILE_ATTRIBUTE_REPARSE_POINT, S_ISDIR, S_ISLNK
 from typing import TypeAlias, cast
 
 from ffa_methods import __version__
+from ffa_methods.bayesian_workflow import BAYESIAN_SCHEMAS
 from ffa_methods.compatibility import LEGACY_FLIKE_PROFILE
 from ffa_methods.contracts import (
     AnalysisResult,
@@ -520,7 +521,7 @@ def report_document(result: AnalysisResult, *, settings: Mapping[str, object]) -
     parameters = [_parameter(parameter) for parameter in result.parameters]
     diagnostics = [_diagnostic(diagnostic) for diagnostic in result.diagnostics]
     points = [_point(point, method_id=method_id) for point in result.values]
-    if settings_data.get("schema_version") == "ffa-lognormal-bayesian/1":
+    if settings_data.get("schema_version") in BAYESIAN_SCHEMAS:
         _precision_labels(result, points, parameters)
     warnings = [_text(warning, label="warning") for warning in result.warnings]
     warnings.extend(
@@ -660,7 +661,7 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
         "probability_limit_construction",
         "log10_moment_kind",
     )
-    if settings.get("schema_version") == "ffa-lognormal-bayesian/1":
+    if settings.get("schema_version") in BAYESIAN_SCHEMAS:
         keys = (*keys, "precision_state")
     stream = StringIO(newline="")
     writer = csv.writer(stream, lineterminator="\n")

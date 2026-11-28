@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Literal, cast
 
 from ffa_methods import __version__
-from ffa_methods.bayesian_workflow import BAYESIAN_SCHEMA, calculate_bayesian
+from ffa_methods.bayesian_workflow import BAYESIAN_SCHEMAS, calculate_bayesian
 from ffa_methods.compatibility import LEGACY_FLIKE_PROFILE
 from ffa_methods.contracts import (
     AnalysisResult,
@@ -750,7 +750,7 @@ def calculate_from_bytes(
 ) -> tuple[AnalysisResult, dict[str, str | int | float | bool | None]]:
     """Single explicit schema dispatcher; consumed bytes are also the hashed bytes."""
     values = _settings_object(raw_settings)
-    if values.get("schema_version") == BAYESIAN_SCHEMA:
+    if values.get("schema_version") in BAYESIAN_SCHEMAS:
         return calculate_bayesian(raw_ams, raw_settings, values)
     bootstrap = _bootstrap_settings(values.pop("bootstrap")) if "bootstrap" in values else None
     if values.get("schema_version") == ORDINARY_SCHEMA:

@@ -236,7 +236,7 @@ def _check_gev_support_report(console: Path, output: Path, env: dict[str, str]) 
 
 def _check_bayesian_installed(console: Path, output: Path, env: dict[str, str]) -> None:
     """Check real console execution from admitted synthetic bytes outside checkout."""
-    for kind in ("fixed", "censored"):
+    for kind in ("fixed", "censored", "shape"):
         ams = output / f"bayesian-{kind}-ams.csv"
         settings = output / f"bayesian-{kind}-settings.json"
         destination = output / f"bayesian-{kind}-report"
@@ -267,6 +267,14 @@ def _check_bayesian_installed(console: Path, output: Path, env: dict[str, str]) 
                 or doc["precision_audit"]["completed_count"] != 3
             ):
                 msg = "installed fixed-scale Bayesian fit failed conjugate reference or selected-output audit"
+                raise RuntimeError(msg)
+        elif kind == "shape":
+            # Six reference SEs from the independent 3D posterior, fixed N=1600.
+            if (
+                not isclose(aep["value"], 0.16638535628, abs_tol=0.009655002185, rel_tol=0)
+                or aep["precision_state"] != "not_assessed"
+            ):
+                msg = "installed bounded-shape LP3 fit failed the 3D expected-AEP comparison"
                 raise RuntimeError(msg)
         elif (
             not isclose(doc["parameters"][0]["mean"], 0.003598304886871672, abs_tol=0.032)
@@ -477,7 +485,8 @@ from pathlib import Path
 root = files("ffa_methods").joinpath("resources", "examples")
 for name in ("fixed-gev-ams.csv", "fixed-gev-settings.json", "ordinary-ams.csv", "ordinary-settings.json",
              "bayesian-fixed-ams.csv", "bayesian-fixed-settings.json",
-             "bayesian-censored-ams.csv", "bayesian-censored-settings.json"):
+             "bayesian-censored-ams.csv", "bayesian-censored-settings.json",
+             "bayesian-shape-ams.csv", "bayesian-shape-settings.json"):
     Path(name).write_bytes(root.joinpath(name).read_bytes())
 """
         _invoke([str(interpreter), "-c", copy_examples], cwd=output, env=env, expected_code=0)

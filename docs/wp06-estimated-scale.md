@@ -136,6 +136,8 @@ F_standard(0)=1-exp(-4)*(1+4+8+64/6), below 0.99. Run
 
 ## Subsequent estimated shape
 
+The [bounded estimated-shape workflow](wp06-estimated-shape.md) implements a supplied joint scaled-logit law and verifies three-dimensional inference for the admitted intervals.
+
 Specify a normalized joint prior and its coordinate support before fitting a third coordinate.
 Compact subsets of xi>-1 or |g|<2 avoid the density singularities. Prove a uniform likelihood
 bound and choose a proposal whose density covers the entire admitted support. Include the
