@@ -114,7 +114,10 @@ owns precision admission.
   Expected AEP at fixed discharge and an interior predictive quantile are different quantities.
   The report omits divergent raw design means while retaining defined estimands when representable.
 
-Collapsed transformed shape, unresolvable Gaussian draws, zeroed positive weights and failed
+The prior encloses physical log odds at increasing decimal precision before solving the final
+conditional Gaussian innovation. Upper-tail predictive inversion compares the directly averaged
+survival with 1-p, preserving the smallest representable flow that reaches the requested level.
+Collapsed transformed shape, unresolvable Gaussian draws or variances, zeroed positive weights and failed
 interior likelihoods stop the fit. The innovation round trip uses a 1e-10 absolute/relative
 resolution check. Conditional inverse queries check the smaller forward log tail within 1e-8;
 a finite raw flow that fails this check cannot resolve the requested probability. These

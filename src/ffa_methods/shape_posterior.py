@@ -1,6 +1,7 @@
 """Three-coordinate GEV and LP3 posteriors under a supplied bounded logit-Normal shape law."""
 
 from dataclasses import dataclass, field
+from decimal import Context, Decimal, localcontext
 from fractions import Fraction
 from math import exp, fsum, inf, isclose, isfinite, log, log1p, nextafter, pi, tanh
 from random import Random
@@ -37,6 +38,27 @@ LP3_COORDINATES = (LP3_MEAN, LP3_LOG_SD, ParameterCoordinate.LP3_SKEW_LOGE_FLOW.
 GEV_LATENT = (GEV_LOCATION, GEV_LOG_SCALE, "gev.logit_shape_fraction")
 LP3_LATENT = (LP3_MEAN, LP3_LOG_SD, "lp3.logit_skew_fraction")
 METHOD_VERSION = "bounded-shape-posterior/1"
+
+
+def _conditional_logit(odds: Fraction, center: Fraction, sd: Fraction) -> float:
+    """Enclose the conditional innovation before converting to binary64.
+
+    The exactly supplied binary64 center can be much closer to the true
+    log odds than one ulp of a rounded logit. Normalizing first preserves
+    that difference even for a small positive conditional SD.
+    """
+    if odds == 1:
+        return float(-center / sd)
+    for digits in (48, 96, 192, 384, 768, 1536):
+        with localcontext(Context(prec=digits)):
+            ratio = Decimal(odds.numerator) / Decimal(odds.denominator)
+            low = Fraction(ratio.next_minus().ln().next_minus())
+            high = Fraction(ratio.next_plus().ln().next_plus())
+        u = float((low - center) / sd)
+        if u == float((high - center) / sd) and isfinite(u):
+            return u
+    msg = "conditional shape innovation is numerically unresolved"
+    raise PosteriorBindingError(msg)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -95,16 +117,17 @@ class BoundedShapePrior:
         if min(left, right) <= 0:
             msg = "shape must be inside the declared open interval"
             raise PosteriorBindingError(msg)
-        z = (
-            log1p(float((left - right) / right))
-            if right / 2 < left < 2 * right
-            else log(float(left)) - log(float(right))
-        )
         residuals: list[Fraction] = []
-        for i, (value, center, row) in enumerate(zip((mu, eta, z), self.means, self.lower_factor, strict=True)):
-            residual = Fraction(value) - Fraction(center) - sum(Fraction(row[j]) * u for j, u in enumerate(residuals))
+        for i, value in enumerate((mu, eta)):
+            row = self.lower_factor[i]
+            residual = (
+                Fraction(value) - Fraction(self.means[i]) - sum(Fraction(row[j]) * u for j, u in enumerate(residuals))
+            )
             residuals.append(residual / Fraction(row[i]))
-        return tuple(float(u) for u in residuals)
+        row = self.lower_factor[2]
+        center = Fraction(self.means[2]) + sum(Fraction(row[j]) * u for j, u in enumerate(residuals))
+        last = _conditional_logit(left / right, center, Fraction(row[2]))
+        return float(residuals[0]), float(residuals[1]), last
 
     def logpdf(self, values: tuple[float, ...], *, gamma: float = 1.0) -> float:
         if len(values) != 3 or not all(isfinite(v) for v in values) or not isfinite(gamma) or gamma <= 0:
@@ -291,6 +314,12 @@ def execute_shape_posterior(
         ),
     )
     particles = result.particles
+    # All three coordinates have positive variance under this full-rank prior
+    # and positive posterior on an open set, even if the particle variance
+    # rounds to zero or the effective support collapses to a single point.
+    if any(result.moments.covariance[i][i] == 0 for i in range(3)):
+        msg = "posterior coordinate variance is unresolved in the reported covariance"
+        raise PosteriorBindingError(msg)
     ratios = tuple(
         fsum((ll, lp, -lq))
         for ll, lp, lq in zip(particles.log_likelihood, particles.log_prior, particles.log_proposal, strict=True)

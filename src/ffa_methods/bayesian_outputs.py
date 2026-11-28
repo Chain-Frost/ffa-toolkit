@@ -284,10 +284,12 @@ def _kernels(particles: ImportanceParticles, factory: KernelFactory) -> tuple[Di
     return tuple(factory(draw) for draw in particles.draws)
 
 
-def _model_cdf(discharge: float, kernels: Sequence[DistributionKernel], weights: Sequence[float]) -> float:
-    probabilities = tuple(kernel.cdf(discharge) for kernel in kernels)
+def _mixture_probability(
+    discharge: float, kernels: Sequence[DistributionKernel], weights: Sequence[float], *, survival: bool
+) -> float:
+    probabilities = tuple(kernel.sf(discharge) if survival else kernel.cdf(discharge) for kernel in kernels)
     if any(not isfinite(p) or p < 0 or p > 1 for p in probabilities):
-        msg = "a posterior component returned an invalid non-exceedance probability"
+        msg = "a posterior component returned an invalid mixture component probability"
         raise ValueError(msg)
     return fsum(w * p for w, p in zip(weights, probabilities, strict=True))
 
@@ -311,9 +313,7 @@ def _float_from_ordered_key(key: int) -> float:
 def _predictive_bracket(
     low: float,
     high: float,
-    target: float,
-    kernels: Sequence[DistributionKernel],
-    weights: Sequence[float],
+    reached: Callable[[float], bool],
 ) -> tuple[int, int]:
     """Repair finite PPF rounding using exponentially widened binary64 keys.
 
@@ -325,22 +325,24 @@ def _predictive_bracket(
     minimum = _ordered_float_key(-float_info.max)
     maximum = _ordered_float_key(float_info.max)
     stride = 1
-    while low_key > minimum and _model_cdf(_float_from_ordered_key(low_key), kernels, weights) >= target:
+    while low_key > minimum and reached(_float_from_ordered_key(low_key)):
         low_key = max(minimum, low_key - stride)
         stride *= 2
-    if _model_cdf(_float_from_ordered_key(low_key), kernels, weights) >= target:
+    if reached(_float_from_ordered_key(low_key)):
         return low_key, low_key  # The lowest representable discharge already reaches F.
     stride = 1
-    while high_key < maximum and _model_cdf(_float_from_ordered_key(high_key), kernels, weights) < target:
+    while high_key < maximum and not reached(_float_from_ordered_key(high_key)):
         high_key = min(maximum, high_key + stride)
         stride *= 2
-    if _model_cdf(_float_from_ordered_key(high_key), kernels, weights) < target:
+    if not reached(_float_from_ordered_key(high_key)):
         msg = "posterior-predictive quantile cannot be represented by a finite discharge"
         raise ValueError(msg)
     return low_key, high_key
 
 
-def predictive_quantile(particles: ImportanceParticles, non_exceedance: float, factory: KernelFactory) -> float:
+def predictive_quantile(
+    particles: ImportanceParticles, non_exceedance: float, factory: KernelFactory, *, direct_upper_tail: bool = False
+) -> float:
     """Generalized inverse of the posterior-predictive CDF, including atoms.
 
     The per-component PPFs bracket the mixture quantile for 0<F<1 when
@@ -353,13 +355,19 @@ def predictive_quantile(particles: ImportanceParticles, non_exceedance: float, f
     if any(not isfinite(x) for x in brackets):
         msg = "cannot bracket the predictive quantile: non-finite component quantile"
         raise ValueError(msg)
-    low_key, high_key = _predictive_bracket(min(brackets), max(brackets), non_exceedance, kernels, particles.weights)
+    survival = direct_upper_tail and non_exceedance > 0.5
+
+    def reached(discharge: float) -> bool:
+        tail = _mixture_probability(discharge, kernels, particles.weights, survival=survival)
+        return tail <= 1 - non_exceedance if survival else tail >= non_exceedance
+
+    low_key, high_key = _predictive_bracket(min(brackets), max(brackets), reached)
     # Interior binary64 search takes at most 64 evaluations, regardless of
     # component scale separation. The bracketing helper handles PPF roundoff.
     while low_key + 1 < high_key:
         mid_key = (low_key + high_key) // 2
         mid = _float_from_ordered_key(mid_key)
-        if _model_cdf(mid, kernels, particles.weights) >= non_exceedance:
+        if reached(mid):
             high_key = mid_key
         else:
             low_key = mid_key
@@ -374,6 +382,7 @@ def quantile_outputs(
     interval_mass: float,
     mean_undefined_reason: str | None = None,
     log_undefined_reason: str | None = None,
+    direct_upper_tail: bool = False,
 ) -> QuantileOutputs:
     """Compute separate posterior quantile estimands and explicit log10 warnings."""
     _level(non_exceedance)
@@ -406,7 +415,9 @@ def quantile_outputs(
             fsum(w * q for w, q in zip(weights, quantiles, strict=True)) if mean_undefined_reason is None else None
         ),
         median_of_quantiles=weighted_quantile(quantiles, weights, 0.5),
-        predictive_quantile=predictive_quantile(particles, non_exceedance, factory),
+        predictive_quantile=predictive_quantile(
+            particles, non_exceedance, factory, direct_upper_tail=direct_upper_tail
+        ),
         probability_limits=(lower_limit, upper_limit),
         mean_log10_quantile=mean_log,
         standard_deviation_log10_quantile=sd_log,

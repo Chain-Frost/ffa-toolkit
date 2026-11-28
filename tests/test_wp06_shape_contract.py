@@ -2,14 +2,16 @@
 
 import json
 from dataclasses import replace
+from decimal import Context, Decimal, localcontext
 from hashlib import sha256
-from math import exp, inf, isclose, log, nextafter, pi, sqrt
+from math import exp, fsum, inf, isclose, log, nextafter, pi, sqrt
 from pathlib import Path
 from typing import cast
 
 import pytest
 from scipy.integrate import quad
 
+from ffa_methods.bayesian_outputs import predictive_quantile
 from ffa_methods.contracts import ResultMeaning
 from ffa_methods.deterministic_workflow import calculate_from_bytes
 from ffa_methods.family_posterior import PosteriorFamily
@@ -139,3 +141,58 @@ def test_installed_shape_report_contract(family: PosteriorFamily) -> None:
     settings["precision"] = {"mode": "audit"}
     with pytest.raises(ValueError, match="not_assessed"):
         calculate_from_bytes(raw, json.dumps(settings).encode())
+
+
+def test_nearly_degenerate_logit_density() -> None:
+    model = synthetic_shape_model(*CASES[0])
+    prior = replace(
+        model.prior,
+        means=(0.0, 0.0, log(3.0)),
+        lower_factor=((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1e-16)),
+        bounds=(0.0, 1.0),
+    )
+    with localcontext(Context(prec=110)):
+        expected = float((Decimal(3).ln() - Decimal(log(3.0))) / Decimal(prior.lower_factor[2][2]))
+    assert prior.innovations((0.0, 0.0, 0.75))[2] == expected
+    assert isclose(prior.logpdf((0.0, 0.0, 0.75)), 35.34708015423365, abs_tol=1e-13, rel_tol=0)
+
+
+def test_unrepresentable_likelihood_and_sample_covariance() -> None:
+    model = synthetic_shape_model(*CASES[0])
+    extreme = replace(model, prior=replace(model.prior, bounds=(0.0, 1.2e308)))
+    kernel = extreme.kernel((0.0, 0.0, 1e308))
+    with pytest.raises(PosteriorBindingError, match="shape times"):
+        kernel.logcdf(2.0)
+    lp3 = synthetic_shape_model(*CASES[1])
+    factor = ((1e-200, 0.0, 0.0), *lp3.prior.lower_factor[1:])
+    with pytest.raises(PosteriorBindingError, match="variance is unresolved"):
+        execute_shape_posterior(
+            replace(lp3, prior=replace(lp3.prior, lower_factor=factor)),
+            gamma=1.0,
+            sampling=replace(SAMPLES, draw_count=32, minimum_effective_size=1, maximum_single_weight=1),
+        )
+
+
+def test_retained_excluded_underflow() -> None:
+    root = Path(__file__).resolve().parents[1] / "docs" / "examples"
+    raw = (root / "bayesian-shape-ams.csv").read_bytes().replace(b"excluded,0,", b"excluded,1e-1000,")
+    with pytest.raises(ValueError, match="underflows"):
+        calculate_from_bytes(raw, (root / "bayesian-shape-settings.json").read_bytes())
+
+
+@pytest.mark.parametrize(("family", "bounds"), CASES[:2])
+def test_rare_predictive_inverse_uses_direct_survival(family: PosteriorFamily, bounds: tuple[float, float]) -> None:
+    model = synthetic_shape_model(family, bounds)
+    run = execute_shape_posterior(
+        model, gamma=1.0, sampling=replace(SAMPLES, draw_count=32, minimum_effective_size=1, maximum_single_weight=1)
+    )
+    p = nextafter(1.0, 0.0)
+    q = predictive_quantile(run.particles, p, model.kernel, direct_upper_tail=True)
+
+    def survival(x: float) -> float:
+        return fsum(
+            w * model.kernel(theta).sf(x) for theta, w in zip(run.particles.draws, run.particles.weights, strict=True)
+        )
+
+    assert survival(q) <= 1 - p
+    assert survival(nextafter(q, -inf)) > 1 - p

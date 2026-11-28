@@ -3,6 +3,7 @@
 import csv
 import json
 from dataclasses import asdict, dataclass, replace
+from decimal import Decimal
 from hashlib import sha256
 from io import StringIO
 from itertools import pairwise
@@ -321,6 +322,9 @@ def _csv_flow(token: str, *, retained_excluded: bool = False) -> float | None:
         msg = "classified CSV flow must be a decimal number or an explicitly empty cell"
         raise ValueError(msg)
     value = float(token)
+    if retained_excluded and value == 0 and not Decimal(token).is_zero():
+        msg = "nonzero retained excluded flow underflows binary64"
+        raise ValueError(msg)
     if not isfinite(value) or (value <= 0 and not retained_excluded):
         msg = "classified CSV nonempty flow and bound cells must be strictly positive finite binary64 values"
         raise ValueError(msg)
@@ -645,6 +649,7 @@ def _calculate_shape(
                 model.kernel,
                 interval_mass=outputs.interval_mass,
                 mean_undefined_reason=reason,
+                direct_upper_tail=True,
                 log_undefined_reason="the population assigns positive mass to nonpositive GEV design quantiles"
                 if model.family == PosteriorFamily.GEV
                 else None,

@@ -113,9 +113,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
-        mode = "lognormal Bayesian" if settings["schema_version"] == BAYESIAN_SCHEMA else "deterministic"
-        if settings["schema_version"] == SHAPE_SCHEMA:
-            mode = "bounded-shape Bayesian"
+        mode = {BAYESIAN_SCHEMA: "lognormal Bayesian", SHAPE_SCHEMA: "bounded-shape Bayesian"}.get(
+            str(settings["schema_version"]), "deterministic"
+        )
         print(f"Independent {mode} mathematical fit only — not native Flike-qualified. Reports: {paths[0].parent}")
         return 0
     parser.error("no command selected; use fit, explain, references or --help")
