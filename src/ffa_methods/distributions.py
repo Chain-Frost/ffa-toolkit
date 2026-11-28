@@ -12,6 +12,7 @@ import sys
 from dataclasses import dataclass
 from typing import Protocol, cast
 
+from scipy.special import log_ndtr, ndtr
 from scipy.stats import gamma, genextreme, genpareto, gumbel_r, norm
 
 
@@ -240,15 +241,33 @@ class Lognormal(_LogFlowKernel):
     def _frozen(self) -> _FrozenContinuous:
         return cast(_FrozenContinuous, norm(loc=self.log.natural_mean, scale=math.exp(self.log.natural_log_sd)))
 
-    def cdf(self, discharge: float) -> float:
-        # Predictive inversion calls CDF repeatedly across a potentially large
-        # particle set. Pass the same parameters without cloning a distribution.
+    def _z(self, discharge: float) -> float:
         discharge = _point(discharge)
-        if discharge <= 0.0:
-            return 0.0
-        return float(
-            norm.cdf(self._to_statistic(discharge), loc=self.log.natural_mean, scale=math.exp(self.log.natural_log_sd))
+        if discharge <= 0:
+            return -math.inf
+        return (self._to_statistic(discharge) - self.log.natural_mean) / math.exp(self.log.natural_log_sd)
+
+    def logpdf(self, discharge: float) -> float:
+        discharge = _point(discharge)
+        if math.isinf(discharge) or discharge <= 0:
+            return -math.inf
+        # Parameterized SciPy call is identical to the frozen Normal's logpdf.
+        value = norm.logpdf(
+            self._to_statistic(discharge), loc=self.log.natural_mean, scale=math.exp(self.log.natural_log_sd)
         )
+        return float(value) - math.log(discharge)
+
+    def cdf(self, discharge: float) -> float:
+        return float(ndtr(self._z(discharge)))
+
+    def sf(self, discharge: float) -> float:
+        return float(ndtr(-self._z(discharge)))
+
+    def logcdf(self, discharge: float) -> float:
+        return float(log_ndtr(self._z(discharge)))
+
+    def logsf(self, discharge: float) -> float:
+        return float(log_ndtr(-self._z(discharge)))
 
 
 def _gamma_upper_fraction(shape: float, x: float) -> float:
@@ -516,6 +535,10 @@ class LogPearsonIII(_LogFlowKernel):
             _ = _GammaPearson3(self.log.natural_mean, math.exp(self.log.natural_log_sd), self.skew)
 
     def _frozen(self) -> _FrozenContinuous:
+        return self.log_flow_law()
+
+    def log_flow_law(self) -> _FrozenContinuous:
+        """Pearson III law in natural-log coordinates before the discharge transform."""
         mean, sd = self.log.natural_mean, math.exp(self.log.natural_log_sd)
         if abs(self.skew) < 1.6e-5:
             return cast(_FrozenContinuous, norm(loc=mean, scale=sd))

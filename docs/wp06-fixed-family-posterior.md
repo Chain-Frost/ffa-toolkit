@@ -121,7 +121,7 @@ check results and independent review are recorded on [PR #35](https://github.com
 
 ## Estimated scale and shape assessment
 
-Start with fixed shape and estimated `eta = ln(scale)` in an explicitly
+The [estimated-scale implementation and verification](wp06-estimated-scale.md) use fixed shape and estimated `eta = ln(scale)` in an explicitly
 correlated two-coordinate prior, using independent two-dimensional
 quadrature for exact and censored reference cases. For shape estimation,
 define a joint density and its support in the exact model coordinates
@@ -174,16 +174,16 @@ condition for order-r weights is positive definiteness of
 `r*P^(-1) - (r-1)*G^(-1)`, using the exact-density bound above.
 This permits bounded AEP integrands and single-exponential log-scale
 growth. It cannot establish LP3 raw quantile moments in the divergent
-case. Issue #6 owns CLI schema and report routing. A future family path
+case. The installed issue #6 lognormal workflow provides CLI schema and report routing. A future family path
 should carry named prior coordinates, declared support and explicit
 availability per estimand through that shared workflow.
 
 ## Remaining #8 scope
 
-- Free scale and shape/skew, joint priors and transformations, singular
+- Free shape/skew, shape priors and transformations, singular
   or near-zero shape regimes, independent inference and moment existence.
 - Gumbel and GP explicit bindings; GP annual-maxima versus event/POT,
   fixed/free location, and unresolved settings require disposition.
-- Family-specific precision admission (#5), installed CLI (#6) and
+- Family-specific precision admission (#5), installed family adapters (#8) and
   reporting (#7), historical/grouped (#9), rating (#10), and separately
   controlled native comparison. No release or merge requested.
