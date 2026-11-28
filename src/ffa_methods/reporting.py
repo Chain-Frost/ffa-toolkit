@@ -8,13 +8,13 @@ import csv
 import json
 import ntpath
 import shutil
+import sys
 import tempfile
 from collections.abc import Callable, Mapping
 from dataclasses import asdict
 from hashlib import sha256
 from io import StringIO
 from math import isfinite
-from os import name as os_name
 from pathlib import Path, PureWindowsPath
 from stat import FILE_ATTRIBUTE_REPARSE_POINT, S_ISDIR, S_ISLNK
 from typing import TypeAlias, cast
@@ -681,7 +681,7 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
         )
     method_guidance = cast(dict[str, object], doc["method_guidance"])
     lines = [
-        "FFA ANALYSIS RESULT — UNQUALIFIED FORMATTER OUTPUT",
+        "FFA ANALYSIS RESULT â€” UNQUALIFIED FORMATTER OUTPUT",
         "This is not a verified legacy Flike comparison or an adopted engineering estimate.",
         f"Compatibility target: {LEGACY_FLIKE_PROFILE.identifier}",
         f"Method: {provenance['method_id']} (algorithm {provenance['method_version']})",
@@ -746,12 +746,14 @@ def validate_output_path(destination: Path) -> Path:
         msg = "output directory must not traverse parent components"
         raise ValueError(msg)
     target = destination.absolute()
-    if os_name == "nt" and any(_reserved_windows_component(part) for part in target.parts[1:]):
+    if sys.platform == "win32" and any(_reserved_windows_component(part) for part in target.parts[1:]):
         msg = "output path contains a Windows device, stream or ambiguous component"
         raise ValueError(msg)
     for path in reversed(target.parents):
         info = path.lstat()
-        if S_ISLNK(info.st_mode) or (os_name == "nt" and info.st_file_attributes & FILE_ATTRIBUTE_REPARSE_POINT):
+        if S_ISLNK(info.st_mode) or (
+            sys.platform == "win32" and info.st_file_attributes & FILE_ATTRIBUTE_REPARSE_POINT
+        ):
             msg = f"output directory must not traverse symbolic links or reparse points: {path}"
             raise ValueError(msg)
         if not S_ISDIR(info.st_mode):

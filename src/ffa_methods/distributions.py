@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import math
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol, cast
 
 from scipy.stats import gamma, genextreme, genpareto, gumbel_r, norm
@@ -236,9 +236,15 @@ class _LogFlowKernel(_ContinuousKernel):
 @dataclass(frozen=True, slots=True)
 class Lognormal(_LogFlowKernel):
     log: LogCoordinates
+    _normal: _FrozenContinuous = field(init=False, repr=False, compare=False, hash=False)
+
+    def __post_init__(self) -> None:
+        # Posterior predictive inversion evaluates each component repeatedly.
+        distribution = norm(loc=self.log.natural_mean, scale=math.exp(self.log.natural_log_sd))
+        object.__setattr__(self, "_normal", cast(_FrozenContinuous, distribution))
 
     def _frozen(self) -> _FrozenContinuous:
-        return cast(_FrozenContinuous, norm(loc=self.log.natural_mean, scale=math.exp(self.log.natural_log_sd)))
+        return self._normal
 
 
 def _gamma_upper_fraction(shape: float, x: float) -> float:
