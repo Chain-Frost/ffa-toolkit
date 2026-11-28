@@ -184,9 +184,7 @@ def test_exact_only_reference_and_direct_rare_survival() -> None:
 
 def _atan_bounds(denominator: int, pairs: int) -> tuple[Fraction, Fraction]:
     terms = 2 * pairs
-    lower = sum(
-        (Fraction((-1) ** k, (2 * k + 1) * denominator ** (2 * k + 1)) for k in range(terms)), Fraction(0)
-    )
+    lower = sum((Fraction((-1) ** k, (2 * k + 1) * denominator ** (2 * k + 1)) for k in range(terms)), Fraction(0))
     return lower, lower + Fraction(1, (2 * terms + 1) * denominator ** (2 * terms + 1))
 
 

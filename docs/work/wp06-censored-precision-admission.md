@@ -505,32 +505,35 @@ v = 1 / (1 + 2 / sigma**2)
 m = v * (-0.4 + 0.5) / sigma**2
 s = np.sqrt(v)
 
+
 def interval(mu):
     return ndtr((0.6 - mu) / sigma) - ndtr((-0.5 - mu) / sigma)
+
 
 def censor(mu):
     return ndtr((-0.2 - mu) / sigma) * ndtr((mu - 0.1) / sigma) * interval(mu)
 
-def base(mu):
-    return np.exp(-0.5 * ((mu - m) / s)**2) / (np.sqrt(2*np.pi) * s)
 
-A = quad(lambda mu: base(mu)*censor(mu), -np.inf, np.inf,
-         epsabs=1e-13, epsrel=1e-13)[0]
-edges = np.linspace(m-8*s, m+8*s, 4097)
+def base(mu):
+    return np.exp(-0.5 * ((mu - m) / s) ** 2) / (np.sqrt(2 * np.pi) * s)
+
+
+A = quad(lambda mu: base(mu) * censor(mu), -np.inf, np.inf, epsabs=1e-13, epsrel=1e-13)[0]
+edges = np.linspace(m - 8 * s, m + 8 * s, 4097)
 a, b = edges[:-1], edges[1:]
-mass = np.diff(ndtr((edges-m)/s))
-lo = ndtr((-0.2-b)/sigma) * ndtr((a-0.1)/sigma) * np.minimum(interval(a), interval(b))
-hi = ndtr((-0.2-a)/sigma) * ndtr((b-0.1)/sigma) * interval(np.clip(0.05,a,b))
-print(np.dot(mass,lo), A, np.dot(mass,hi)+2*ndtr(-8))
+mass = np.diff(ndtr((edges - m) / s))
+lo = ndtr((-0.2 - b) / sigma) * ndtr((a - 0.1) / sigma) * np.minimum(interval(a), interval(b))
+hi = ndtr((-0.2 - a) / sigma) * ndtr((b - 0.1) / sigma) * interval(np.clip(0.05, a, b))
+print(np.dot(mass, lo), A, np.dot(mass, hi) + 2 * ndtr(-8))
 
 for n in (64, 128):
     x, w = roots_hermitenorm(n)
-    mu = 0.4*x[:,None]
-    eta = -0.0288 + 0.12*x[None,:]
+    mu = 0.4 * x[:, None]
+    eta = -0.0288 + 0.12 * x[None, :]
     sd = np.exp(eta)
-    residual = np.exp(-0.5*((mu+0.4)**2+(mu-0.5)**2)/sd**2)
-    residual *= ndtr((-0.2-mu)/sd) * ndtr((mu-0.1)/sd)
-    print(n, np.sum(w[:,None]*w[None,:]*residual)/(2*np.pi))
+    residual = np.exp(-0.5 * ((mu + 0.4) ** 2 + (mu - 0.5) ** 2) / sd**2)
+    residual *= ndtr((-0.2 - mu) / sd) * ndtr((mu - 0.1) / sd)
+    print(n, np.sum(w[:, None] * w[None, :] * residual) / (2 * np.pi))
 ```
 
 ## 6. Bounded implementation and review sequence

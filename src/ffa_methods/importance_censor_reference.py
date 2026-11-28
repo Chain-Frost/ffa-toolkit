@@ -49,7 +49,8 @@ def bound_fixed_scale_reference(
     events = tuple(
         CensorEvent(lower=row.lower_bound, upper=row.upper_bound)
         for row in model.series.annual
-        if row.kind in (ObservationKind.LEFT_CENSORED, ObservationKind.RIGHT_CENSORED, ObservationKind.INTERVAL_CENSORED)
+        if row.kind
+        in (ObservationKind.LEFT_CENSORED, ObservationKind.RIGHT_CENSORED, ObservationKind.INTERVAL_CENSORED)
     )
     inputs = FixedScaleReferenceInputs(
         prior_mean=model.prior.means[0],
