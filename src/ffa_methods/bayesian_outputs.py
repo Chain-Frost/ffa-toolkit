@@ -289,7 +289,8 @@ def _mixture_probability(
 ) -> float:
     probabilities = tuple(kernel.sf(discharge) if survival else kernel.cdf(discharge) for kernel in kernels)
     if any(not isfinite(p) or p < 0 or p > 1 for p in probabilities):
-        msg = "a posterior component returned an invalid mixture component probability"
+        kind = "survival" if survival else "non-exceedance"
+        msg = f"a posterior component returned an invalid {kind} probability"
         raise ValueError(msg)
     return fsum(w * p for w, p in zip(weights, probabilities, strict=True))
 

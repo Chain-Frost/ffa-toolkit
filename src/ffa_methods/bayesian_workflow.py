@@ -3,7 +3,6 @@
 import csv
 import json
 from dataclasses import asdict, dataclass, replace
-from decimal import Decimal
 from hashlib import sha256
 from io import StringIO
 from itertools import pairwise
@@ -322,7 +321,7 @@ def _csv_flow(token: str, *, retained_excluded: bool = False) -> float | None:
         msg = "classified CSV flow must be a decimal number or an explicitly empty cell"
         raise ValueError(msg)
     value = float(token)
-    if retained_excluded and value == 0 and not Decimal(token).is_zero():
+    if retained_excluded and value == 0 and any(c in "123456789" for c in token.lower().partition("e")[0]):
         msg = "nonzero retained excluded flow underflows binary64"
         raise ValueError(msg)
     if not isfinite(value) or (value <= 0 and not retained_excluded):

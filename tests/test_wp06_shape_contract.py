@@ -173,9 +173,10 @@ def test_unrepresentable_likelihood_and_sample_covariance() -> None:
         )
 
 
-def test_retained_excluded_underflow() -> None:
+@pytest.mark.parametrize("token", [b"1e-1000", b"1e-" + b"9" * 32])
+def test_retained_excluded_underflow(token: bytes) -> None:
     root = Path(__file__).resolve().parents[1] / "docs" / "examples"
-    raw = (root / "bayesian-shape-ams.csv").read_bytes().replace(b"excluded,0,", b"excluded,1e-1000,")
+    raw = (root / "bayesian-shape-ams.csv").read_bytes().replace(b"excluded,0,", b"excluded," + token + b",")
     with pytest.raises(ValueError, match="underflows"):
         calculate_from_bytes(raw, (root / "bayesian-shape-settings.json").read_bytes())
 
