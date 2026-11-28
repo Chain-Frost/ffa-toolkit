@@ -121,7 +121,7 @@ check results and independent review are recorded on [PR #35](https://github.com
 
 ## Estimated scale and shape assessment
 
-Start with fixed shape and estimated `eta = ln(scale)` in an explicitly
+The [estimated-scale implementation and verification](wp06-estimated-scale.md) use fixed shape and estimated `eta = ln(scale)` in an explicitly
 correlated two-coordinate prior, using independent two-dimensional
 quadrature for exact and censored reference cases. For shape estimation,
 define a joint density and its support in the exact model coordinates
@@ -180,7 +180,7 @@ availability per estimand through that shared workflow.
 
 ## Remaining #8 scope
 
-- Free scale and shape/skew, joint priors and transformations, singular
+- Free shape/skew, shape priors and transformations, singular
   or near-zero shape regimes, independent inference and moment existence.
 - Gumbel and GP explicit bindings; GP annual-maxima versus event/POT,
   fixed/free location, and unresolved settings require disposition.
