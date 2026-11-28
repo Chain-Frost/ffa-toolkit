@@ -8,7 +8,7 @@ This is a deterministic independently specified calculation, not legacy replay.
 
 import json
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from hashlib import sha256
 from math import exp, isfinite, sqrt
 from pathlib import Path
@@ -38,6 +38,8 @@ from ffa_methods.estimators.ordinary_lmoments import (
 )
 from ffa_methods.estimators.parametric_bootstrap import (
     BootstrapEndpoint,
+    BootstrapRefit,
+    BootstrapRefusalError,
     BootstrapSettings,
     Quantile,
     parametric_bootstrap,
@@ -411,19 +413,26 @@ def _calculate_selected_gev(
     )
     if bootstrap is not None:
         if selected is None:
-            report_settings["bootstrap_status"] = "unavailable_without_selected_fit"
+            report_settings.update(
+                bootstrap_status="unavailable_without_selected_fit",
+                bootstrap_replications=bootstrap.replications,
+                bootstrap_attempted=0,
+                bootstrap_successful=0,
+                bootstrap_failed=0,
+                bootstrap_attempts="[]",
+            )
             report = replace(
                 report,
                 warnings=(*report.warnings, "Bootstrap unavailable because the original record has no selected fit."),
             )
         else:
 
-            def refit(record: tuple[float, ...]) -> Quantile:
+            def refit(record: tuple[float, ...]) -> BootstrapRefit:
                 replicate, selected_h = evaluate_candidate_h(record, critical_z=critical_z, seed=seed)
                 if selected_h is None:
                     msg = "no bootstrap candidate passed the declared cutoff"
                     raise ValueError(msg)
-                return replicate[selected_h].fit.quantile
+                return BootstrapRefit(replicate[selected_h].fit.quantile, selected_h)
 
             report = _with_bootstrap(
                 report, report_settings, bootstrap, config.probabilities, len(records), candidate_fit.quantile, refit
@@ -676,25 +685,36 @@ def _with_bootstrap(
     probabilities: tuple[float, ...],
     count: int,
     generate: Quantile,
-    refit: Callable[[tuple[float, ...]], Quantile],
+    refit: Callable[[tuple[float, ...]], Quantile | BootstrapRefit],
 ) -> AnalysisResult:
-    result = parametric_bootstrap(generate, refit, count=count, probabilities=probabilities, settings=settings)
-    failed = sum(count for _, count in result.failures)
+    try:
+        result = parametric_bootstrap(generate, refit, count=count, probabilities=probabilities, settings=settings)
+    except BootstrapRefusalError as exc:
+        outcome = exc
+    else:
+        outcome = result
+    failed = sum(number for _, number in outcome.failures)
     report_settings.update(
-        bootstrap_status="completed",
+        bootstrap_status="refused" if isinstance(outcome, BootstrapRefusalError) else "completed",
         bootstrap_replications=settings.replications,
+        bootstrap_attempted=len(outcome.attempts),
         bootstrap_seed=str(settings.seed),
         bootstrap_confidence=settings.confidence,
         bootstrap_maximum_failure_fraction=settings.maximum_failure_fraction,
         bootstrap_endpoint_tolerance=settings.endpoint_tolerance,
         bootstrap_successful=settings.replications - failed,
         bootstrap_failed=failed,
-        bootstrap_failure_reasons=json.dumps(dict(result.failures)),
+        bootstrap_failure_reasons=json.dumps(dict(outcome.failures)),
+        bootstrap_attempts=json.dumps([asdict(attempt) for attempt in outcome.attempts], separators=(",", ":")),
+        bootstrap_interval_target="conditional_on_successful_refits",
     )
+    if isinstance(outcome, BootstrapRefusalError):
+        report_settings.update(bootstrap_refusal_code=outcome.code, bootstrap_refusal_detail=str(outcome))
+        return replace(report, warnings=(*report.warnings, f"Bootstrap intervals refused. {outcome}"))
     points = list(report.values)
     diagnostics = list(report.diagnostics)
     unit = report.values[0].unit
-    for f, (low, high) in zip(probabilities, result.endpoints, strict=True):
+    for f, (low, high) in zip(probabilities, outcome.endpoints, strict=True):
         endpoints: tuple[tuple[Literal["lower", "upper"], BootstrapEndpoint], ...] = (("lower", low), ("upper", high))
         for side, endpoint in endpoints:
             points.append(

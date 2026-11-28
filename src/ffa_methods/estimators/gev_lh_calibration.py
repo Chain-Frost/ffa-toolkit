@@ -10,12 +10,25 @@ from scipy.special import stdtrit
 from ffa_methods.estimators.gev_lh import GEVLHFit, fit_gev_lh, lh_gap_weight
 from ffa_methods.estimators.gev_lh_diagnostics import (
     LHConditionalVariance,
+    require_resolved_lh_residual,
     select_lowest_passing_h,
     standardized_lh_z,
 )
 
 _BATCHES = 20
 _RECORDS_PER_BATCH = 10_000
+
+
+class LHDomainError(ValueError):
+    """The complete candidate set is outside the calibration domain."""
+
+
+class LHPrecisionError(ValueError):
+    """Simulation precision is insufficient to admit calibration or selection."""
+
+
+class LHNumericalError(ValueError):
+    """A candidate fit or calibration calculation failed."""
 
 
 def _gap_weights(count: int, shift: int) -> NDArray[np.float64]:
@@ -44,8 +57,10 @@ def _simulate_pairs(
 def _covariance(ratios: NDArray[np.float64]) -> LHConditionalVariance:
     """Centered regression for bounded simulated ratios, including the pooled ensemble."""
     count = len(ratios)
-    skew = ratios[:, 0] - ratios[:, 0].mean()
-    kurtosis = ratios[:, 1] - ratios[:, 1].mean()
+    skew = ratios[:, 0] - ratios[0, 0]
+    kurtosis = ratios[:, 1] - ratios[0, 1]
+    skew -= skew.mean()
+    kurtosis -= kurtosis.mean()
     ss3 = float((skew * skew).sum())
     ss4 = float((kurtosis * kurtosis).sum())
     cross = float((skew * kurtosis).sum())
@@ -54,9 +69,7 @@ def _covariance(ratios: NDArray[np.float64]) -> LHConditionalVariance:
         raise ValueError(msg)
     residual = kurtosis - (cross / ss3) * skew
     variance = float((residual * residual).sum()) / (count - 1)
-    if not isfinite(variance) or variance <= 0:
-        msg = "simulated LH pairs have invalid conditional variance"
-        raise ValueError(msg)
+    require_resolved_lh_residual(variance, ss4 / (count - 1))
     return LHConditionalVariance(count, ss3 / (count - 1), ss4 / (count - 1), cross / (count - 1), variance)
 
 
@@ -72,7 +85,7 @@ def calibrate_fitted_lh(count: int, shape: float, shift: int, *, seed: int) -> F
     """Calibrate at fitted shape using standardized GEV records and independent batches."""
     if not 20 <= count <= 60 or not -0.8 <= shape <= 0.6 or shift not in range(5):
         msg = "provisional LH calibration requires n=20..60, ARR shape k in [-0.8, 0.6] and H=0..4"
-        raise ValueError(msg)
+        raise LHDomainError(msg)
     rng = np.random.Generator(np.random.PCG64(seed))
     weights = _gap_weights(count, shift)
     batches = np.empty((_BATCHES, _RECORDS_PER_BATCH, 2), dtype=np.float64)
@@ -89,7 +102,7 @@ def calibrate_fitted_lh(count: int, shape: float, shift: int, *, seed: int) -> F
     relative_half_width = half_width / covariance.conditional_variance
     if not 0 < lower < upper or not isfinite(upper) or relative_half_width > 0.02:
         msg = f"LH calibration failed the 2% relative variance precision target (half-width {relative_half_width:.3%})"
-        raise ValueError(msg)
+        raise LHPrecisionError(msg)
     return FittedLHCalibration(covariance, lower, upper, seed)
 
 
@@ -108,23 +121,36 @@ def evaluate_candidate_h(
         msg = "selection requires a finite positive critical z and a nonnegative integer seed"
         raise ValueError(msg)
     if not 20 <= len(values) <= 60:
-        msg = "selected-H GEV calibration requires 20 to 60 exact annual maxima"
-        raise ValueError(msg)
-    candidates: list[LHCandidate] = []
+        msg = "selected-H domain refusal: calibration requires 20 to 60 exact annual maxima"
+        raise LHDomainError(msg)
+    fits: list[GEVLHFit] = []
     for shift in range(5):
         try:
-            fit = fit_gev_lh(values, shift=shift)
-            calibration = calibrate_fitted_lh(len(values), fit.shape, shift, seed=seed + shift)
+            fits.append(fit_gev_lh(values, shift=shift))
+        except (ValueError, ArithmeticError) as exc:
+            msg = f"H={shift}: selected-H numerical failure during fit: {exc}"
+            raise LHNumericalError(msg) from exc
+    outside = ", ".join(f"H={fit.shift} (k={fit.shape:.17g})" for fit in fits if not -0.8 <= fit.shape <= 0.6)
+    if outside:
+        msg = f"selected-H domain refusal: all five fitted shapes must be in [-0.8, 0.6]; outside: {outside}"
+        raise LHDomainError(msg)
+    candidates: list[LHCandidate] = []
+    for fit in fits:
+        try:
+            calibration = calibrate_fitted_lh(len(values), fit.shape, fit.shift, seed=seed + fit.shift)
             sample_kurtosis = fit.sample_moments[3] / fit.sample_moments[1]
             fitted_kurtosis = fit.fitted_moments[3] / fit.fitted_moments[1]
             z = standardized_lh_z(sample_kurtosis, fitted_kurtosis, calibration.covariance)
-        except ValueError as exc:
-            msg = f"H={shift}: {exc}"
-            raise ValueError(msg) from exc
+        except LHPrecisionError as exc:
+            msg = f"H={fit.shift}: selected-H calibration precision refusal: {exc}"
+            raise LHPrecisionError(msg) from exc
+        except (ValueError, ArithmeticError) as exc:
+            msg = f"H={fit.shift}: selected-H numerical failure during calibration: {exc}"
+            raise LHNumericalError(msg) from exc
         residual = abs(sample_kurtosis - fitted_kurtosis)
         if residual / sqrt(calibration.variance_upper) <= critical_z < residual / sqrt(calibration.variance_lower):
-            msg = f"H={fit.shift}: calibration uncertainty straddles the critical z"
-            raise ValueError(msg)
+            msg = f"H={fit.shift}: selected-H calibration precision refusal: uncertainty straddles the critical z"
+            raise LHPrecisionError(msg)
         candidates.append(LHCandidate(fit, calibration, z))
     return tuple(candidates), select_lowest_passing_h(
         tuple(candidate.z for candidate in candidates), critical_z=critical_z

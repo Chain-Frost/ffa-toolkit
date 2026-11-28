@@ -26,8 +26,8 @@ sample LH scale, an unconditional kurtosis SD or a bootstrap confidence limit. E
 functions are fourth-degree polynomials in population LH skew and depend on H. The article
 derived them from simulations of 100,000 complete records per size and shape, at n=20 and
 50 and ARR-coordinate shape k=-0.8 to +0.6 at 0.05 increments, separately for H=0..4.
-The evaluation of test rejection rates includes n=30 and 60, shape -0.3 to +0.3, and nominal
-5% and 1% levels; the test is approximate rather than an exact level guarantee.
+Wang evaluates nominal 5% rejection at n=30 and 60 and nominal 1% rejection at n=30,
+using shapes -0.3 to +0.3. The test is approximate.
 The printed table captions and the equations in the text use inconsistent cross-references;
 the body of equations (6) and (7) identifies b and c unambiguously.
 
@@ -93,6 +93,17 @@ absolute-z bracket that straddles the declared cutoff. A 2% variance error corre
 to at most approximately 1.02% error in the magnitude of z. The cutoff check addresses
 decisions for which even that precision is insufficient. No automatic seed retries.
 
+The covariance implementations subtract an anchor before centering so that rounding
+of a mean at a common offset does not dominate the centered ratios. The regression
+uses the squared norm of the residual vector. Reject when its norm is no greater
+than 32 binary64 epsilons times the centered kurtosis norm. Centering, covariance
+accumulation, division and subtraction each contribute roundoff at the centered
+scale. The factor of 32 gives those operations headroom and the relative rule is
+invariant to rescaling kurtosis. This is a numerical rank guard, with no floor
+substituted for the variance and no change to the 2% Monte Carlo requirement.
+The exactly collinear dyadic record from the independent review and a one-ulp-scale
+perturbation both trigger it in the scalar and simulation paths.
+
 An independent rerun on Python 3.14.6 calculated the ratios from ordered ranks and
 the population skew by integrating beta order-statistic densities. It reproduced
 maximum discrepancies of 0.9175% (polynomial against direct), 1.4405% (between
@@ -123,10 +134,12 @@ check, with no nominal error guarantee after conditioning or selection.
 
 Fit every H=0..4 using the existing LH estimator. The smallest H with absolute z
 at most the configured critical value is selected when all five decisions are
-numerically stable. Equality passes at the point-rule level. A failed calibration
-or undecidable candidate stops the calculation with an explicit error. An
-all-rejected record retains all diagnostics and support observations and emits
-no selected quantile. Support findings are independent of the LH cutoff decision.
+numerically stable. Equality passes at the point-rule level. A domain refusal
+lists the out-of-range fitted candidates and prevents calibration. A precision
+refusal identifies the candidate and failed Monte Carlo gate. Numerical failures
+identify the candidate and fit or calibration stage. A complete all-rejected
+record reports `selection=no_pass`, retains diagnostics and support observations,
+and emits no selected quantile. Support findings are independent of the cutoff.
 
 The optional complete-record parametric bootstrap uses the fitted distribution
 as its generating law. Each equal-length synthetic record repeats the declared
@@ -135,7 +148,9 @@ the calibration seed is held fixed across replicates, as part of the procedure
 being repeated. The bootstrap record generator uses a separate declared MT19937
 seed. Simulated discharges are drawn from the fitted law without clipping; refits
 apply the estimator's own domain rules. Fit, calibration and no-pass failures are
-counted against all attempted records and are never replaced.
+counted against all attempted records. Each attempt appears once in simulation order
+in the JSON array encoded in `settings.bootstrap_attempts`. Each row records the
+selected H where applicable and any failed stage and reason.
 
 Report central type-7 percentile intervals over the successful replicate quantiles
 at each explicitly requested non-exceedance probability. A positive admitted failure
@@ -145,10 +160,18 @@ corresponding tail probability to bracket its finite-simulation error. Allocate 
 across both bracket tails, both endpoints and all requested probabilities. A bracket
 that cannot be supported by the successful count or whose distance from the type-7
 estimate exceeds the caller's absolute discharge tolerance prevents interval
-publication. These numerical brackets concern the endpoint estimates, while the
-percentile interval expresses model-based sampling variability.
+publication. The CLI returns status 2 and saves the point-fit bundle and attempt
+ledger on interval refusal. The report settings identify the gate as
+`failure_fraction`, `endpoint_count` or `endpoint_precision`. These numerical
+brackets concern the endpoint estimates, while the percentile interval expresses
+model-based sampling variability.
 
 ## Qualification
+
+The [held-out direct-calibration evidence](wp04-direct-lh-held-out-validation.md)
+covers record lengths 20 and 60, all-candidate eligibility, precision refusals
+and decision stability. The [bootstrap worked example](wp04-bootstrap-evidence.md)
+records separate ordinary, fixed-H and selected-H executions.
 
 The direct method retains Wang's joint-normal and negligible-bias approximation.
 The operational precision rule addresses calculation stability. Test rejection rates

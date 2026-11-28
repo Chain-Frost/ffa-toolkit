@@ -84,6 +84,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         except OSError as exc:
             print(f"ffa: fit I/O failure: {exc}", file=sys.stderr)
             return 1
+        if settings.get("bootstrap_status") == "refused":
+            print(
+                f"ffa: {settings['bootstrap_refusal_detail']}. Point fit and attempt ledger: {paths[0].parent}",
+                file=sys.stderr,
+            )
+            return 2
         print(f"Independent mathematical fit only — not native Flike-qualified. Reports: {paths[0].parent}")
         return 0
     parser.error("no command selected; use fit, explain, references or --help")

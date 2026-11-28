@@ -229,12 +229,38 @@ def _check_selected_h_installed(console: Path, output: Path, env: dict[str, str]
         expected_code=0,
     )
     report = json.loads((target / "results.json").read_text(encoding="utf-8"))
+    attempts = json.loads(report["settings"]["bootstrap_attempts"])
     if (
         report["settings"]["lh_shift"] != 0
         or set(report["candidate_gev_support"]) != set("01234")
         or [point["probability_limit_side"] for point in report["results"]] != [None, "lower", "upper"]
+        or len(attempts) != 24
     ):
-        msg = "installed selected-H CLI did not report five fitted supports, H=0 and bootstrap limits"
+        msg = "installed selected-H CLI did not report five fitted supports, H=0, bootstrap limits and all attempts"
+        raise RuntimeError(msg)
+
+    settings["bootstrap"] = {
+        "replications": 4,
+        "seed": 42,
+        "confidence": 0.8,
+        "maximum_failure_fraction": 0.0,
+        "endpoint_tolerance": 1.0,
+    }
+    config.write_text(json.dumps(settings), encoding="utf-8")
+    target = output / "selected-h-bootstrap-refused"
+    _invoke(
+        [str(console), "fit", "--ams", str(ams), "--settings", str(config), "--output", str(target)],
+        cwd=output,
+        env=env,
+        expected_code=2,
+    )
+    report = json.loads((target / "results.json").read_text(encoding="utf-8"))
+    if (
+        report["settings"]["bootstrap_refusal_code"] != "endpoint_count"
+        or [point["probability_limit_side"] for point in report["results"]] != [None]
+        or [attempt["selected_h"] for attempt in json.loads(report["settings"]["bootstrap_attempts"])] != [0] * 4
+    ):
+        msg = "installed selected-H CLI failed to retain the point fit and four reselections on interval refusal"
         raise RuntimeError(msg)
 
 

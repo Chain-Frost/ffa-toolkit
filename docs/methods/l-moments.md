@@ -41,7 +41,7 @@ Read `results.json`, `results.csv` and `report.txt`. Parameter summaries are `po
 
 An optional `bootstrap` object configures parametric percentile intervals. For example, add `"bootstrap": {"replications": 2000, "seed": 42, "confidence": 0.9, "maximum_failure_fraction": 0, "endpoint_tolerance": 5}` to the ordinary Gumbel settings. The tolerance is in the declared discharge unit and must reflect the desired endpoint precision. The original fitted family generates a complete record of the original length. Each refit repeats the same family, reference discharge and GP location mode. Failed trials count against the declared maximum fraction, and limits use the successful refits. The report provides rank-based Monte Carlo bounds on each endpoint separately from the percentile sampling interval. See the [bootstrap specification](https://github.com/Chain-Frost/ffa-toolkit/blob/main/docs/wp04-optimized-h-specification.md).
 
-With the packaged ordinary synthetic data and these settings, the 10% AEP point fit is approximately 4.7472 m³/s. The 90% bootstrap percentile limits are approximately 1.9497 and 9.0002 m³/s, with 2,000 successful refits.
+The report retains every attempted refit in simulation order. If the failure limit or endpoint precision requirement is unmet, the CLI exits with status 2 and saves the point-fit bundle and attempt ledger without interval limits. With the packaged ordinary synthetic data and these settings, the 10% AEP point fit is approximately 4.7472 m³/s. The 90% bootstrap percentile limits are approximately 1.9497 and 9.0002 m³/s, with 2,000 successful refits.
 
 ## Basis and limits
 

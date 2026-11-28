@@ -2,8 +2,10 @@
 
 from math import inf, isclose, nan, sqrt
 
+import numpy as np
 import pytest
 
+from ffa_methods.estimators.gev_lh_calibration import _covariance  # pyright: ignore[reportPrivateUsage]
 from ffa_methods.estimators.gev_lh_diagnostics import (
     LHConditionalVariance,
     conditional_lh_variance,
@@ -43,6 +45,15 @@ def test_conditional_variance_exact_rational_reference() -> None:
 def test_conditional_variance_rejects_unusable_calibration(pairs: tuple[tuple[float, float], ...]) -> None:
     with pytest.raises(ValueError, match="conditional LH"):
         conditional_lh_variance(pairs)
+
+
+@pytest.mark.parametrize("perturbation", [0.0, 2.0**-52])
+def test_conditional_variance_refuses_unresolved_rank(perturbation: float) -> None:
+    pairs = ((0.0, 0.125), (0.125, 0.25 + perturbation), (0.5, 0.625))
+    with pytest.raises(ValueError, match="rank deficient"):
+        conditional_lh_variance(pairs)
+    with pytest.raises(ValueError, match="rank deficient"):
+        _covariance(np.asarray(pairs))
 
 
 @pytest.mark.parametrize("variance", [0.0, -1.0, inf, nan])

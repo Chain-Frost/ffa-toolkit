@@ -8,6 +8,14 @@ population LH skew, and qualify simulation precision before using the result.
 from collections.abc import Iterable
 from dataclasses import dataclass
 from math import fsum, isfinite, sqrt
+from sys import float_info
+
+
+def require_resolved_lh_residual(variance: float, kurtosis_variance: float) -> None:
+    """Reject residual norms at the roundoff scale of the centered kurtoses."""
+    if not isfinite(variance) or variance <= 0 or sqrt(variance) <= 32 * float_info.epsilon * sqrt(kurtosis_variance):
+        msg = "conditional LH variance is numerically rank deficient or nonfinite"
+        raise ValueError(msg)
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,9 +43,11 @@ def conditional_lh_variance(pairs: Iterable[tuple[float, float]]) -> LHCondition
         msg = "conditional LH variance requires at least three finite paired ratios"
         raise ValueError(msg)
     try:
-        mean3 = fsum(x for x, _ in values) / count
-        mean4 = fsum(y for _, y in values) / count
-        centered = tuple((x - mean3, y - mean4) for x, y in values)
+        origin3, origin4 = values[0]
+        offsets = tuple((x - origin3, y - origin4) for x, y in values)
+        mean3 = fsum(x for x, _ in offsets) / count
+        mean4 = fsum(y for _, y in offsets) / count
+        centered = tuple((x - mean3, y - mean4) for x, y in offsets)
         ss3 = fsum(x * x for x, _ in centered)
         ss4 = fsum(y * y for _, y in centered)
         cross = fsum(x * y for x, y in centered)
@@ -53,12 +63,10 @@ def conditional_lh_variance(pairs: Iterable[tuple[float, float]]) -> LHCondition
     skew_variance = ss3 / (count - 1)
     kurtosis_variance = ss4 / (count - 1)
     covariance = cross / (count - 1)
-    if (
-        not all(isfinite(value) for value in (variance, skew_variance, kurtosis_variance, covariance))
-        or min(variance, skew_variance, kurtosis_variance) <= 0
-    ):
+    if min(skew_variance, kurtosis_variance) <= 0:
         msg = "conditional LH variance must be finite and positive"
         raise ValueError(msg)
+    require_resolved_lh_residual(variance, kurtosis_variance)
     return LHConditionalVariance(count, skew_variance, kurtosis_variance, covariance, variance)
 
 
