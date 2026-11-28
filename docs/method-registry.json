@@ -400,7 +400,7 @@
         "Bounded known-scale exact-record precision audit against conjugate Normal reference outputs, centered residual MCSE, simultaneous inverse and transformed intervals, reproducibility and retained unsuccessful attempts"
       ],
       "evidence_gaps": [
-        "Independent local curvature, explicit full covariance scaling, Normal importance draws, explicit lognormal binding and a bounded known-scale exact-record precision audit are internal components; broader model/exposure precision admission and installed Bayesian fitting remain outstanding.",
+        "Internal fixed-budget precision covers the admitted exact-record model and explicitly configured fixed-scale censored parameter mean and expected CDF/direct AEP using complete deterministic enclosures. Censored transformed and inverse outputs, estimated-scale precision and installed Bayesian fitting remain outstanding.",
         "Actual native Flike optimizer/proposal, random controls, stopping and output interpolation are not established; external native qualification remains separate.",
         "ESS, approximate mean Monte Carlo standard error, and independent seeds do not by themselves validate extreme-tail flood estimates or native equivalence."
       ],
