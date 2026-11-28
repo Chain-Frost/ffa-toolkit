@@ -67,7 +67,7 @@ lognormal Bayesian Year,AMS schema, require complete, consecutive, positive exac
 year definition and unit remain assertions. The plot refuses unresolved gaps rather than treating
 them as measured exposure or non-exceedances. Existing unplotted fits are not restricted further.
 No missing, zero, historical, grouped, censored, rating-error or POT plot is admitted here.
-Selected-H and parametric-bootstrap visualization remain separate pending work. An annual-maxima GP fit is not a POT workflow. Independence, stationarity,
+Selected-H plots require a successfully selected candidate; bootstrap plots require completed intervals. An annual-maxima GP fit is not a POT workflow. Independence, stationarity,
 physical support, model selection, data quality, rating error and engineering adoption still
 require review. No native labels or defaults are inferred.
 
@@ -115,3 +115,89 @@ the plotted values are the actual finite seeded importance-sampling outputs.
 The configured AEP precision audit does not qualify those quantile points.
 See `ffa explain quantile-estimands --format markdown` and the installed Bayesian
 workflow guidance for the source method and limitations. Native qualification remains separate.
+
+## Selected-H and completed parametric-bootstrap plots
+
+The `ffa-gev-selected-h/1` workflow displays the actual selected fitted quantiles,
+with the selected H and provisional calibration explicitly labelled. All five candidate
+diagnostics remain in the numerical report. No curve is fabricated when no candidate passes.
+
+For a completed declared parametric bootstrap of an admitted exact-record ordinary,
+fixed-H or selected-H fit, each vertical sampling interval uses the actual lower and
+upper `quantile_parametric_bootstrap_percentile_limit` values, their recorded confidence
+mass and `parametric_percentile_type_7_successful_refits` construction. The interval
+describes sampling/refitting variability conditional on successful refits, including
+reselection for selected H. It is not a posterior credible interval, prediction
+interval, simultaneous band or the numerical Monte Carlo bracket around an endpoint.
+The full numerical report preserves the attempted/failed replicate ledger and endpoint
+Monte Carlo diagnostics. Per-row Bayesian precision state is blank when not supplied by
+the deterministic result contract. A plot does not independently certify precision.
+
+The extended coordinate CSV preserves one-based canonical numerical result row
+identity and actual typed interval metadata. The ordinary and fixed-H point-only
+coordinate schema is unchanged. Refused bootstrap or no-selected-fit plotting requests
+still fail closed; use the same settings without `--frequency-report` to retain the
+point-fit or candidate report and applicable attempt ledger.
+
+### Rerunnable synthetic examples
+
+Using the existing synthetic 50-year Gumbel-like record from the selected-H CLI
+validation, save and run the following script with the installed package:
+
+~~~python
+import json
+import subprocess
+import sys
+import tempfile
+from importlib.resources import files
+from math import log
+from pathlib import Path
+
+root = Path(tempfile.mkdtemp(prefix="ffa-selected-bootstrap-", dir=Path.cwd()))
+resources = files("ffa_methods").joinpath("resources", "examples")
+ams = root / "annual.csv"
+ams.write_text(
+    "Year,AMS\n" + "\n".join(
+        f"{1950+i},{20-log(-log((i-0.35)/50.3))}" for i in range(1, 51)
+    ),
+    encoding="utf-8",
+)
+fixed = json.loads(resources.joinpath("fixed-gev-settings.json").read_bytes())
+fixed.update(lh_shift=1, non_exceedance_probabilities=[0.9])
+ordinary = json.loads(resources.joinpath("ordinary-settings.json").read_bytes())
+ordinary["non_exceedance_probabilities"] = [0.9]
+bootstrap = {
+    "replications": 200, "seed": 42, "confidence": 0.8,
+    "maximum_failure_fraction": 0.0, "endpoint_tolerance": 1.0,
+}
+selected = dict(fixed)
+selected.pop("lh_shift")
+selected.update(
+    schema_version="ffa-gev-selected-h/1", estimator="gev_lh_selected_h",
+    critical_z=1.96, calibration_seed=7,
+)
+cases = {
+    "selected": selected,
+    "fixed-bootstrap": {**fixed, "bootstrap": bootstrap},
+    "ordinary-bootstrap": {**ordinary, "bootstrap": bootstrap},
+    "selected-bootstrap": {
+        **selected, "bootstrap": {
+            "replications": 24, "seed": 42, "confidence": 0.5,
+            "maximum_failure_fraction": 0.25, "endpoint_tolerance": 2.0,
+        },
+    },
+}
+for name, config in cases.items():
+    path = root / f"{name}.json"
+    path.write_text(json.dumps(config), encoding="utf-8")
+    subprocess.run(
+        [sys.executable, "-m", "ffa_methods", "fit", "--ams", ams.name,
+         "--settings", path.name, "--output", name, "--frequency-report"],
+        cwd=root, check=True,
+    )
+print(root)
+~~~
+
+These synthetic budgets, tolerances and confidence levels are validation examples,
+not adopted engineering settings. The selected-H calibration is provisional.
+See the GEV method page and the separate bootstrap evidence for the numerical basis.

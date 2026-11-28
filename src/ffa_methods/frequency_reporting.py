@@ -13,15 +13,18 @@ from ffa_methods.contracts import AnalysisResult, ProbabilityKind, ResultMeaning
 from ffa_methods.frequency_quantiles import (
     BAYESIAN_PLOT_SCHEMA,
     BAYESIAN_SERIES,
+    BOOTSTRAP_LIMIT,
+    DETERMINISTIC_SCHEMAS,
     POSTERIOR_LIMIT,
+    SELECTED_SCHEMA,
     QuantilePlotRow,
     bayesian_quantile_rows,
+    deterministic_quantile_rows,
 )
 from ffa_methods.legacy.models import ObservationKind
 from ffa_methods.legacy.project import parse_ams_csv
 
 # Deliberately version-gated here: future fitter schemas do not automatically gain plotting admission.
-_ADMITTED_SCHEMAS = ("ffa-gev-fixed-h/1", "ffa-ordinary-lmoments/1")
 _EXACT_ASSERTION = "caller_asserted_complete_exact_positive_annual_maxima"
 _SOURCE = "ARR Book 3 v4.2, Chapter 2, section 2.6.2, eq. (3.2.36), printed pp. 35-36"
 _LIMITS = (
@@ -281,7 +284,8 @@ def _html_report(svg: str, points: tuple[PlotPoint, ...], report_text: str, unit
 
 
 # The deterministic point-only renderer and its coordinate CSV remain unchanged.
-_BAYESIAN_STYLES: dict[ResultMeaning, tuple[str, str, str, float]] = {
+_QUANTILE_STYLES: dict[ResultMeaning, tuple[str, str, str, float]] = {
+    ResultMeaning.DETERMINISTIC_FITTED_QUANTILE: ("Deterministic fitted quantile", "#1767a0", "", 5.5),
     ResultMeaning.QUANTILE_AT_EXPECTED_PARAMETERS: ("At expected parameters", "#1767a0", "", 5.5),
     ResultMeaning.POSTERIOR_MEAN_QUANTILE: ("Mean of posterior quantiles", "#a34f05", "7 4", 7.5),
     ResultMeaning.POSTERIOR_MEDIAN_QUANTILE: ("Median of posterior quantiles", "#7552a0", "2 3", 9.0),
@@ -298,17 +302,17 @@ def _model_plot_point(row: QuantilePlotRow) -> PlotPoint:
     return PlotPoint(row.point.meaning.value, row.point.value, row.aep, row.f)
 
 
-def _bayesian_marker(row: QuantilePlotRow, scale: PlotScale) -> str:
+def _quantile_marker(row: QuantilePlotRow, scale: PlotScale) -> str:
     x, y = scale.xy(_model_plot_point(row))
-    if row.point.meaning == POSTERIOR_LIMIT:
+    if row.point.meaning in (POSTERIOR_LIMIT, BOOTSTRAP_LIMIT):
         color, radius = "#64748b", 3.0
-        label = f"Posterior quantile interval {row.point.probability_limit_side}, mass={row.point.confidence_level!r}"
+        interval = "Posterior quantile" if row.point.meaning == POSTERIOR_LIMIT else "Parametric bootstrap sampling"
+        label = f"{interval} interval {row.point.probability_limit_side}, mass={row.point.confidence_level!r}"
     else:
-        label, color, _, radius = _BAYESIAN_STYLES[row.point.meaning]
-    title = (
-        f"{label}, F={row.f!r}, AEP={row.aep!r}, Q={row.point.value!r} {row.point.unit}; "
-        f"numerical precision={row.precision_state}"
-    )
+        label, color, _, radius = _QUANTILE_STYLES[row.point.meaning]
+    title = f"{label}, F={row.f!r}, AEP={row.aep!r}, Q={row.point.value!r} {row.point.unit}"
+    if row.precision_state:
+        title += f"; numerical precision={row.precision_state}"
     return (
         f'<circle data-result-row="{row.index}" data-series="{row.point.meaning.value}" '
         f'cx="{x}" cy="{y}" r="{radius}" fill="none" stroke="{color}" stroke-width="1.7">'
@@ -316,13 +320,13 @@ def _bayesian_marker(row: QuantilePlotRow, scale: PlotScale) -> str:
     )
 
 
-def _bayesian_segments(rows: tuple[QuantilePlotRow, ...], scale: PlotScale) -> list[str]:
+def _quantile_segments(rows: tuple[QuantilePlotRow, ...], scale: PlotScale) -> list[str]:
     """Only join adjacent requested probabilities; never bridge an omitted mean."""
     lines: list[str] = []
     probabilities = sorted({row.f for row in rows})
-    for meaning in BAYESIAN_SERIES:
+    for meaning in _QUANTILE_STYLES:
         by_f = {row.f: row for row in rows if row.point.meaning == meaning}
-        _, color, dash, _ = _BAYESIAN_STYLES[meaning]
+        _, color, dash, _ = _QUANTILE_STYLES[meaning]
         for left, right in zip(probabilities[:-1], probabilities[1:], strict=True):
             if left in by_f and right in by_f:
                 x1, y1 = scale.xy(_model_plot_point(by_f[left]))
@@ -334,15 +338,16 @@ def _bayesian_segments(rows: tuple[QuantilePlotRow, ...], scale: PlotScale) -> l
     return lines
 
 
-def _posterior_interval_bars(rows: tuple[QuantilePlotRow, ...], scale: PlotScale) -> list[str]:
+def _interval_bars(rows: tuple[QuantilePlotRow, ...], scale: PlotScale) -> list[str]:
     lowers = {row.f: row for row in rows if row.point.probability_limit_side == "lower"}
     uppers = {row.f: row for row in rows if row.point.probability_limit_side == "upper"}
     lines: list[str] = []
     for f, lower in lowers.items():
         x, low_y = scale.xy(_model_plot_point(lower))
         _, high_y = scale.xy(_model_plot_point(uppers[f]))
+        kind = "posterior_quantile" if lower.point.meaning == POSTERIOR_LIMIT else "parametric_bootstrap"
         lines.append(
-            f'<path data-interval="posterior_quantile" d="M{x - 5} {low_y} H{x + 5} '
+            f'<path data-interval="{kind}" d="M{x - 5} {low_y} H{x + 5} '
             f'M{x} {low_y} V{high_y} M{x - 5} {high_y} H{x + 5}" '
             'fill="none" stroke="#64748b" stroke-width="1.5"/>'
         )
@@ -350,14 +355,15 @@ def _posterior_interval_bars(rows: tuple[QuantilePlotRow, ...], scale: PlotScale
 
 
 def _bayesian_legend(rows: tuple[QuantilePlotRow, ...]) -> list[str]:
+    mass = next(row.point.confidence_level for row in rows if row.point.meaning == POSTERIOR_LIMIT)
     lines = [
         '<circle cx="120" cy="522" r="4" fill="#202c39"/>',
         '<text x="138" y="526">Observed Cunnane positions</text>',
         '<path d="M115 536 V552 M110 536 H120 M110 552 H120" stroke="#64748b" fill="none"/>',
-        '<text x="138" y="548">Pointwise posterior quantile interval</text>',
+        f'<text x="138" y="548">Pointwise posterior quantile interval (mass={mass})</text>',
     ]
     for index, meaning in enumerate(BAYESIAN_SERIES):
-        label, color, dash, radius = _BAYESIAN_STYLES[meaning]
+        label, color, dash, radius = _QUANTILE_STYLES[meaning]
         y = 522 + 22 * index
         if any(row.point.meaning == meaning for row in rows):
             lines.extend(
@@ -382,19 +388,81 @@ def _bayesian_legend(rows: tuple[QuantilePlotRow, ...]) -> list[str]:
     return lines
 
 
-def _bayesian_svg(
-    observed: tuple[PlotPoint, ...], rows: tuple[QuantilePlotRow, ...], scale: PlotScale, unit: str
+@dataclass(frozen=True, slots=True)
+class QuantilePlotDescription:
+    heading: str
+    summary: str
+    explanation: str
+    legend: tuple[str, ...]
+
+
+def _deterministic_description(
+    result: AnalysisResult, settings: Mapping[str, object], rows: tuple[QuantilePlotRow, ...]
+) -> QuantilePlotDescription:
+    selected = settings.get("schema_version") == SELECTED_SCHEMA
+    fit_label = f"Selected H={settings['lh_shift']} (provisional calibration)" if selected else "Deterministic point fit"
+    mass = next((row.point.confidence_level for row in rows if row.point.meaning == BOOTSTRAP_LIMIT), None)
+    legend = [
+        '<circle cx="120" cy="522" r="4" fill="#202c39"/>',
+        '<text x="138" y="526">Observed Cunnane positions</text>',
+        '<circle cx="505" cy="522" r="5.5" fill="none" stroke="#1767a0" stroke-width="1.7"/>',
+        '<text x="520" y="526">Requested fitted quantile</text>',
+        f'<text x="110" y="620">{escape(fit_label)}. Not native-qualified; segments are visual guides.</text>',
+    ]
+    summary = "No uncertainty intervals were requested. Only the selected point fit is displayed."
+    if mass is not None:
+        summary = (
+            "Pointwise parametric-bootstrap percentile sampling intervals, conditional on successful refits. "
+            "They are not posterior or predictive intervals, simultaneous bands or endpoint Monte Carlo brackets."
+        )
+        legend.extend(
+            (
+                '<path d="M115 536 V552 M110 536 H120 M110 552 H120" stroke="#64748b" fill="none"/>',
+                f'<text x="138" y="548">Pointwise bootstrap sampling interval (mass={mass})</text>',
+                '<text x="110" y="642">Conditional on successful refits. Not posterior uncertainty or MC error.</text>',
+                '<text x="110" y="664">Endpoint Monte Carlo diagnostics and refit attempt ledger: see report.</text>',
+            )
+        )
+    legend.append(f'<text x="110" y="686" font-size="12">{escape(_support_notice(result))}</text>')
+    explanation = (
+        f"{fit_label}. {summary} The numerical report preserves all candidate diagnostics and, "
+        "when requested, the complete bootstrap attempt ledger and endpoint Monte Carlo brackets. "
+        "Blank per-result precision state means no Bayesian per-row audit field is supplied."
+    )
+    return QuantilePlotDescription("Annual maximum flood frequency", summary, explanation, tuple(legend))
+
+
+def _bayesian_description(rows: tuple[QuantilePlotRow, ...]) -> QuantilePlotDescription:
+    return QuantilePlotDescription(
+        "Bayesian annual maximum flood frequency",
+        _BAYESIAN_LIMITS,
+        (
+            "The four central estimands are different quantities. The posterior predictive quantile inverts "
+            "the averaged CDF; it is not the mean or median of component quantiles. Probability-at-flow and "
+            "return-period rows remain in the numerical report, not the quantile plot. "
+            "Missing or undefined outputs are not reconstructed."
+        ),
+        tuple(_bayesian_legend(rows)),
+    )
+
+
+def _quantile_svg(
+    observed: tuple[PlotPoint, ...],
+    rows: tuple[QuantilePlotRow, ...],
+    scale: PlotScale,
+    unit: str,
+    description: QuantilePlotDescription,
 ) -> str:
     lines = [
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 705" role="img" aria-labelledby="title desc">',
-        '<title id="title">Bayesian annual maximum flood frequency — independent, not native-qualified</title>',
-        f'<desc id="desc">{escape(_BAYESIAN_LIMITS)}</desc>',
+        f'<title id="title">{escape(description.heading)} — independent, not native-qualified</title>',
+        f'<desc id="desc">{escape(description.summary)}</desc>',
         '<rect width="1000" height="705" fill="white"/>',
         '<g font-family="sans-serif" font-size="13" fill="#202c39">',
-        '<text x="110" y="28" font-size="18" font-weight="bold">Bayesian annual maximum flood frequency</text>',
+        f'<text x="110" y="28" font-size="18" font-weight="bold">{escape(description.heading)}</text>',
         *_axis_svg(scale, unit),
-        *_posterior_interval_bars(rows, scale),
-        *_bayesian_segments(rows, scale),
+        *_interval_bars(rows, scale),
+        *_quantile_segments(rows, scale),
     ]
     for point in observed:
         x, y = scale.xy(point)
@@ -403,13 +471,13 @@ def _bayesian_svg(
             f'<circle data-series="observed" cx="{x}" cy="{y}" r="4" fill="#202c39">'
             f"<title>{escape(title)}</title></circle>"
         )
-    lines.extend(_bayesian_marker(row, scale) for row in rows)
-    lines.extend(_bayesian_legend(rows))
+    lines.extend(_quantile_marker(row, scale) for row in rows)
+    lines.extend(description.legend)
     lines.append("</g></svg>")
     return "\n".join(lines) + "\n"
 
 
-def _bayesian_csv(
+def _quantile_csv(
     observed: tuple[PlotPoint, ...], rows: tuple[QuantilePlotRow, ...], scale: PlotScale, unit: str
 ) -> str:
     stream = StringIO(newline="")
@@ -440,13 +508,14 @@ def _bayesian_csv(
     return stream.getvalue()
 
 
-def _bayesian_html(
+def _quantile_html(
     svg: str,
     observed: tuple[PlotPoint, ...],
     rows: tuple[QuantilePlotRow, ...],
     unit: str,
     year_definition: str,
     report_text: str,
+    description: QuantilePlotDescription,
 ) -> str:
     def cell(value: object) -> str:
         return f"<td>{escape('' if value is None else str(value))}</td>"
@@ -465,16 +534,15 @@ def _bayesian_html(
         for row in rows
     )
     return (
-        '<!doctype html>\n<html lang="en"><meta charset="utf-8"><title>FFA Bayesian frequency report</title>'
+        '<!doctype html>\n<html lang="en"><meta charset="utf-8">'
+        f"<title>{escape(description.heading)}</title>"
         '<style>body{font:15px/1.5 system-ui,sans-serif;max-width:1150px;margin:2rem auto;padding:0 1rem}'
         'svg{width:100%;height:auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #aaa;padding:.3rem}'
         'td,th{overflow-wrap:anywhere}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.85rem}'
         'h2{break-after:avoid-page}@media print{body{margin:0}tr,svg{break-inside:avoid}thead{display:table-header-group}}</style>'
-        '<main><h1>Bayesian flood frequency analysis</h1><p><strong>Not an adopted engineering estimate.</strong> '
-        f'{escape(_BAYESIAN_LIMITS)}</p><h2>Frequency plot</h2>{svg}'
-        '<p>The four central estimands are different quantities. The posterior predictive quantile inverts the averaged CDF; '
-        'it is not the mean or median of component quantiles. Probability-at-flow and return-period rows remain in the '
-        'numerical report, not the quantile plot. Missing or undefined outputs are not reconstructed.</p>'
+        f"<main><h1>{escape(description.heading)}</h1><p><strong>Not an adopted engineering estimate.</strong> "
+        f"{escape(description.summary)}</p><h2>Frequency plot</h2>{svg}"
+        f"<p>{escape(description.explanation)}</p>"
         '<h2>Requested quantiles and pointwise limits</h2><p>Result row is the one-based data row of results.csv '
         '(excluding its header), or the corresponding results.json entry. F and AEP are fractions.</p>'
         '<table><thead><tr><th>Result row</th><th>Meaning</th><th>F</th><th>AEP</th>'
@@ -496,7 +564,7 @@ def _bayesian_html(
     )
 
 
-def _render_bayesian_frequency(
+def _render_extended_frequency(
     result: AnalysisResult,
     *,
     settings: Mapping[str, object],
@@ -506,14 +574,19 @@ def _render_bayesian_frequency(
     year_definition: str,
     numerical_rows: Sequence[Mapping[str, object]],
 ) -> dict[str, str]:
-    rows = bayesian_quantile_rows(result, settings=settings, unit=unit, numerical_rows=numerical_rows)
+    if settings.get("schema_version") == BAYESIAN_PLOT_SCHEMA:
+        rows = bayesian_quantile_rows(result, settings=settings, unit=unit, numerical_rows=numerical_rows)
+        description = _bayesian_description(rows)
+    else:
+        rows = deterministic_quantile_rows(result, settings=settings, unit=unit, numerical_rows=numerical_rows)
+        description = _deterministic_description(result, settings, rows)
     observed = _observed_points(raw_ams)
     scale = PlotScale.from_points((*observed, *(_model_plot_point(row) for row in rows)))
-    svg = _bayesian_svg(observed, rows, scale, unit)
+    svg = _quantile_svg(observed, rows, scale, unit, description)
     return {
         "frequency.svg": svg,
-        "frequency-coordinates.csv": _bayesian_csv(observed, rows, scale, unit),
-        "report.html": _bayesian_html(svg, observed, rows, unit, year_definition, report_text),
+        "frequency-coordinates.csv": _quantile_csv(observed, rows, scale, unit),
+        "report.html": _quantile_html(svg, observed, rows, unit, year_definition, report_text, description),
     }
 
 
@@ -536,8 +609,11 @@ def render_frequency_files(
     ):
         msg = "discharge unit contains a character forbidden in SVG XML"
         raise ValueError(msg)
-    if settings.get("schema_version") == BAYESIAN_PLOT_SCHEMA:
-        return _render_bayesian_frequency(
+    if (
+        settings.get("schema_version") in (BAYESIAN_PLOT_SCHEMA, SELECTED_SCHEMA)
+        or settings.get("bootstrap_status") == "completed"
+    ):
+        return _render_extended_frequency(
             result,
             settings=settings,
             raw_ams=raw_ams,
@@ -546,7 +622,10 @@ def render_frequency_files(
             year_definition=year_definition,
             numerical_rows=numerical_rows,
         )
-    if settings.get("schema_version") not in _ADMITTED_SCHEMAS or settings.get("source_classification") != _EXACT_ASSERTION:
+    if (
+        settings.get("schema_version") not in DETERMINISTIC_SCHEMAS
+        or settings.get("source_classification") != _EXACT_ASSERTION
+    ):
         msg = "frequency report requires an admitted deterministic systematic-AMS settings schema"
         raise ValueError(msg)
     if "bootstrap_status" in settings:

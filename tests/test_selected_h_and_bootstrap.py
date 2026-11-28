@@ -232,7 +232,11 @@ def test_cli_candidate_and_bootstrap_reports(tmp_path: Path, schema: str, cutoff
         }
     path.write_text(json.dumps(settings), encoding="utf-8")
     target = tmp_path / "report"
-    assert main(["fit", "--ams", str(raw_ams), "--settings", str(path), "--output", str(target)]) == 0
+    args = ["fit", "--ams", str(raw_ams), "--settings", str(path), "--output", str(target)]
+    # Preserve the no-selected-fit numerical report; it cannot produce a frequency curve.
+    if cutoff != 1e-6:
+        args.append("--frequency-report")
+    assert main(args) == 0
     report = cast(dict[str, object], json.loads((target / "results.json").read_text(encoding="utf-8")))
     values = cast(list[dict[str, object]], report["results"])
     if schema == "ffa-gev-selected-h/1":
@@ -260,3 +264,20 @@ def test_cli_candidate_and_bootstrap_reports(tmp_path: Path, schema: str, cutoff
             measured = result["value"]
             assert isinstance(measured, float)
             assert isclose(measured, expected, abs_tol=1e-9, rel_tol=0)
+
+    if cutoff != 1e-6:
+        with (target / "frequency-coordinates.csv").open(encoding="utf-8", newline="") as stream:
+            plotted = [row for row in csv.DictReader(stream) if row["series"] != "observed"]
+        assert len(plotted) == len(values)
+        for marker in plotted:
+            row = values[int(marker["result_row"]) - 1]
+            assert float(marker["discharge"]) == row["value"]
+            assert float(marker["F"]) == row["input_non_exceedance_probability"]
+            assert float(marker["AEP"]) == row["input_annual_exceedance_probability"]
+            assert marker["meaning"] == row["meaning"]
+            if row["probability_limit_side"] is not None:
+                assert marker["probability_limit_side"] == row["probability_limit_side"]
+                assert float(marker["reported_probability_level"]) == row["reported_probability_level"]
+                assert marker["probability_limit_construction"] == row["probability_limit_construction"]
+        svg = (target / "frequency.svg").read_text(encoding="utf-8")
+        assert ('data-interval="parametric_bootstrap"' in svg) == (schema != "ffa-gev-selected-h/1")

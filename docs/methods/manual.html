@@ -130,6 +130,64 @@ print(root)</code></pre>
 <p>Read the pointwise limits and numerical precision states as separate information.
 Probability-at-flow results remain in the numerical report. The exact Year,AMS
 plot does not rank censored, historical or gapped records.</p>
+<h2 id="bootstrap-example">Selected-H and parametric-bootstrap examples</h2>
+<p>Use a fresh working directory. The following synthetic budgets and tolerances are
+validation examples, not engineering defaults. The selected-H calibration is provisional.
+Bootstrap sampling intervals are conditional on successful refits; they are distinct from
+posterior uncertainty and endpoint Monte Carlo diagnostics.</p>
+<pre><code>import json
+import subprocess
+import sys
+import tempfile
+from importlib.resources import files
+from math import log
+from pathlib import Path
+
+root = Path(tempfile.mkdtemp(prefix="ffa-selected-bootstrap-", dir=Path.cwd()))
+resources = files("ffa_methods").joinpath("resources", "examples")
+ams = root / "annual.csv"
+ams.write_text(
+    "Year,AMS\n" + "\n".join(
+        f"{1950+i},{20-log(-log((i-0.35)/50.3))}" for i in range(1, 51)
+    ),
+    encoding="utf-8",
+)
+fixed = json.loads(resources.joinpath("fixed-gev-settings.json").read_bytes())
+fixed.update(lh_shift=1, non_exceedance_probabilities=[0.9])
+ordinary = json.loads(resources.joinpath("ordinary-settings.json").read_bytes())
+ordinary["non_exceedance_probabilities"] = [0.9]
+bootstrap = {
+    "replications": 200, "seed": 42, "confidence": 0.8,
+    "maximum_failure_fraction": 0.0, "endpoint_tolerance": 1.0,
+}
+selected = dict(fixed)
+selected.pop("lh_shift")
+selected.update(
+    schema_version="ffa-gev-selected-h/1", estimator="gev_lh_selected_h",
+    critical_z=1.96, calibration_seed=7,
+)
+cases = {
+    "selected": selected,
+    "fixed-bootstrap": {**fixed, "bootstrap": bootstrap},
+    "ordinary-bootstrap": {**ordinary, "bootstrap": bootstrap},
+    "selected-bootstrap": {
+        **selected, "bootstrap": {
+            "replications": 24, "seed": 42, "confidence": 0.5,
+            "maximum_failure_fraction": 0.25, "endpoint_tolerance": 2.0,
+        },
+    },
+}
+for name, config in cases.items():
+    path = root / f"{name}.json"
+    path.write_text(json.dumps(config), encoding="utf-8")
+    subprocess.run(
+        [sys.executable, "-m", "ffa_methods", "fit", "--ams", ams.name,
+         "--settings", path.name, "--output", name, "--frequency-report"],
+        cwd=root, check=True,
+    )
+print(root)</code></pre>
+<p>With a refused bootstrap or no selected candidate, omit the plot flag to retain the
+applicable numerical report and attempt ledger. Do not substitute a point or interval.</p>
 <h2 id="outputs">Read the report</h2>
 <ul>
 <li>Observe the dark Cunnane markers and hollow fitted markers. The horizontal axis is log AEP
@@ -147,7 +205,8 @@ posterior mean or median of quantiles, and quantile of the predictive mixture ha
 meanings. A pointwise posterior quantile interval describes parameter-induced uncertainty
 at one F. Its width is distinct from a predictive interval, a simultaneous band, or Monte Carlo error.
 The exact Year,AMS Bayesian plot displays the separate central estimands and requested
-pointwise posterior quantile limits. Censored/historical and bootstrap plots remain unavailable.</li>
+pointwise posterior quantile limits. Completed parametric-bootstrap plots use distinct sampling
+intervals conditional on successful refits. Censored/historical plots remain unavailable.</li>
 <li>Retain <code>results.json</code>, <code>results.csv</code>, <code>report.txt</code>,
 <code>frequency-coordinates.csv</code> and both source snapshots. Source and settings hashes
 identify the analysed bytes. Replay with the same package and dependency versions using the
