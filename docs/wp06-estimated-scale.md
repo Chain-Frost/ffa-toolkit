@@ -80,7 +80,9 @@ unresolved tails, saturation, inadequate proposal coverage and precision for the
 A finite particle mean cannot estimate a divergent population moment. Use expected AEP or an
 explicitly named log-scale quantity if that is the requested estimand. The joint aggregate
 quantile-output helper includes a raw mean and is unsuitable for divergent LP3 requests.
-Issue #6 owns schema, installed CLI and output routing.
+The installed lognormal Bayesian workflow from [PR #39](https://github.com/Chain-Frost/ffa-toolkit/pull/39)
+provides the shared orchestration and reporting architecture. Issue #8 retains the family-specific
+installed adapters and #5 owns per-output precision.
 
 ## Independent comparison protocol
 
