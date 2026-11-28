@@ -1,8 +1,7 @@
 # WP04: standardized LH diagnostics and optimized-H GEV — mathematical foundation
 
-**Status: partial internal research primitives; no admitted fitted-GEV calibration, automatic
-fit workflow, installed selector or uncertainty workflow.** [Issue #2](https://github.com/Chain-Frost/ffa-toolkit/issues/2)
-owns the remaining requirements. Fixed-H GEV point fitting and its raw fourth-ratio residual remain unchanged.
+**Status: provisional direct calibration and explicit CLI workflow.**
+[Issue #2](https://github.com/Chain-Frost/ffa-toolkit/issues/2) tracks qualification and independent review.
 
 ## Primary-source verification
 
@@ -74,68 +73,82 @@ source vectors or publication-derived fixtures are shipped. Reproduce the study 
 described original procedure and a separately held copy of the article. The wider grid,
 independent held-out calibration and numerical precision policy remain outstanding.
 
-## Internal software delivered in this slice
+## Direct fitted-GEV calibration
 
-The separate internal module `estimators/gev_lh_diagnostics.py` evaluates the empirical
-covariance, conditional variance and standardized residual. Its centered least-squares form
-avoids subtracting nearly equal variance terms. It accepts already-paired simulated ratios;
-the caller must authenticate their H, n, GEV shape and RNG configuration and qualify
-precision. The primitive rejects fewer than three simulations, nonfinite ratios,
-nonpositive marginal/conditional variance and nonfinite z. Three is an algebraic minimum,
-not a recommended calibration count. Near-singular and finite-range behavior needs further
-admission tests before production use.
+For each fitted H, simulate 20 batches of 10,000 complete unit-scale, zero-location
+GEV records at its fitted ARR shape. Positive affine transformations leave the two
+ratios invariant. NumPy PCG64 uses the declared base seed plus H. The pooled sample
+covariance gives the point variance. An approximate Student t batch-means interval
+allocates 1% across the two tails and five candidates. The interval is widened by
+the absolute pooled versus batch-mean difference. It measures Monte Carlo precision
+under this simulation design. It does not measure uncertainty about the observed flood
+record or certify the normal approximation.
 
-The candidate decision primitive requires all five finite diagnostics in H=0..4 order,
-plus a positive explicit two-sided critical z. Section 5 illustrates selecting the smallest
-H that passes a two-sided 5% test; its examples select H=0, 1 and 4. This supports the
-lowest-passing rule, not an automatic highest-H choice or a minimum-absolute-z rule.
-For this independent policy, equality passes, an incomplete/invalid candidate set errors,
-and an entirely rejected set returns no selection. Equality and fail-closed/no-pass
-behaviors are explicit proposed Toolkit design decisions, not verified vendor rules.
-No default alpha or cutoff is provided. The primitive does not compute candidate fits,
-certify calibration, infer a native default or publish a selected flood quantile.
+Require 20–60 annual maxima and fitted k in [-0.8, 0.6] for every H. These provisional
+limits span the record lengths and simulation shape range in Wang's specification
+and evaluation. The simulation evaluates the actual record length and fitted shape,
+without interpolating the paper's polynomials. Reject a nonpositive or nonfinite
+variance bracket, a variance half-width exceeding 2% of its pooled estimate, or an
+absolute-z bracket that straddles the declared cutoff. A 2% variance error corresponds
+to at most approximately 1.02% error in the magnitude of z. The cutoff check addresses
+decisions for which even that precision is insufficient. No automatic seed retries.
 
-The 20 isolated focused tests passed under Python 3.13.5. They verify a hand-derived
-rational covariance and z, affine invariance, degenerate/invalid calibrations, both
-diagnostic signs, cutoff equality, lowest-H ordering, missing/invalid candidates and no
-selection. These are algebra/policy tests, not full production candidate validation.
-The checkout could not be cloned into the execution environment; tests were run against
-the new files in an isolated directory, not the integrated repository. Python 3.11/3.14,
-Ruff, strict Pyright, full tests, build, distribution/installed CLI and independent
-review are still required. Draft status deliberately does not invoke ready-PR CI.
+An independent rerun on Python 3.14.6 calculated the ratios from ordered ranks and
+the population skew by integrating beta order-statistic densities. It reproduced
+maximum discrepancies of 0.9175% (polynomial against direct), 1.4405% (between
+batches), and 4.0e-14 (regression versus covariance). Extending the two independent
+batches to n=60 gave differences up to 5.54% between the polynomial and direct
+variance. The polynomial was lower in 14 of 15 n=60 cells. Thus matching the polynomial
+is not the acceptance criterion for direct calibration at n=60. The 100,000-record
+prototype exceeded the precision target on the predeclared seed grid, so the
+production candidate doubles the budget without relaxing that target.
 
-## Required before installed admission
+A held-out experiment used 100,000 new records at each n/shape cell, with n=20,30,60
+and true k=-0.3,0,0.3. Independent order-statistic weights and population beta-density
+moments were used to refit shape. The research variance oracle interpolated 50,000-record
+simulations on a 0.01 shape grid. The study used PCG64 seeds 225829 for records and
+638273 for the variance oracle. It excluded records with any fitted shape outside the
+provisional range and omitted finite-budget precision gating. At n=30 and true k=0,
+96.88% met the shape restriction. Candidate rejection rates among those records were
+3.96%, 4.08%, 4.37%, 4.62% and 4.71% at the conventional 1.96 cutoff. At n=20 and true
+k=0.3, 69.86% met the shape restriction. A cutoff describes an individual approximate
+check, with no nominal error guarantee after conditioning or selection.
 
-1. Independently review the original equations and reproduce the synthetic calculation
-   from the primary pages; retain the published tables outside the repository. Extend
-   shape/sample-size coverage and establish explicit, justified calibration admission
-   and a quantity-specific simulation precision/failure rule. Do not extrapolate
-   from the small checked grid or assume the polynomial's finite-n calibration everywhere.
-2. Generate paired ratios at each fitted H, record n, fitted skew/shape, simulation
-   count, RNG/seeds, variance components and precision, and fail explicitly if
-   calibration is inadmissible. Sample fourth moments require n>=H+4; all five
-   candidates require n>=8 but this is not a calibrated minimum sample size.
-   Verify degenerate/tied samples, numerical range, shape boundaries and independent
-   fitted-GEV rejection-rate experiments (including decision stability near cutoff).
-3. Fit each candidate using the existing GEV estimator; preserve sample/fitted tau3
-   and tau4, conditional variance/SD, signed z, decision reason, support diagnostics,
-   input identity and explicitly configured selection controls. Do not silently skip
-   unavailable candidates or fall back to H=0. An all-rejected set has no selected fit.
-   Coordinate shared settings/report contracts with #6, #7 and #14.
-4. Complete explicitly configured uncertainty for ordinary L-moment, fixed-H and
-   selected-H fits. Distinguish parametric-bootstrap sampling intervals from Bayesian
-   posterior intervals and numerical simulation error. Declare generation distribution,
-   refit/reselection per replicate, seeds, count, interval type, interpolation, failure
-   denominators and acceptance thresholds; assess interval endpoint precision separately.
-   Do not silently reuse fixed-H bootstrap for the selected-H workflow.
-5. Provide installed CLI/report examples and full Python 3.11/3.14 quality and
-   packaging checks plus independent final-head review. Keep #2 open until all its
-   requirements are completed or explicitly dispositioned by the owner.
+## Selection and uncertainty
 
-Native Flike 5.0.306.0 settings, source-specific variants, search/tie/no-pass handling,
-bootstrap RNG/count/interpolation and settings-matched comparisons remain unqualified.
-ARR example 10 (Albert River at Broomfleet) and Wang's example are source illustrations,
-not native fixtures. No native match, release or publication is authorized.
+Fit every H=0..4 using the existing LH estimator. The smallest H with absolute z
+at most the configured critical value is selected when all five decisions are
+numerically stable. Equality passes at the point-rule level. A failed calibration
+or undecidable candidate stops the calculation with an explicit error. An
+all-rejected record retains all diagnostics and support observations and emits
+no selected quantile. Support findings are independent of the LH cutoff decision.
+
+The optional complete-record parametric bootstrap uses the fitted distribution
+as its generating law. Each equal-length synthetic record repeats the declared
+ordinary family/configuration, fixed H, or full five-H selection. For selected H,
+the calibration seed is held fixed across replicates, as part of the procedure
+being repeated. The bootstrap record generator uses a separate declared MT19937
+seed. Simulated discharges are drawn from the fitted law without clipping; refits
+apply the estimator's own domain rules. Fit, calibration and no-pass failures are
+counted against all attempted records and are never replaced.
+
+Report central type-7 percentile intervals over the successful replicate quantiles
+at each explicitly requested non-exceedance probability. A positive admitted failure
+fraction changes the target to the conditional distribution of successful refits.
+For each interval endpoint, use theoretical binomial ranks evaluated at the
+corresponding tail probability to bracket its finite-simulation error. Allocate 5%
+across both bracket tails, both endpoints and all requested probabilities. A bracket
+that cannot be supported by the successful count or whose distance from the type-7
+estimate exceeds the caller's absolute discharge tolerance prevents interval
+publication. These numerical brackets concern the endpoint estimates, while the
+percentile interval expresses model-based sampling variability.
+
+## Qualification
+
+The direct method retains Wang's joint-normal and negligible-bias approximation.
+The operational precision rule addresses calculation stability. Test rejection rates
+and independent review are separate requirements. Native Flike 5.0.306.0 selection
+and bootstrap settings and settings-matched comparisons remain unqualified.
 
 ## References
 

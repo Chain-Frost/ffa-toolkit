@@ -21,6 +21,15 @@ def _comb(n: int, k: int) -> int:
     return comb(n, k) if 0 <= k <= n else 0
 
 
+def lh_gap_weight(count: int, subset_size: int, order: int, rank: int, denominator: int) -> float:
+    """Weight of the gap after rank observations for a higher LH moment."""
+    signed_count = sum(
+        (-1) ** (k - 1) * _comb(order - 2, k - 1) * _comb(count - rank, k) * _comb(rank, subset_size - k)
+        for k in range(1, order)
+    )
+    return signed_count / (order * denominator)
+
+
 def _validate_shift(shift: int) -> None:
     if type(shift) is not int or shift not in range(5):
         msg = "GEV LH shift must be one of H=0, 1, 2, 3, 4"
@@ -79,10 +88,7 @@ def sample_lh_moments(values: Iterable[float], *, shift: int = 0, order: int = 4
         for i, gap in enumerate(gaps, start=1):
             if gap == 0:
                 continue
-            signed_count = sum(
-                (-1) ** (k - 1) * _comb(r - 2, k - 1) * _comb(n - i, k) * _comb(i, subset_size - k) for k in range(1, r)
-            )
-            terms.append(gap * (signed_count / (r * denominator)))
+            terms.append(gap * lh_gap_weight(n, subset_size, r, i, denominator))
         result.append(fsum(terms))
     if not all(isfinite(value) for value in result):
         msg = "sample LH moments are not numerically representable"
@@ -230,7 +236,7 @@ def fit_gev_lh(values: Iterable[float], *, shift: int = 0) -> GEVLHFit:
     return GEVLHFit(shift, location, scale, shape, moments, fitted, residual)
 
 
-def _linear_quantile(sorted_values: list[float], probability: float) -> float:
+def linear_sample_quantile(sorted_values: list[float], probability: float) -> float:
     """Quantile type 7 interpolation; not yet a verified Flike output rule."""
     index = (len(sorted_values) - 1) * probability
     lower = int(index)
@@ -332,8 +338,8 @@ def bootstrap_fixed_gev_lh(
         raise ValueError(msg)
     lower_p = (1 - confidence) / 2
     upper_p = (1 + confidence) / 2
-    lows = tuple(_linear_quantile(sorted(bucket), lower_p) for bucket in draws)
-    highs = tuple(_linear_quantile(sorted(bucket), upper_p) for bucket in draws)
+    lows = tuple(linear_sample_quantile(sorted(bucket), lower_p) for bucket in draws)
+    highs = tuple(linear_sample_quantile(sorted(bucket), upper_p) for bucket in draws)
     return FixedHBootstrap(
         shift,
         seed,

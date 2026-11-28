@@ -37,6 +37,7 @@ MODELLED_DISCHARGE_MEANINGS: frozenset[ResultMeaning] = frozenset(
     {
         ResultMeaning.QUANTILE_AT_EXPECTED_PARAMETERS,
         ResultMeaning.DETERMINISTIC_FITTED_QUANTILE,
+        ResultMeaning.QUANTILE_BOOTSTRAP_LIMIT,
         ResultMeaning.POSTERIOR_MEAN_QUANTILE,
         ResultMeaning.POSTERIOR_MEDIAN_QUANTILE,
         ResultMeaning.POSTERIOR_PREDICTIVE_QUANTILE,
@@ -45,10 +46,8 @@ MODELLED_DISCHARGE_MEANINGS: frozenset[ResultMeaning] = frozenset(
 )
 
 RESULT_MEANINGS: dict[ResultMeaning, str] = {
-    ResultMeaning.DETERMINISTIC_FITTED_QUANTILE: (
-        "Quantile of explicitly configured fixed-H GEV L/LH point estimate; "
-        "not Bayesian, posterior predictive, bootstrapped or native Flike-qualified."
-    ),
+    ResultMeaning.DETERMINISTIC_FITTED_QUANTILE: ("Quantile of the reported GEV L/LH point estimate."),
+    ResultMeaning.QUANTILE_BOOTSTRAP_LIMIT: "Pointwise parametric-bootstrap sampling interval endpoint.",
     ResultMeaning.QUANTILE_AT_EXPECTED_PARAMETERS: (
         "Quantile at expected source-coordinate parameters; not the expected quantile."
     ),
@@ -196,6 +195,7 @@ def _validate_point_context(point: ResultPoint) -> None:
         ResultMeaning.POSTERIOR_MEAN_QUANTILE,
         ResultMeaning.POSTERIOR_MEDIAN_QUANTILE,
         ResultMeaning.POSTERIOR_PREDICTIVE_QUANTILE,
+        ResultMeaning.QUANTILE_BOOTSTRAP_LIMIT,
         ResultMeaning.QUANTILE_MONTE_CARLO_PROBABILITY_LIMIT,
         ResultMeaning.LOG10_QUANTILE_POSTERIOR_MOMENT,
     ):
@@ -207,6 +207,7 @@ def _validate_point_context(point: ResultPoint) -> None:
 
 def _record_probability_limit(point: ResultPoint, record: dict[str, object]) -> None:
     if point.meaning in (
+        ResultMeaning.QUANTILE_BOOTSTRAP_LIMIT,
         ResultMeaning.QUANTILE_MONTE_CARLO_PROBABILITY_LIMIT,
         ResultMeaning.RETURN_PERIOD_MONTE_CARLO_PROBABILITY_LIMIT,
     ):
@@ -437,7 +438,7 @@ def report_document(result: AnalysisResult, *, settings: Mapping[str, object]) -
         msg = "provenance package version does not match the installed package"
         raise ValueError(msg)
     settings_data = _report_settings(settings)
-    if not result.values:
+    if not result.values and not result.candidate_gev_support:
         msg = "cannot export an analysis with no numerical result points"
         raise ValueError(msg)
     parameters = [_parameter(parameter) for parameter in result.parameters]
@@ -491,6 +492,16 @@ def report_document(result: AnalysisResult, *, settings: Mapping[str, object]) -
         "results": points,
         "warnings": warnings,
         **_fitted_support_fields(result.fitted_gev_support),
+        **(
+            {
+                "candidate_gev_support": {
+                    str(h): _fitted_support_fields(s)["gev_fitted_support"]
+                    for h, s in enumerate(result.candidate_gev_support)
+                }
+            }
+            if result.candidate_gev_support
+            else {}
+        ),
     }
 
 
@@ -592,6 +603,9 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
         lines.append("  None supplied")
     lines.extend(f"  {item['name']}: {item['value']} {item['unit']}" for item in diagnostics)
     lines.extend(_fitted_support_text(result.fitted_gev_support))
+    for shift, candidate_support in enumerate(result.candidate_gev_support):
+        lines.append(f"Candidate H={shift}")
+        lines.extend(_fitted_support_text(candidate_support))
     lines.extend(("", "RESULT POINTS"))
     for point in typed_points:
         components = [

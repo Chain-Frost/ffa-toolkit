@@ -18,8 +18,8 @@ def make_parser() -> argparse.ArgumentParser:
         allow_abbrev=False,
         description="FFA Toolkit: independent flood frequency analysis CLI.",
         epilog=(
-            "Explicit-settings, complete-positive-AMS fixed-H GEV and ordinary L-moment fits are available; "
-            "no Bayesian fitting, optimized-H selection or native Flike qualification."
+            "Explicit settings for complete positive annual maxima support ordinary L-moments, "
+            "fixed-H and selected-H GEV, and parametric bootstrap."
         ),
     )
     parser.add_argument(
@@ -84,9 +84,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         except OSError as exc:
             print(f"ffa: fit I/O failure: {exc}", file=sys.stderr)
             return 1
-        print(
-            f"Independent deterministic mathematical fit only — not native Flike-qualified. Reports: {paths[0].parent}"
-        )
+        print(f"Independent mathematical fit only — not native Flike-qualified. Reports: {paths[0].parent}")
         return 0
     parser.error("no command selected; use fit, explain, references or --help")
     return 2  # Unreachable: parser.error raises SystemExit.

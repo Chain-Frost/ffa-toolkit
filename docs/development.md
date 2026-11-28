@@ -10,7 +10,7 @@ posterior execution and explicit proposal scaling do not make Bayesian fitting a
 
 ## Remaining software requirements
 
-- Complete standardized Wang diagnostics, optimized H selection and declared uncertainty.
+- Complete operational qualification of the provisional direct Wang calibration, selected H and declared bootstrap.
 - Deliver installed explicitly configured lognormal Bayesian orchestration; internal binding and
   proposal covariance scaling are implemented, while output-specific precision/stopping remains pending.
 - Extend explicit posterior bindings to other families, historical/grouped exposure and shared rating error.

@@ -43,7 +43,7 @@ def conditional_lh_variance(pairs: Iterable[tuple[float, float]]) -> LHCondition
         cross = fsum(x * y for x, y in centered)
         if not all(isfinite(value) for value in (ss3, ss4, cross)) or ss3 <= 0 or ss4 <= 0:
             msg = "LH ratio covariance must be finite with positive marginal variances"
-            raise ValueError(msg)
+            raise ValueError(msg)  # noqa: TRY301  # Use the same covariance failure at the numerical boundary.
         slope = cross / ss3
         residuals = tuple(y - slope * x for x, y in centered)
         variance = fsum(residual * residual for residual in residuals) / (count - 1)
@@ -53,9 +53,10 @@ def conditional_lh_variance(pairs: Iterable[tuple[float, float]]) -> LHCondition
     skew_variance = ss3 / (count - 1)
     kurtosis_variance = ss4 / (count - 1)
     covariance = cross / (count - 1)
-    if not all(isfinite(value) for value in (variance, skew_variance, kurtosis_variance, covariance)) or min(
-        variance, skew_variance, kurtosis_variance
-    ) <= 0:
+    if (
+        not all(isfinite(value) for value in (variance, skew_variance, kurtosis_variance, covariance))
+        or min(variance, skew_variance, kurtosis_variance) <= 0
+    ):
         msg = "conditional LH variance must be finite and positive"
         raise ValueError(msg)
     return LHConditionalVariance(count, skew_variance, kurtosis_variance, covariance, variance)
