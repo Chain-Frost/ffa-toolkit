@@ -271,6 +271,46 @@ def _check_bayesian_installed(console: Path, output: Path, env: dict[str, str]) 
         raise RuntimeError(msg)
 
 
+def _check_selected_h_installed(console: Path, output: Path, env: dict[str, str], settings: dict[str, object]) -> None:
+    ams = output / "selected-h-ams.csv"
+    ams.write_text(
+        "Year,AMS\n" + "\n".join(f"{1950 + i},{20 - log(-log((i - 0.35) / 50.3))}" for i in range(1, 51)),
+        encoding="utf-8",
+    )
+    settings.pop("lh_shift")
+    settings.update(
+        schema_version="ffa-gev-selected-h/1",
+        estimator="gev_lh_selected_h",
+        critical_z=1.96,
+        calibration_seed=7,
+        non_exceedance_probabilities=[0.9],
+        bootstrap={
+            "replications": 24,
+            "seed": 42,
+            "confidence": 0.5,
+            "maximum_failure_fraction": 0.25,
+            "endpoint_tolerance": 2.0,
+        },
+    )
+    config = output / "selected-h-settings.json"
+    config.write_text(json.dumps(settings), encoding="utf-8")
+    target = output / "selected-h-report"
+    _invoke(
+        [str(console), "fit", "--ams", str(ams), "--settings", str(config), "--output", str(target)],
+        cwd=output,
+        env=env,
+        expected_code=0,
+    )
+    report = json.loads((target / "results.json").read_text(encoding="utf-8"))
+    if (
+        report["settings"]["lh_shift"] != 0
+        or set(report["candidate_gev_support"]) != set("01234")
+        or [point["probability_limit_side"] for point in report["results"]] != [None, "lower", "upper"]
+    ):
+        msg = "installed selected-H CLI did not report five fitted supports, H=0 and bootstrap limits"
+        raise RuntimeError(msg)
+
+
 def smoke_installed(dist_dir: Path) -> None:
     """Check version/help/rejection, import origin and offline packaged resources."""
     wheels = sorted(dist_dir.glob("ffa_toolkit-*.whl"))
@@ -406,6 +446,9 @@ for name in ("fixed-gev-ams.csv", "fixed-gev-settings.json", "ordinary-ams.csv",
         _check_ordinary_installed(console, output, env)
         _check_gev_support_report(console, output, env)
         _check_bayesian_installed(console, output, env)
+        _check_selected_h_installed(
+            console, output, env, json.loads((output / "fixed-gev-settings.json").read_text(encoding="utf-8"))
+        )
         reference = _invoke([str(console), "references", "ARR3"], cwd=output, env=env, expected_code=0)
         if "### ARR3" not in reference.stdout or "2.6.3.6" not in reference.stdout:
             msg = "installed offline reference register lacks the pinned ARR citation"

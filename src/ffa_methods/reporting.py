@@ -41,6 +41,7 @@ MODELLED_DISCHARGE_MEANINGS: frozenset[ResultMeaning] = frozenset(
     {
         ResultMeaning.QUANTILE_AT_EXPECTED_PARAMETERS,
         ResultMeaning.DETERMINISTIC_FITTED_QUANTILE,
+        ResultMeaning.QUANTILE_BOOTSTRAP_LIMIT,
         ResultMeaning.POSTERIOR_MEAN_QUANTILE,
         ResultMeaning.POSTERIOR_MEDIAN_QUANTILE,
         ResultMeaning.POSTERIOR_PREDICTIVE_QUANTILE,
@@ -49,10 +50,8 @@ MODELLED_DISCHARGE_MEANINGS: frozenset[ResultMeaning] = frozenset(
 )
 
 RESULT_MEANINGS: dict[ResultMeaning, str] = {
-    ResultMeaning.DETERMINISTIC_FITTED_QUANTILE: (
-        "Quantile of explicitly configured fixed-H GEV L/LH point estimate; "
-        "not Bayesian, posterior predictive, bootstrapped or native Flike-qualified."
-    ),
+    ResultMeaning.DETERMINISTIC_FITTED_QUANTILE: ("Quantile of the reported GEV L/LH point estimate."),
+    ResultMeaning.QUANTILE_BOOTSTRAP_LIMIT: "Pointwise parametric-bootstrap sampling interval endpoint.",
     ResultMeaning.QUANTILE_AT_EXPECTED_PARAMETERS: (
         "Quantile at expected source-coordinate parameters; not the expected quantile."
     ),
@@ -200,6 +199,7 @@ def _validate_point_context(point: ResultPoint) -> None:
         ResultMeaning.POSTERIOR_MEAN_QUANTILE,
         ResultMeaning.POSTERIOR_MEDIAN_QUANTILE,
         ResultMeaning.POSTERIOR_PREDICTIVE_QUANTILE,
+        ResultMeaning.QUANTILE_BOOTSTRAP_LIMIT,
         ResultMeaning.QUANTILE_MONTE_CARLO_PROBABILITY_LIMIT,
         ResultMeaning.LOG10_QUANTILE_POSTERIOR_MOMENT,
     ):
@@ -211,6 +211,7 @@ def _validate_point_context(point: ResultPoint) -> None:
 
 def _record_probability_limit(point: ResultPoint, record: dict[str, object]) -> None:
     if point.meaning in (
+        ResultMeaning.QUANTILE_BOOTSTRAP_LIMIT,
         ResultMeaning.QUANTILE_MONTE_CARLO_PROBABILITY_LIMIT,
         ResultMeaning.RETURN_PERIOD_MONTE_CARLO_PROBABILITY_LIMIT,
     ):
@@ -512,7 +513,7 @@ def report_document(result: AnalysisResult, *, settings: Mapping[str, object]) -
         msg = "provenance package version does not match the installed package"
         raise ValueError(msg)
     settings_data = _report_settings(settings)
-    if not result.values:
+    if not result.values and not result.candidate_gev_support:
         msg = "cannot export an analysis with no numerical result points"
         raise ValueError(msg)
     parameters = [_parameter(parameter) for parameter in result.parameters]
@@ -569,6 +570,16 @@ def report_document(result: AnalysisResult, *, settings: Mapping[str, object]) -
         "warnings": warnings,
         **_fitted_support_fields(result.fitted_gev_support),
         **_precision_fields(result),
+        **(
+            {
+                "candidate_gev_support": {
+                    str(h): _fitted_support_fields(s)["gev_fitted_support"]
+                    for h, s in enumerate(result.candidate_gev_support)
+                }
+            }
+            if result.candidate_gev_support
+            else {}
+        ),
     }
 
 
@@ -652,9 +663,8 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
         keys = (*keys, "precision_state")
     stream = StringIO(newline="")
     writer = csv.writer(stream, lineterminator="\n")
-    support = doc.get("gev_fitted_support")
-    support_header = ("gev_fitted_support_json",) if support is not None else ()
-    support_cell = (json.dumps(support, ensure_ascii=False, allow_nan=False),) if support is not None else ()
+    support_keys = tuple(key for key in ("gev_fitted_support", "candidate_gev_support") if key in doc)
+    support_cells = tuple(json.dumps(doc[key], ensure_ascii=False, allow_nan=False) for key in support_keys)
     writer.writerow(
         (
             "method_id",
@@ -663,11 +673,12 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
             "legacy_comparison_status",
             "reference_evidence_status",
             *keys,
-            *support_header,
+            *(f"{key}_json" for key in support_keys),
         )
     )
     provenance = cast(dict[str, object], doc["provenance"])
-    for point in typed_points:
+    # A no-pass selected-H run still carries support evidence and has no quantile.
+    for point in typed_points or [{}]:
         writer.writerow(
             (
                 provenance["method_id"],
@@ -675,8 +686,8 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
                 doc["method_qualification"],
                 doc["legacy_comparison_status"],
                 provenance["reference_evidence_status"],
-                *("" if point[key] is None else str(point[key]) for key in keys),
-                *support_cell,
+                *("" if point.get(key) is None else str(point[key]) for key in keys),
+                *support_cells,
             )
         )
     method_guidance = cast(dict[str, object], doc["method_guidance"])
@@ -706,6 +717,9 @@ def render_report_files(result: AnalysisResult, *, settings: Mapping[str, object
         lines.append("  None supplied")
     lines.extend(f"  {item['name']}: {item['value']} {item['unit']}" for item in diagnostics)
     lines.extend(_fitted_support_text(result.fitted_gev_support))
+    for shift, candidate_support in enumerate(result.candidate_gev_support):
+        lines.append(f"Candidate H={shift}")
+        lines.extend(_fitted_support_text(candidate_support))
     lines.extend(("", "RESULT POINTS"))
     lines.extend(_result_text_lines(typed_points))
     lines.extend(("", "WARNINGS"))

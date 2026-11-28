@@ -19,8 +19,8 @@ def make_parser() -> argparse.ArgumentParser:
         allow_abbrev=False,
         description="FFA Toolkit: independent flood frequency analysis CLI.",
         epilog=(
-            "Explicit-settings, complete-positive-AMS fixed-H GEV and ordinary L-moment fits are available; "
-            "explicit lognormal Bayesian fitting is available; no optimized-H selection or native Flike qualification."
+            "Explicit settings for complete positive annual maxima support fixed-H GEV and ordinary L-moment fits, "
+            "selected-H GEV and parametric bootstrap. Explicit lognormal Bayesian fitting is also available."
         ),
     )
     parser.add_argument(
