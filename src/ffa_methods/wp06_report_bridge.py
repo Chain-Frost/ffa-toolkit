@@ -60,12 +60,19 @@ def _quantile_points(output: QuantileOutputs, unit: str) -> tuple[list[ResultPoi
     if not isfinite(f) or not 0.0 < f < 1.0:
         msg = "WP06 quantile input must be a non-exceedance probability in (0, 1)"
         raise ValueError(msg)
-    values = (
+    values = [
         (ResultMeaning.QUANTILE_AT_EXPECTED_PARAMETERS, output.at_expected_parameters),
-        (ResultMeaning.POSTERIOR_MEAN_QUANTILE, output.mean_of_quantiles),
         (ResultMeaning.POSTERIOR_MEDIAN_QUANTILE, output.median_of_quantiles),
         (ResultMeaning.POSTERIOR_PREDICTIVE_QUANTILE, output.predictive_quantile),
-    )
+    ]
+    if output.mean_of_quantiles is not None:
+        if output.mean_undefined_reason is not None:
+            msg = "a defined posterior mean quantile cannot carry an undefined reason"
+            raise ValueError(msg)
+        values.insert(1, (ResultMeaning.POSTERIOR_MEAN_QUANTILE, output.mean_of_quantiles))
+    elif not output.mean_undefined_reason or not output.mean_undefined_reason.strip():
+        msg = "omitted posterior mean quantile requires an explicit undefined reason"
+        raise ValueError(msg)
     points = [
         ResultPoint(
             meaning=meaning,
@@ -107,6 +114,16 @@ def _quantile_points(output: QuantileOutputs, unit: str) -> tuple[list[ResultPoi
             "these are not Monte Carlo standard errors."
         )
     ]
+    if output.mean_undefined_reason is not None:
+        warnings.append(f"WP06 quantile F={f:.17g}: UNDEFINED posterior mean quantile; {output.mean_undefined_reason}.")
+    moment_points, moment_warnings = _log_quantile_moments(output, unit)
+    return points + moment_points, warnings + moment_warnings
+
+
+def _log_quantile_moments(output: QuantileOutputs, unit: str) -> tuple[list[ResultPoint], list[str]]:
+    f = output.non_exceedance
+    points: list[ResultPoint] = []
+    warnings: list[str] = []
     log_mean = output.mean_log10_quantile
     log_sd = output.standard_deviation_log10_quantile
     if output.nonpositive_quantile_weight:

@@ -163,6 +163,7 @@ def test_nonlinearity_distinguishes_expected_parameters_quantile_average_median_
     assert out.probability_limits == near((c, 4 * c))
     assert out.lower_limit_effective_size == near(1.0)
     assert out.upper_limit_effective_size == near(1.0)
+    assert out.mean_of_quantiles is not None
     assert out.at_expected_parameters < out.predictive_quantile < out.mean_of_quantiles
     assert out.mean_log10_quantile == near(log10(c * (4**0.25)))
     assert out.standard_deviation_log10_quantile == near(sqrt(0.75 * 0.25) * log10(4))

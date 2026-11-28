@@ -240,6 +240,16 @@ class Lognormal(_LogFlowKernel):
     def _frozen(self) -> _FrozenContinuous:
         return cast(_FrozenContinuous, norm(loc=self.log.natural_mean, scale=math.exp(self.log.natural_log_sd)))
 
+    def cdf(self, discharge: float) -> float:
+        # Predictive inversion calls CDF repeatedly across a potentially large
+        # particle set. Pass the same parameters without cloning a distribution.
+        discharge = _point(discharge)
+        if discharge <= 0.0:
+            return 0.0
+        return float(
+            norm.cdf(self._to_statistic(discharge), loc=self.log.natural_mean, scale=math.exp(self.log.natural_log_sd))
+        )
+
 
 def _gamma_upper_fraction(shape: float, x: float) -> float:
     """Continued-fraction correction for the upper incomplete gamma Q."""

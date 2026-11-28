@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 RESOURCE_FILES: tuple[tuple[str, str], ...] = (
     ("docs/method-registry.json", "ffa_methods/resources/method-registry.json"),
     ("docs/references.md", "ffa_methods/resources/references.md"),
+    ("docs/wp08-bayesian-cli.md", "ffa_methods/resources/wp08-bayesian-cli.md"),
     ("docs/compatibility-contract.md", "ffa_methods/resources/compatibility-contract.md"),
     ("docs/distribution-kernels.md", "ffa_methods/resources/distribution-kernels.md"),
     ("docs/methods/mgb-low-flow-screen.md", "ffa_methods/resources/methods/mgb-low-flow-screen.md"),
@@ -26,6 +27,10 @@ RESOURCE_FILES: tuple[tuple[str, str], ...] = (
     ("docs/examples/ordinary-settings.json", "ffa_methods/resources/examples/ordinary-settings.json"),
     ("docs/examples/ordinary-ams.csv", "ffa_methods/resources/examples/ordinary-ams.csv"),
     ("docs/methods/l-moments.md", "ffa_methods/resources/methods/l-moments.md"),
+    ("docs/examples/bayesian-fixed-ams.csv", "ffa_methods/resources/examples/bayesian-fixed-ams.csv"),
+    ("docs/examples/bayesian-fixed-settings.json", "ffa_methods/resources/examples/bayesian-fixed-settings.json"),
+    ("docs/examples/bayesian-censored-ams.csv", "ffa_methods/resources/examples/bayesian-censored-ams.csv"),
+    ("docs/examples/bayesian-censored-settings.json", "ffa_methods/resources/examples/bayesian-censored-settings.json"),
 )
 BLOCKED_COMPONENTS = frozenset({"reference", "legacy-candidates", "private-evidence", "local-evidence"})
 BLOCKED_SUFFIXES = (".fld", ".fid", ".7z")
