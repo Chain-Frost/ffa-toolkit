@@ -6,8 +6,8 @@ This is not an additional sampler, a CLI workflow or a precision-pass gate.
 from dataclasses import dataclass
 
 from ffa_methods.censored_reference import (
-    CensorEvent,
     CensoredReferenceError,
+    CensorEvent,
     FixedScaleReference,
     FixedScaleReferenceInputs,
     ReferenceControls,
@@ -44,9 +44,7 @@ def bound_fixed_scale_reference(
         msg = "reference proposal and model coordinates differ"
         raise CensoredReferenceError(msg)
     exact = tuple(
-        row.value
-        for row in model.series.annual
-        if row.kind == ObservationKind.EXACT and row.value is not None
+        row.value for row in model.series.annual if row.kind == ObservationKind.EXACT and row.value is not None
     )
     events = tuple(
         CensorEvent(lower=row.lower_bound, upper=row.upper_bound)

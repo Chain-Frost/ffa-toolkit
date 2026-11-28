@@ -1,7 +1,7 @@
 """Independent identities and quadrature for deterministic censor enclosures."""
 
 from dataclasses import replace
-from decimal import Decimal, localcontext
+from decimal import Decimal, FloatOperation, localcontext
 from fractions import Fraction
 from math import erfc, exp, log, nextafter, pi, sqrt
 from statistics import NormalDist
@@ -10,8 +10,8 @@ import pytest
 
 from ffa_methods.censored_reference import (
     PI_BOUNDS,
-    CensorEvent,
     CensoredReferenceError,
+    CensorEvent,
     FixedScaleReference,
     FixedScaleReferenceInputs,
     ReferenceBounds,
@@ -52,7 +52,7 @@ def _value(result: FixedScaleReference, index: int) -> ReferenceBounds:
 
 
 def _inside(bounds: ReferenceBounds, value: float) -> None:
-    assert bounds.contains(Decimal.from_float(value)), (bounds, value)
+    assert bounds.contains(Decimal(value)), (bounds, value)
 
 
 def test_mixed_reference_refinement_and_output_containment() -> None:
@@ -71,8 +71,10 @@ def test_mixed_reference_refinement_and_output_containment() -> None:
     # Independent values from adaptive integration of the unnormalized real-line density.
     _inside(fine.normalizer, 0.0676240123107145)
     assert coarse.normalizer.lower < fine.normalizer.lower < fine.normalizer.upper < coarse.normalizer.upper
-    assert fine.ratio_eligible and fine.log_ratio_upper is not None
-    assert coarse.log_ratio_upper is not None and fine.log_ratio_upper < coarse.log_ratio_upper
+    assert fine.ratio_eligible
+    assert fine.log_ratio_upper is not None
+    assert coarse.log_ratio_upper is not None
+    assert fine.log_ratio_upper < coarse.log_ratio_upper
     assert fine.log_ratio_upper >= Decimal("3.403272126898")
     exp_mu = 3.026592795635 / exp(0.8 * NormalDist().inv_cdf(0.9))
     expected = (0.0158223513737, 0.1329595261158, exp_mu, 0.3519021069439, 1 - 0.3519021069439)
@@ -114,28 +116,35 @@ def test_single_event_exact_identities_and_identical_base_proposal() -> None:
     )
     result = fixed_scale_reference(inputs, _controls(), requests)
     _inside(result.normalizer, 0.5)
-    assert result.ratio_eligible and result.log_ratio_upper is not None
-    assert result.log_ratio_upper >= Decimal.from_float(log(2))
+    assert result.ratio_eligible
+    assert result.log_ratio_upper is not None
+    assert result.log_ratio_upper >= Decimal(log(2))
     # Truncated joint Gaussian and uniform-to-Beta transformations.
     expected = (-1 / sqrt(pi), 1.0, 2 / 3, 1 / 3, 2 * exp(0.5) * NormalDist().cdf(-1 / sqrt(2)), 0.75)
     for index, value in enumerate(expected):
         _inside(_value(result, index), value)
     displaced = fixed_scale_reference(replace(inputs, proposal_mean=0.1), _controls(1), ())
-    assert not displaced.ratio_eligible and displaced.log_ratio_upper is None
+    assert not displaced.ratio_eligible
+    assert displaced.log_ratio_upper is None
     narrower = fixed_scale_reference(replace(inputs, proposal_variance=0.5), _controls(1), ())
-    assert not narrower.ratio_eligible and narrower.log_ratio_upper is None
+    assert not narrower.ratio_eligible
+    assert narrower.log_ratio_upper is None
     ceiling = fixed_scale_reference(inputs, replace(_controls(1), maximum_log_ratio=0.1), ())
-    assert not ceiling.ratio_eligible and ceiling.log_ratio_upper is not None
+    assert not ceiling.ratio_eligible
+    assert ceiling.log_ratio_upper is not None
     # A changed ambient decimal precision must not change our enclosures.
     with localcontext() as ctx:
         ctx.prec = 7
+        ctx.traps[FloatOperation] = True
         replay = fixed_scale_reference(inputs, _controls(), requests)
     assert result == replay
 
 
 def test_all_censored_beta_normalizer_and_probability() -> None:
     inputs = replace(_all_censored(), censor_events=(CensorEvent(upper=1.0),) * 3 + (CensorEvent(lower=1.0),) * 2)
-    result = fixed_scale_reference(inputs, _controls(), (ReferenceRequest(kind=ReferenceKind.EXPECTED_F, argument=1.0),))
+    result = fixed_scale_reference(
+        inputs, _controls(), (ReferenceRequest(kind=ReferenceKind.EXPECTED_F, argument=1.0),)
+    )
     _inside(result.normalizer, 1 / 60)
     _inside(_value(result, 0), 4 / 7)
 
@@ -145,7 +154,8 @@ def test_narrow_interval_and_resource_limits_fail_closed() -> None:
     requests = (ReferenceRequest(kind=ReferenceKind.MEAN_MU),)
     result = fixed_scale_reference(inputs, _controls(0), requests)
     assert result.normalizer.lower == 0 < result.normalizer.upper
-    assert not result.ratio_eligible and result.values[0].bounds is None
+    assert not result.ratio_eligible
+    assert result.values[0].bounds is None
     with pytest.raises(CensoredReferenceError, match="cell-term budget"):
         fixed_scale_reference(inputs, replace(_controls(0), maximum_cell_terms=1), requests)
     with pytest.raises(CensoredReferenceError, match="cell budget"):
@@ -189,7 +199,9 @@ def test_pi_constant_encloses_machin_series() -> None:
 def test_unit_rescaling_and_small_normalizer() -> None:
     inputs = _all_censored()
     scaled = replace(inputs, reference_discharge=2.0, censor_events=(CensorEvent(upper=2.0),))
-    result = fixed_scale_reference(scaled, _controls(2), (ReferenceRequest(kind=ReferenceKind.EXPECTED_F, argument=2.0),))
+    result = fixed_scale_reference(
+        scaled, _controls(2), (ReferenceRequest(kind=ReferenceKind.EXPECTED_F, argument=2.0),)
+    )
     _inside(result.normalizer, 0.5)
     _inside(_value(result, 0), 2 / 3)
     rare = replace(inputs, censor_events=(CensorEvent(upper=exp(-8)),))
@@ -197,4 +209,5 @@ def test_unit_rescaling_and_small_normalizer() -> None:
     expected = 0.5 * erfc(4.0)
     _inside(result.normalizer, expected)
     assert result.normalizer.lower > 0
-    assert not result.ratio_eligible and result.log_ratio_upper is not None
+    assert not result.ratio_eligible
+    assert result.log_ratio_upper is not None

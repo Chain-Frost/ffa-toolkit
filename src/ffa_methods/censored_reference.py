@@ -41,7 +41,8 @@ class ReferenceBounds:
 
 
 def _point(value: int | float | Decimal) -> ReferenceBounds:
-    number = Decimal.from_float(value) if isinstance(value, float) else Decimal(value)
+    # from_float also bypasses the ambient context's FloatOperation trap.
+    number = Decimal.from_float(value) if isinstance(value, float) else Decimal(value)  # noqa: FURB164
     return ReferenceBounds(number, number)
 
 
@@ -226,18 +227,22 @@ class ReferenceRequest:
     argument: float | None = None
 
     def __post_init__(self) -> None:
-        if self.kind in (ReferenceKind.MEAN_MU, ReferenceKind.EXP_MU):
-            if self.argument is None:
-                return
-        elif self.kind in (
-            ReferenceKind.CENTERED_SECOND_MU,
-            ReferenceKind.EXPECTED_F,
-            ReferenceKind.EXPECTED_AEP,
-            ReferenceKind.MU_CDF,
-            ReferenceKind.MU_SF,
-        ) and self.argument is not None and isfinite(self.argument):
-            if self.kind not in (ReferenceKind.EXPECTED_F, ReferenceKind.EXPECTED_AEP) or self.argument > 0:
-                return
+        if self.kind in (ReferenceKind.MEAN_MU, ReferenceKind.EXP_MU) and self.argument is None:
+            return
+        if (
+            self.kind
+            in (
+                ReferenceKind.CENTERED_SECOND_MU,
+                ReferenceKind.EXPECTED_F,
+                ReferenceKind.EXPECTED_AEP,
+                ReferenceKind.MU_CDF,
+                ReferenceKind.MU_SF,
+            )
+            and self.argument is not None
+            and isfinite(self.argument)
+            and (self.kind not in (ReferenceKind.EXPECTED_F, ReferenceKind.EXPECTED_AEP) or self.argument > 0)
+        ):
+            return
         msg = "reference request has an invalid kind or argument"
         raise CensoredReferenceError(msg)
 
@@ -393,7 +398,11 @@ def _tail_mass(a: _Arithmetic, extent: int) -> ReferenceBounds:
 
 
 def _ratio_upper(
-    a: _Arithmetic, inputs: FixedScaleReferenceInputs, base: _Base, normalizer: ReferenceBounds, controls: ReferenceControls
+    a: _Arithmetic,
+    inputs: FixedScaleReferenceInputs,
+    base: _Base,
+    normalizer: ReferenceBounds,
+    controls: ReferenceControls,
 ) -> tuple[Decimal | None, str | None]:
     if normalizer.lower <= 0:
         return None, "positive censor normalizer lower bound unresolved"
@@ -479,7 +488,12 @@ def _value(
     try:
         interior = _sum_bounds(a, tuple(a.mul(cell.mass, _integrand(a, base, request, cell.mu)) for cell in cells))
         bounds = a.div(a.add(interior, _tail_bound(a, base, request, extent, tail)), normalizer)
-        if request.kind in (ReferenceKind.EXPECTED_AEP, ReferenceKind.EXPECTED_F, ReferenceKind.MU_CDF, ReferenceKind.MU_SF):
+        if request.kind in (
+            ReferenceKind.EXPECTED_AEP,
+            ReferenceKind.EXPECTED_F,
+            ReferenceKind.MU_CDF,
+            ReferenceKind.MU_SF,
+        ):
             bounds = _probability(bounds)
     except (DecimalException, CensoredReferenceError) as exc:
         return ReferenceValue(request, None, f"reference output enclosure unresolved: {exc}")

@@ -59,9 +59,11 @@ def test_reference_preserves_bound_identity_and_missing_excluded_rows() -> None:
     )
     requests = (ReferenceRequest(kind=ReferenceKind.EXPECTED_F, argument=2.0),)
     result = bound_fixed_scale_reference(model=model, proposal=proposal, controls=controls, requests=requests)
-    assert result.model is model and result.proposal is proposal
+    assert result.model is model
+    assert result.proposal is proposal
     assert len(result.model.series.annual) == 3
-    assert not result.reference.inputs.exact_flows and len(result.reference.inputs.censor_events) == 1
+    assert not result.reference.inputs.exact_flows
+    assert len(result.reference.inputs.censor_events) == 1
     assert result.reference.inputs.censor_events[0].upper == 2.0
     assert result.reference.normalizer.contains(Decimal("0.5"))
     bounds = result.reference.values[0].bounds
