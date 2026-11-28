@@ -3,9 +3,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
-from fractions import Fraction
 from hashlib import sha256
-from math import exp, inf, isfinite, log
+from math import isfinite
 from re import fullmatch
 from sys import float_info
 from typing import ClassVar
@@ -23,6 +22,7 @@ from ffa_methods.contracts import (
     RunProvenance,
 )
 from ffa_methods.distributions import GEV, LogCoordinates, LogPearsonIII
+from ffa_methods.estimated_scale_kernel import EstimatedScaleKernel
 from ffa_methods.importance_proposal import CurvatureControls, CurvatureProposalResult, build_curvature_proposal
 from ffa_methods.importance_sampling import (
     ExplicitPosteriorTarget,
@@ -206,6 +206,9 @@ class ClassifiedFixedFamilyPosterior(_ClassifiedFamilyPosterior):
 
     def __post_init__(self) -> None:
         _ClassifiedFamilyPosterior.__post_init__(self)
+        if not isfinite(self.fixed_log_scale):
+            msg = "fixed log-scale and shape must be finite"
+            raise PosteriorBindingError(msg)
         _ = self._raw_kernel(0.0, self.fixed_log_scale)
 
     @property
@@ -229,6 +232,12 @@ class ClassifiedEstimatedScalePosterior(_ClassifiedFamilyPosterior):
 
     version: ClassVar[str] = "explicit-estimated-scale-family-posterior/1"
 
+    def __post_init__(self) -> None:
+        _ClassifiedFamilyPosterior.__post_init__(self)
+        if self.prior.covariance[0][1] != self.prior.covariance[1][0]:
+            msg = "estimated-scale prior covariance must be symmetric in the declared coordinates"
+            raise PosteriorBindingError(msg)
+
     @property
     def _scale_description(self) -> str:
         return f"estimated {self.coordinates}; prior means={self.prior.means}; covariance={self.prior.covariance}"
@@ -241,39 +250,7 @@ class ClassifiedEstimatedScalePosterior(_ClassifiedFamilyPosterior):
         if len(values) != 2 or not all(isfinite(v) for v in values):
             msg = "estimated scale requires a finite location/mean and log-scale in declared order"
             raise PosteriorBindingError(msg)
-        return _as_shared_kernel(self._raw_kernel(*values))
-
-    def log_likelihood(self, values: tuple[float, ...]) -> float:
-        result = log_likelihood(self.kernel(values), self.series)
-        if result.log_value == -inf:
-            # Underflow in an interior log density/tail is not structural zero.
-            for term, row in zip(result.terms, self.series.annual, strict=True):
-                if term.log_value == -inf and self._overlaps_support(row, *values):
-                    msg = f"year {row.year}: unresolved interior log likelihood"
-                    raise PosteriorBindingError(msg)
-        return result.log_value
-
-    def _overlaps_support(self, row: AnnualObservation, mu: float, eta: float) -> bool:
-        if self.fixed_shape == 0.0:
-            return True
-        # Compare in the source statistic, avoiding exponentiation of LP3 endpoints.
-        q = (
-            row.value
-            if row.kind == ObservationKind.EXACT
-            else (row.upper_bound if self.fixed_shape > 0 else row.lower_bound)
-        )
-        if q is None:
-            return True
-        if self.family == PosteriorFamily.GEV:
-            delta = Fraction(q) - Fraction(mu)
-            shape = self.fixed_shape
-        else:
-            if self.reference_discharge is None:
-                msg = "LP3 requires a reference discharge"
-                raise PosteriorBindingError(msg)
-            delta = Fraction(log(q) - log(self.reference_discharge)) - Fraction(mu)
-            shape = self.fixed_shape / 2.0
-        return delta * Fraction(shape) > -Fraction(exp(eta))
+        return EstimatedScaleKernel(self._raw_kernel(*values))
 
 
 def _exact_series(data: bytes, discharge_unit: str, year_definition: str) -> ObservationSeries:
