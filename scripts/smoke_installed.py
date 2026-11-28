@@ -284,6 +284,18 @@ def _check_bayesian_installed(console: Path, output: Path, env: dict[str, str]) 
             msg = "installed Bayesian same-environment seeded replay differs"
             raise RuntimeError(msg)
         _invoke(args, cwd=output, env=env, expected_code=2)
+        plotted = output / f"bayesian-{kind}-frequency-report"
+        _invoke(
+            [*args[:-1], str(plotted), "--frequency-report"],
+            cwd=output,
+            env=env,
+            expected_code=0 if kind == "fixed" else 2,
+        )
+        if kind == "fixed":
+            _check_frequency_files(plotted, destination)
+        elif plotted.exists():
+            msg = "censored Bayesian frequency request created an unsupported report bundle"
+            raise RuntimeError(msg)
     bad_ams = output / "bayesian-invalid-ams.csv"
     bad_ams.write_bytes(b"Year,AMS\n2000,0\n")
     invalid_destination = output / "bayesian-invalid-report"
@@ -332,7 +344,10 @@ def _check_selected_h_installed(console: Path, output: Path, env: dict[str, str]
     config.write_text(json.dumps(settings), encoding="utf-8")
     target = output / "selected-h-report"
     _invoke(
-        [str(console), "fit", "--ams", str(ams), "--settings", str(config), "--output", str(target)],
+        [
+            str(console), "fit", "--ams", str(ams), "--settings", str(config), "--output", str(target),
+            "--frequency-report",
+        ],
         cwd=output,
         env=env,
         expected_code=0,
@@ -344,6 +359,8 @@ def _check_selected_h_installed(console: Path, output: Path, env: dict[str, str]
         or set(report["candidate_gev_support"]) != set("01234")
         or [point["probability_limit_side"] for point in report["results"]] != [None, "lower", "upper"]
         or len(attempts) != 24
+        or not (target / "frequency-coordinates.csv").is_file()
+        or 'data-interval="parametric_bootstrap"' not in (target / "frequency.svg").read_text(encoding="utf-8")
     ):
         msg = "installed selected-H CLI did not report five fitted supports, H=0, bootstrap limits and all attempts"
         raise RuntimeError(msg)

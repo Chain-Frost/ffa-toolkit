@@ -23,9 +23,9 @@ and rarer events to the right. For spans of up to three decades, intermediate 2/
 AEP labels aid reading; open fitted markers keep coincident observed points visible.
 The vertical axis is linear in the supplied discharge unit
 and includes zero and signed fitted quantiles; it does not clip nonphysical predictions.
-The graph shows only the actual requested deterministic fitted quantiles; line segments
-are visual guides, not interpolated calculations. No confidence, probability or
-prediction intervals are calculated. Support warnings remain visible; refer to the full
+The deterministic graph shows only the actual requested fitted quantiles; line segments
+are visual guides, not interpolated calculations. The point-fit route calculates no intervals.
+The exact-record Bayesian route presents already calculated posterior intervals as described below. Support warnings remain visible; refer to the full
 analysis and check assumptions before adopting a design discharge.
 
 ## Offline worked examples
@@ -54,7 +54,7 @@ numerical records; their requested probabilities, discharge values and units are
 The opt-in report adds `frequency.svg` (standalone vector graphic), `frequency-coordinates.csv`
 (full numeric F, AEP, Q, row, year and rank plus SVG pixel coordinates), and `report.html`
 (self-contained, printable, with the full numerical text report and systematic data table).
-It also retains byte-exact input and settings snapshots for both deterministic schemas.
+It also retains byte-exact input and settings snapshots for the plotted workflows.
 Use an existing, user-controlled parent and a new output directory. Files are staged before
 publication. On POSIX the final existence check and rename are separate operations, so concurrent
 external creation of an empty directory at the same destination is outside the safety guarantee.
@@ -62,12 +62,13 @@ Without the flag, previous outputs and schemas remain unchanged.
 
 ## Admission and limitations
 
-Only the existing explicit deterministic ordinary and fixed-H GEV schemas and complete,
-consecutive, positive exact systematic annual maxima are supported. The caller's classification,
+The existing explicit deterministic ordinary and fixed-H GEV schemas, and the explicit
+lognormal Bayesian Year,AMS schema, require complete, consecutive, positive exact systematic annual maxima. The caller's classification,
 year definition and unit remain assertions. The plot refuses unresolved gaps rather than treating
 them as measured exposure or non-exceedances. Existing unplotted fits are not restricted further.
-No missing, zero, historical, grouped, censored, rating-error, POT, posterior or interval plot
-is admitted here. An annual-maxima GP fit is not a POT workflow. Independence, stationarity,
+No missing, zero, historical, grouped, censored, rating-error or POT plot is admitted here.
+Selected-H plots require a successfully selected candidate; bootstrap plots require completed intervals.
+An annual-maxima GP fit is not a POT workflow. Independence, stationarity,
 physical support, model selection, data quality, rating error and engineering adoption still
 require review. No native labels or defaults are inferred.
 
@@ -76,3 +77,154 @@ require review. No native labels or defaults are inferred.
 DOI 10.1016/0022-1694(78)90017-3 (publisher abstract reviewed; full paper not obtained).
 Use `ffa references ARR3` and `ffa references CUNNANE1978`.
 Independent numeric and installed checks are required before acceptance; native qualification is separate.
+
+## Exact-record Bayesian frequency reporting
+
+The installed explicit lognormal Bayesian schema `ffa-lognormal-bayesian/1` supports
+`--frequency-report` for `source_format: year_ams_csv` and consecutive positive exact
+systematic annual maxima. Classified-systematic CSV (including censored records) is
+intentionally not admitted by this increment. A quantile request is required;
+probability-at-flow-only output remains a numerical table.
+
+The renderer consumes the typed quantile results and their canonical report rows, without
+running another fit, sampling additional draws or substituting different estimands.
+The separately labelled series are quantile at expected source-coordinate parameters,
+posterior mean of quantiles, posterior median of quantiles, and posterior predictive
+quantile (the inverse averaged CDF). Undefined posterior means remain absent; segments
+do not bridge missing requested values. The exact recorded lower and upper central
+posterior quantile probability limits are vertical intervals at their own requested F.
+These are parameter-induced uncertainty in the model quantile, not predictive intervals,
+simultaneous bands, bootstrap intervals or numerical Monte Carlo error. Interval
+mass and construction, source unit, canonical one-based result-row identity and each
+reported numerical precision state are retained in the coordinate CSV and HTML.
+No new precision claim follows from a plot. The other Bayesian probability and
+return-period quantities remain in the complete numerical report.
+
+Run the bundled synthetic fixed-scale example (copy the two resources from the wheel
+as for the deterministic examples):
+~~~console
+ffa fit --ams bayesian-fixed-ams.csv --settings bayesian-fixed-settings.json --output bayesian-plot --frequency-report
+~~~
+For its three log flows 1,2,3, normal prior N(0,1) and known log SD 0 (SD=1),
+the independent posterior log-location reference is N(1.5,1/4). At F=0.9 and
+z=Phi^-1(F), the at-expected-parameter quantile is exp(1.5+z), the posterior
+mean quantile exp(1.5+z+0.125), the posterior median quantile exp(1.5+z), and
+the predictive quantile exp(1.5+sqrt(1.25)*z). The central 80% posterior
+quantile interval endpoints are exp(1.5+z+0.5*Phi^-1(0.1)) and
+exp(1.5+z+0.5*Phi^-1(0.9)). These analytical values are reference quantities;
+the plotted values are the actual finite seeded importance-sampling outputs.
+The configured AEP precision audit does not qualify those quantile points.
+See `ffa explain quantile-estimands --format markdown` and the installed Bayesian
+workflow guidance for the source method and limitations. Native qualification remains separate.
+
+## Selected-H and completed parametric-bootstrap plots
+
+The `ffa-gev-selected-h/1` workflow displays the actual selected fitted quantiles,
+with the selected H and provisional calibration explicitly labelled. All five candidate
+diagnostics remain in the numerical report. No curve is fabricated when no candidate passes.
+
+For a completed declared parametric bootstrap of an admitted exact-record ordinary,
+fixed-H or selected-H fit, each vertical sampling interval uses the actual lower and
+upper `quantile_parametric_bootstrap_percentile_limit` values, their recorded confidence
+mass and `parametric_percentile_type_7_successful_refits` construction. The interval
+describes sampling/refitting variability conditional on successful refits, including
+reselection for selected H. It is not a posterior credible interval, prediction
+interval, simultaneous band or the numerical Monte Carlo bracket around an endpoint.
+The full numerical report preserves the attempted/failed replicate ledger and endpoint
+Monte Carlo diagnostics. Per-row Bayesian precision state is blank when not supplied by
+the deterministic result contract. A plot does not independently certify precision.
+
+The extended coordinate CSV preserves one-based canonical numerical result row
+identity and actual typed interval metadata. The ordinary and fixed-H point-only
+coordinate schema is unchanged. Refused bootstrap or no-selected-fit plotting requests
+still fail closed; use the same settings without `--frequency-report` to retain the
+point-fit or candidate report and applicable attempt ledger.
+
+### Rerunnable synthetic examples
+
+Using the existing synthetic 50-year Gumbel-like record from the selected-H CLI
+validation, save and run the following script with the installed package:
+
+~~~python
+import json
+import subprocess
+import sys
+import tempfile
+from importlib.resources import files
+from math import log
+from pathlib import Path
+
+root = Path(tempfile.mkdtemp(prefix="ffa-selected-bootstrap-", dir=Path.cwd()))
+resources = files("ffa_methods").joinpath("resources", "examples")
+ams = root / "annual.csv"
+ams.write_text(
+    "Year,AMS\n" + "\n".join(
+        f"{1950+i},{20-log(-log((i-0.35)/50.3))}" for i in range(1, 51)
+    ),
+    encoding="utf-8",
+)
+fixed = json.loads(resources.joinpath("fixed-gev-settings.json").read_bytes())
+fixed.update(lh_shift=1, non_exceedance_probabilities=[0.9])
+ordinary = json.loads(resources.joinpath("ordinary-settings.json").read_bytes())
+ordinary["non_exceedance_probabilities"] = [0.9]
+bootstrap = {
+    "replications": 200, "seed": 42, "confidence": 0.8,
+    "maximum_failure_fraction": 0.0, "endpoint_tolerance": 1.0,
+}
+selected = dict(fixed)
+selected.pop("lh_shift")
+selected.update(
+    schema_version="ffa-gev-selected-h/1", estimator="gev_lh_selected_h",
+    critical_z=1.96, calibration_seed=7,
+)
+cases = {
+    "selected": selected,
+    "fixed-bootstrap": {**fixed, "bootstrap": bootstrap},
+    "ordinary-bootstrap": {**ordinary, "bootstrap": bootstrap},
+    "selected-bootstrap": {
+        **selected, "bootstrap": {
+            "replications": 24, "seed": 42, "confidence": 0.5,
+            "maximum_failure_fraction": 0.25, "endpoint_tolerance": 2.0,
+        },
+    },
+}
+for name, config in cases.items():
+    path = root / f"{name}.json"
+    path.write_text(json.dumps(config), encoding="utf-8")
+    subprocess.run(
+        [sys.executable, "-m", "ffa_methods", "fit", "--ams", ams.name,
+         "--settings", path.name, "--output", name, "--frequency-report"],
+        cwd=root, check=True,
+    )
+print(root)
+~~~
+
+These synthetic budgets, tolerances and confidence levels are validation examples,
+not adopted engineering settings. The selected-H calibration is provisional.
+See the GEV method page and the separate bootstrap evidence for the numerical basis.
+
+## Outstanding historical and censored plotting-position admission
+
+ARR Book 3 v4.2 section 2.6.2, printed pages 35–36 (PDF pages 52–53),
+was rechecked directly. It specifies the Cunnane formula for gauged annual
+maxima, warns that historical and censored plotting positions can be inaccurate,
+and directs the reader to Stedinger et al. (1993). Section 2.6.3.3 provides
+censored likelihood terms, not an empirical plotting-position formula.
+Hirsch and Stedinger (1987), *Plotting positions for historical floods and their
+precision*, DOI [10.1029/WR023i004p00715](https://doi.org/10.1029/WR023i004p00715),
+and Hirsch (1987), *Probability plotting position formulas for flood records with
+historical information*, DOI [10.1016/0022-1694(87)90152-1](https://doi.org/10.1016/0022-1694(87)90152-1),
+identify partially censored sampling as the relevant model. The abstracts
+were inspected, not the full primary derivations. They are candidates for
+method admission, not authorization to implement an assumed formula.
+
+Before enabling historical/censored empirical points, pin the source formula
+and applicable sampling experiment (including perception thresholds, complete
+systematic/historical exposure, equality and ties, and grouped or interval
+records). Independently reproduce source examples and limiting cases. Do not
+rank only the remaining exact observations as though censored years were absent,
+assign threshold discharges as observations, infer non-exceedance years from
+gaps, or assume the first historical flood establishes the record length.
+Coordinate exposure admission with #9. Until these gates pass, the existing
+plot refusal remains intentional; the fitted numerical report is available
+without the plot flag.

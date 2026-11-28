@@ -683,11 +683,11 @@
         "CUNNANE1978"
       ],
       "source_location": "ARR Book 3 Chapter 2 section 2.6.2 equations 3.2.35–3.2.36, printed pp. 35–36",
-      "purpose": "Display ranked exact systematic annual maxima and requested deterministic fitted quantiles without altering the calculation",
+      "purpose": "Display ranked exact systematic annual maxima, deterministic fixed/selected-H quantiles and completed bootstrap limits, and admitted Bayesian quantile estimands and pointwise limits without altering the calculation",
       "key_assumptions": [
         "Consecutive exact positive annual maxima only",
         "Descending ranks, Cunnane AEP; ascending year breaks ties as an explicit presentation rule",
-        "Log AEP axis, linear signed discharge; no interval or engineering adoption claim"
+        "Log AEP axis, linear signed discharge; distinguish pointwise posterior quantile limits from successful-refit-conditional bootstrap sampling intervals and numerical error; preserve precision states; no engineering adoption claim"
       ],
       "documentation": "methods/frequency-plots.md",
       "validation_required": [
