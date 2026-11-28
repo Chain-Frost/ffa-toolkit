@@ -1,6 +1,6 @@
 # Fixed-H GEV ordinary L and LH mathematical fitting
 
-**Method ID** `lh-moments-gev`. Fixed H=0–4 point fitting, provisional direct-simulation selected H and optional parametric bootstrap are available for complete exact annual maxima. Native Flike qualification remains open.
+**Method ID:** `lh-moments-gev`. Fixed H=0–4 point fitting, provisional direct-simulation selected H and optional parametric bootstrap are available for complete exact annual maxima. Native Flike qualification remains open.
 
 ## Purpose and required inputs
 
