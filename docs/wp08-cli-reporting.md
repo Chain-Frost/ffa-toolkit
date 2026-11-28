@@ -119,3 +119,24 @@ Cunnane AEP (descending ranks), F, units, tie decision, signed quantiles, the ab
 intervals and fitted-support warnings are explicit. See [frequency plot guidance](methods/frequency-plots.md).
 Censored/historical exposure, Bayesian estimands and interval plots, full offline HTML manual,
 independent review and full qualification remain outside this increment.
+
+The packaged HTML method manual is available with `ffa manual > method-manual.html`.
+It includes a runnable synthetic example for each installed deterministic configuration
+and interpretation of support warnings and output probabilities.
+
+### Bayesian and non-exact records
+
+Issue #7 remains open. PR #37 introduces explicit lognormal Bayesian result identities.
+After that workflow is integrated, exact consecutive systematic records can use the same
+Cunnane diagnostic. The quantile-at-expected-parameters, posterior median, posterior mean
+when defined, and predictive quantile are separate series. Match any central pointwise
+posterior-quantile limits by F, paired side, unit, construction and interval mass. A posterior
+quantile interval applies at a single probability; it is neither a simultaneous band nor a
+predictive interval or a Monte Carlo precision assessment. The estimated-scale workflow
+may omit a divergent posterior mean at upper design probabilities; there is no valid
+finite substitute for that series at those points.
+
+Systematic censoring in PR #37 establishes likelihood contributions and explicit data
+classification. It does not establish plotting positions. Historical/grouped exposure
+depends on issue #9 and a reviewed plotting-position basis. No exact rank is assigned
+to a threshold or historical event based on the number of uncensored supplied rows.

@@ -3,6 +3,7 @@
 import csv
 from collections.abc import Mapping
 from dataclasses import dataclass
+from decimal import Decimal
 from html import escape
 from io import StringIO
 from math import ceil, isfinite, log10
@@ -15,7 +16,7 @@ from ffa_methods.legacy.project import parse_ams_csv
 # Deliberately version-gated here: future fitter schemas do not automatically gain plotting admission.
 _ADMITTED_SCHEMAS = ("ffa-gev-fixed-h/1", "ffa-ordinary-lmoments/1")
 _EXACT_ASSERTION = "caller_asserted_complete_exact_positive_annual_maxima"
-_SOURCE = "ARR Book 3 v4.2, Chapter 2, section 2.6.2, eq. (3.2.36), printed pp. 35–36"
+_SOURCE = "ARR Book 3 v4.2, Chapter 2, section 2.6.2, eq. (3.2.36), printed pp. 35-36"
 _LIMITS = (
     "Observed ranks are plotting positions, not fitted probabilities. Fitted markers are the requested "
     "deterministic quantiles; connecting segments are visual guides, not additional calculations. "
@@ -37,7 +38,7 @@ class PlotPoint:
 
 def _observed_points(raw_ams: bytes) -> tuple[PlotPoint, ...]:
     """Use all admitted source rows; do not infer exposure in unrepresented years."""
-    rows: list[tuple[int, int, float]] = []
+    rows: list[tuple[int, int, Decimal]] = []
     for index, record in enumerate(parse_ams_csv(raw_ams), start=1):
         if record.kind != ObservationKind.EXACT or record.value is None:
             msg = "frequency report requires exact positive systematic annual maxima"
@@ -46,17 +47,17 @@ def _observed_points(raw_ams: bytes) -> tuple[PlotPoint, ...]:
         if not isfinite(discharge) or discharge <= 0:
             msg = "frequency report requires finite positive systematic annual maxima"
             raise ValueError(msg)
-        rows.append((index, record.year, discharge))
+        rows.append((index, record.year, record.value))
     n = len(rows)
     years = [row[1] for row in rows]
     if max(years) - min(years) + 1 != n:
         msg = "frequency report requires consecutive systematic years; missing exposure is not inferred"
         raise ValueError(msg)
-    ranked = sorted(rows, key=lambda row: (-row[2], row[1]))
+    ranked = sorted(rows, key=lambda row: (row[2].copy_negate(), row[1]))
     points: list[PlotPoint] = []
     for rank, (index, year, discharge) in enumerate(ranked, start=1):
         aep = (rank - 0.4) / (n + 0.2)
-        points.append(PlotPoint("observed", discharge, aep, 1.0 - aep, year, rank, index))
+        points.append(PlotPoint("observed", float(discharge), aep, 1.0 - aep, year, rank, index))
     return tuple(points)
 
 
@@ -95,7 +96,8 @@ class PlotScale:
     def from_points(cls, points: tuple[PlotPoint, ...]) -> Self:
         decades = max(1, ceil(-log10(min(point.aep for point in points))))
         magnitude = max(abs(point.discharge) for point in points)
-        low = min(0.0, min(point.discharge / magnitude for point in points))
+        minimum = min(point.discharge for point in points)
+        low = min(0.0, minimum / magnitude)
         high = max(point.discharge / magnitude for point in points)
         return cls(decades, magnitude, low, high)
 
@@ -108,10 +110,14 @@ class PlotScale:
 def _axis_svg(scale: PlotScale, unit: str) -> list[str]:
     lines: list[str] = []
     step = 1 if scale.decades <= 8 else 2
-    for decade in sorted({*range(0, scale.decades + 1, step), scale.decades}):
+    # Leave room for the final label when a two-decade step ends one decade early.
+    decades = [decade for decade in range(0, scale.decades, step) if scale.decades - decade >= step]
+    for decade in (*decades, scale.decades):
         x = _LEFT + (_RIGHT - _LEFT) * decade / scale.decades
         lines.append(f'<path d="M{x} {_TOP} V{_BOTTOM}" stroke="#d5dbe2"/>')
-        lines.append(f'<text x="{x}" y="469" text-anchor="middle">{10.0 ** (2 - decade):g}%</text>')
+        exponent = 2 - decade
+        label = f"{10.0**exponent:g}" if exponent >= -3 else f"1e{exponent}"
+        lines.append(f'<text x="{x}" y="469" text-anchor="middle">{label}%</text>')
     # For short log ranges, label the engineering-relevant intermediate AEPs.
     # Avoid crowding labels when the requested tail spans many decades.
     if scale.decades <= 3:
@@ -124,14 +130,20 @@ def _axis_svg(scale: PlotScale, unit: str) -> list[str]:
     for index in range(6):
         fraction = index / 5
         y = _BOTTOM - (_BOTTOM - _TOP) * fraction
-        value = ((1.0 - fraction) * scale.low + fraction * scale.high) * scale.magnitude
+        normalized = (1.0 - fraction) * scale.low + fraction * scale.high
+        # Tick labels are real-valued interpolations. Avoid underflow between
+        # subnormal inputs and retain readable scientific notation at large scales.
+        value = Decimal(normalized) * Decimal(scale.magnitude)
+        label = f"{value:.5g}" if value else "0"
+        if value and (abs(value) < Decimal("0.001") or abs(value) >= Decimal("1e6")):
+            label = f"{value:.4e}"
         lines.append(f'<path d="M{_LEFT} {y} H{_RIGHT}" stroke="#d5dbe2"/>')
-        lines.append(f'<text x="100" y="{y + 4}" text-anchor="end">{value:.5g}</text>')
+        lines.append(f'<text x="100" y="{y + 4}" text-anchor="end">{label}</text>')
     lines.extend(
         (
             f'<path d="M{_LEFT} {_TOP} V{_BOTTOM} H{_RIGHT}" fill="none" stroke="#202c39"/>',
             '<text x="535" y="500" text-anchor="middle">Annual exceedance probability (AEP, log scale)</text>',
-            f'<text x="20" y="250" text-anchor="middle" transform="rotate(-90 20 250)">Discharge ({escape(unit)})</text>',
+            f'<text x="12" y="250" text-anchor="middle" transform="rotate(-90 12 250)">Discharge ({escape(unit)})</text>',
         )
     )
     return lines
@@ -169,10 +181,14 @@ def _svg(points: tuple[PlotPoint, ...], scale: PlotScale, unit: str, notice: str
             if point.series == "observed"
             else 'r="5.5" fill="none" stroke="#1767a0" stroke-width="1.7"'
         )
-        label = f"{point.series}: year={point.year}, AEP={point.aep!r}, Q={point.discharge!r} {unit}"
+        identity = (
+            f"Observed year {point.year}, rank {point.rank}, source record {point.source_index}"
+            if point.series == "observed"
+            else "Requested fitted quantile"
+        )
+        label = f"{identity}, F={point.non_exceedance!r}, AEP={point.aep!r}, Q={point.discharge!r} {unit}"
         lines.append(
-            f'<circle data-series="{point.series}" cx="{x}" cy="{y}" {style}>'
-            f"<title>{escape(label)}</title></circle>"
+            f'<circle data-series="{point.series}" cx="{x}" cy="{y}" {style}><title>{escape(label)}</title></circle>'
         )
     lines.extend(
         (
@@ -225,32 +241,35 @@ def _html_report(svg: str, points: tuple[PlotPoint, ...], report_text: str, unit
     )
     return (
         '<!doctype html>\n<html lang="en"><meta charset="utf-8"><title>FFA frequency report</title>'
-        '<style>body{font:16px/1.5 system-ui,sans-serif;max-width:1050px;margin:2rem auto;padding:0 1rem}'
-        'svg{width:100%;height:auto}table{border-collapse:collapse;width:100%}th,td{padding:.4rem;border:1px solid #aaa}'
-        'td{text-align:right}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.85rem}'
-        '@media print{body{margin:0}tr{break-inside:avoid}svg{break-inside:avoid}}</style>'
-        '<main><h1>Flood frequency analysis</h1><p><strong>Not an adopted engineering estimate.</strong> '
-        f'{escape(_LIMITS)}</p><h2>Frequency plot</h2>{svg}'
-        f'<p>Plotting basis: {escape(_SOURCE)}. Cunnane AEP = (rank − 0.4)/(n + 0.2); F = 1 − AEP. '
-        'Equal discharges receive consecutive ranks ordered by ascending year (presentation decision). '
-        'The logarithmic AEP axis is independent of fitted family; discharge is linear and signed.</p>'
-        f'<h2>Systematic record and exposure</h2><p>{len(observed)} consecutive supplied years; '
-        f'year definition: {escape(year_definition)}. The source classification and units are caller assertions. '
-        'No historical, censored, missing, excluded or zero observations are admitted to this report.</p>'
-        f'<table><thead><tr><th>Source record</th><th>Year</th><th>Rank</th><th>Q ({escape(unit)})</th>'
-        f'<th>F</th><th>AEP</th></tr></thead><tbody>{rows}</tbody></table>'
-        '<h2>Requested deterministic design quantiles</h2>'
-        f'<table><thead><tr><th>F</th><th>AEP</th><th>Q ({escape(unit)})</th></tr></thead>'
-        f'<tbody>{fitted_rows}</tbody></table>'
-        '<p>No uncertainty intervals are calculated. These are not adopted estimates.</p>'
-        '<h2>Calculated results, assumptions, diagnostics and warnings</h2>'
-        f'<pre>{escape(report_text)}</pre>'
-        '<h2>Plot reference and replay</h2><p>Cunnane, C. (1978), Unbiased plotting positions — A review, '
-        'Journal of Hydrology 37, 205–222, doi:10.1016/0022-1694(78)90017-3. '
-        'ARR: Commonwealth of Australia (Geoscience Australia), 2019. '
-        'Use the byte-exact source snapshots and the same explicit fit settings to replay; '
-        'frequency-coordinates.csv preserves the plotted coordinates. '
-        'See also the offline command ffa explain frequency-plots --format markdown.</p></main></html>\n'
+        "<style>body{font:16px/1.5 system-ui,sans-serif;max-width:1050px;margin:2rem auto;padding:0 1rem}"
+        "svg{width:100%;height:auto}table{border-collapse:collapse;width:100%}th,td{padding:.4rem;border:1px solid #aaa}"
+        "td{text-align:right}td,th{overflow-wrap:anywhere}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.85rem}"
+        "h2{break-after:avoid-page}code{overflow-wrap:anywhere}"
+        "@media screen and (max-width:650px){table{table-layout:fixed}td,th{padding:.2rem;font-size:.83rem}}"
+        "@media print{body{margin:0}tr,svg{break-inside:avoid}thead{display:table-header-group}}</style>"
+        "<main><h1>Flood frequency analysis</h1><p><strong>Not an adopted engineering estimate.</strong> "
+        f"{escape(_LIMITS)}</p><h2>Frequency plot</h2>{svg}"
+        f"<p>Plotting basis: {escape(_SOURCE)}. Cunnane AEP = (rank - 0.4)/(n + 0.2); F = 1 - AEP. "
+        "Equal discharges receive consecutive ranks ordered by ascending year (presentation decision). "
+        "The horizontal axis shows AEP in percent. Tables show F and AEP as fractions. Discharge is linear and signed.</p>"
+        "<h2>Requested deterministic design quantiles</h2>"
+        f"<table><thead><tr><th>F</th><th>AEP</th><th>Q ({escape(unit)})</th></tr></thead>"
+        f"<tbody>{fitted_rows}</tbody></table>"
+        f"<h2>Systematic record and exposure</h2><p>{len(observed)} consecutive supplied years; "
+        f"year definition: {escape(year_definition)}. The source classification and units are caller assertions. "
+        "No historical, censored, missing, excluded or zero observations are admitted to this report.</p>"
+        f"<table><thead><tr><th>Source record</th><th>Year</th><th>Rank</th><th>Q ({escape(unit)})</th>"
+        f"<th>F</th><th>AEP</th></tr></thead><tbody>{rows}</tbody></table>"
+        "<h2>Calculated results, assumptions, diagnostics and warnings</h2>"
+        f"<pre>{escape(report_text)}</pre>"
+        "<h2>Plot reference and replay</h2><p>Cunnane, C. (1978), Unbiased plotting positions — A review, "
+        "Journal of Hydrology 37, 205-222, doi:10.1016/0022-1694(78)90017-3. "
+        "ARR: Commonwealth of Australia (Geoscience Australia), 2019. "
+        "Replay from this directory using the byte-exact snapshots and the same package and dependency versions.</p>"
+        "<p><code>ffa fit --ams source-ams.csv --settings source-settings.json --output replay "
+        "--frequency-report</code></p><p>"
+        "frequency-coordinates.csv preserves the plotted coordinates. "
+        "See also the offline command ffa explain frequency-plots --format markdown.</p></main></html>\n"
     )
 
 

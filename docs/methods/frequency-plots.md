@@ -14,7 +14,9 @@ printed pp. 35–36, equations (3.2.35) and (3.2.36):
 `AEP_i = (i - 0.4)/(n + 0.2)`, `F_i = 1 - AEP_i`. Here n is the number of
 supplied gauged annual maxima and i=1 is the greatest discharge. Equal flows receive
 consecutive ranks ordered by ascending year; this is a project presentation decision, not
-a native convention or an additional statistical estimator. Each source record and rank is retained.
+a native convention or an additional statistical estimator. Rank order uses the original decimal value before conversion to binary64 for the plot.
+The source snapshot retains the exact recorded decimal, and the coordinate table retains the
+plotted value and source record identity.
 
 The horizontal coordinate is proportional to -log10(AEP), with 100% at the left
 and rarer events to the right. For spans of up to three decades, intermediate 2/5-decade
@@ -34,6 +36,7 @@ Use the already bundled, original synthetic examples for each installed determin
 ffa fit --ams fixed-gev-ams.csv --settings fixed-gev-settings.json --output gev-plot --frequency-report
 ffa fit --ams ordinary-ams.csv --settings ordinary-settings.json --output gumbel-plot --frequency-report
 ffa explain frequency-plots --format markdown
+ffa manual > method-manual.html
 ~~~
 
 Copy the source resources from an installed wheel using
@@ -52,7 +55,9 @@ The opt-in report adds `frequency.svg` (standalone vector graphic), `frequency-c
 (full numeric F, AEP, Q, row, year and rank plus SVG pixel coordinates), and `report.html`
 (self-contained, printable, with the full numerical text report and systematic data table).
 It also retains byte-exact input and settings snapshots for both deterministic schemas.
-The output directory must be new, and no partial bundle is published on validation failure.
+Use an existing, user-controlled parent and a new output directory. Files are staged before
+publication. On POSIX the final existence check and rename are separate operations, so concurrent
+external creation of an empty directory at the same destination is outside the safety guarantee.
 Without the flag, previous outputs and schemas remain unchanged.
 
 ## Admission and limitations

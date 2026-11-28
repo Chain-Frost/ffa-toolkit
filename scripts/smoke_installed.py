@@ -49,6 +49,11 @@ def _check_installed_method_pages(console: Path, output: Path, env: dict[str, st
     _invoke([str(console), "explain", "--format", "markdown"], cwd=output, env=env, expected_code=2)
     _invoke([str(console), "explain", "lp3", "--format", "markdown"], cwd=output, env=env, expected_code=2)
 
+    manual = _invoke([str(console), "manual"], cwd=output, env=env, expected_code=0)
+    if not manual.stdout.startswith("<!doctype html>") or 'id="examples"' not in manual.stdout:
+        msg = "installed wheel lacks the offline HTML method manual"
+        raise RuntimeError(msg)
+
 
 def _ordinary_reference(
     estimator: str, extra: dict[str, object], probabilities: tuple[float, ...]

@@ -4,7 +4,7 @@ import csv
 import io
 import json
 from dataclasses import replace
-from math import ceil, isclose, log10
+from math import ceil, isclose, log10, nextafter
 from pathlib import Path
 from typing import cast
 
@@ -162,7 +162,9 @@ def test_gev_support_violations_remain_visible(tmp_path: Path) -> None:
 def test_non_deterministic_estimand_rejected() -> None:
     raw_ams = (EXAMPLES / "ordinary-ams.csv").read_bytes()
     result, settings = calculate_from_bytes(raw_ams, (EXAMPLES / "ordinary-settings.json").read_bytes())
-    posterior = replace(result, values=(replace(result.values[0], meaning=ResultMeaning.POSTERIOR_PREDICTIVE_QUANTILE),))
+    posterior = replace(
+        result, values=(replace(result.values[0], meaning=ResultMeaning.POSTERIOR_PREDICTIVE_QUANTILE),)
+    )
     with pytest.raises(ValueError, match="deterministic fitted quantiles"):
         render_frequency_files(posterior, settings=settings, raw_ams=raw_ams, report_text="")
 
@@ -184,3 +186,44 @@ def test_intermediate_aep_ticks_and_coincident_marker_visibility() -> None:
     assert ">20%</text>" in svg
     assert f'<circle data-series="observed" {coords} r="4" fill="#202c39">' in svg
     assert f'<circle data-series="fitted" {coords} r="5.5" fill="none" stroke="#1767a0"' in svg
+
+
+def test_ranks_use_source_precision() -> None:
+    raw_ams = b"Year,AMS\n2000,1\n2001,1.00000000000000000000000000001\n2002,4\n"
+    result, settings = calculate_from_bytes(raw_ams, (EXAMPLES / "ordinary-settings.json").read_bytes())
+    files = render_frequency_files(result, settings=settings, raw_ams=raw_ams, report_text="")
+    observed = list(csv.DictReader(io.StringIO(files["frequency-coordinates.csv"])))[:3]
+    assert [row["year"] for row in observed] == ["2002", "2001", "2000"]
+    for row, expected in zip(observed, (3 / 16, 1 / 2, 13 / 16), strict=True):
+        assert isclose(float(row["AEP"]), expected, rel_tol=1e-15)
+
+
+def test_frequency_output_collision_preserves_existing_directory(tmp_path: Path) -> None:
+    destination = tmp_path / "occupied"
+    destination.mkdir()
+    with pytest.raises(SystemExit) as exc:
+        _run(EXAMPLES / "ordinary-ams.csv", EXAMPLES / "ordinary-settings.json", destination)
+    assert exc.value.code == 2
+    assert list(tmp_path.iterdir()) == [destination]
+    assert not list(destination.iterdir())
+
+
+@pytest.mark.parametrize("value", [5e-324, 1.7976931348623157e308])
+def test_extreme_discharge_and_rare_aep(value: float) -> None:
+    source = (EXAMPLES / "ordinary-ams.csv").read_bytes()
+    result, settings = calculate_from_bytes(source, (EXAMPLES / "ordinary-settings.json").read_bytes())
+    altered = replace(
+        result,
+        values=(replace(result.values[0], value=-value, input_probability=nextafter(1.0, 0.0)),),
+    )
+    raw_ams = f"Year,AMS\n2000,{value}\n2001,{value}\n2002,{value}\n".encode()
+    files = render_frequency_files(altered, settings=settings, raw_ams=raw_ams, report_text="")
+    fitted = list(csv.DictReader(io.StringIO(files["frequency-coordinates.csv"])))[-1]
+    assert float(fitted["AEP"]) == 2**-53
+    assert float(fitted["discharge"]) == -value
+    assert float(fitted["svg_y"]) == 445
+    svg = files["frequency.svg"]
+    assert ">1e-14%</text>" in svg
+    y_ticks = [line.split(">")[1].split("<")[0] for line in svg.splitlines() if 'x="100"' in line]
+    assert len(set(y_ticks)) == 6
+    assert "inf</text>" not in svg

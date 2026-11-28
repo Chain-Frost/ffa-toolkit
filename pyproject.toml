@@ -65,6 +65,7 @@ packages = ["src/ffa_methods"]
 "docs/examples/ordinary-ams.csv" = "ffa_methods/resources/examples/ordinary-ams.csv"
 "docs/methods/l-moments.md" = "ffa_methods/resources/methods/l-moments.md"
 "docs/methods/frequency-plots.md" = "ffa_methods/resources/methods/frequency-plots.md"
+"docs/methods/manual.html" = "ffa_methods/resources/methods/manual.html"
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -83,6 +84,7 @@ include = [
     "/docs/examples/ordinary-ams.csv",
     "/docs/methods/l-moments.md",
     "/docs/methods/frequency-plots.md",
+    "/docs/methods/manual.html",
     "/docs/method-registry.json",
     "/docs/references.md",
     "/README.md",

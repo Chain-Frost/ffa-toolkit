@@ -27,6 +27,7 @@ RESOURCE_FILES: tuple[tuple[str, str], ...] = (
     ("docs/examples/ordinary-ams.csv", "ffa_methods/resources/examples/ordinary-ams.csv"),
     ("docs/methods/l-moments.md", "ffa_methods/resources/methods/l-moments.md"),
     ("docs/methods/frequency-plots.md", "ffa_methods/resources/methods/frequency-plots.md"),
+    ("docs/methods/manual.html", "ffa_methods/resources/methods/manual.html"),
 )
 BLOCKED_COMPONENTS = frozenset({"reference", "legacy-candidates", "private-evidence", "local-evidence"})
 BLOCKED_SUFFIXES = (".fld", ".fid", ".7z")

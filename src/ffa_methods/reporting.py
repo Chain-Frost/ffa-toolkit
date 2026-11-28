@@ -675,6 +675,9 @@ def write_report_bundle(
             (staging / filename).write_text(content, encoding="utf-8", newline="\n")
         if source_inputs is not None:
             _write_source_inputs(staging, result, source_inputs)
+        if destination.exists() or destination.is_symlink():
+            msg = f"output directory already exists: {destination}"
+            raise FileExistsError(msg)
         staging.rename(target)
     finally:
         if staging.exists():

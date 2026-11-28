@@ -7,7 +7,7 @@ from pathlib import Path
 
 from ffa_methods import __version__
 from ffa_methods.deterministic_workflow import ORDINARY_SCHEMA, calculate_from_bytes
-from ffa_methods.guidance import explain, references
+from ffa_methods.guidance import explain, method_manual, references
 from ffa_methods.reporting import write_report_bundle
 
 
@@ -36,6 +36,7 @@ def make_parser() -> argparse.ArgumentParser:
     )
     explain_parser.add_argument("method_id", nargs="?", help="registered method ID; omit to list all entries")
     explain_parser.add_argument("--format", choices=("text", "json", "markdown"), default="text", dest="output_format")
+    commands.add_parser("manual", allow_abbrev=False, help="Write the offline HTML method manual to standard output")
     references_parser = commands.add_parser(
         "references",
         allow_abbrev=False,
@@ -61,6 +62,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Return 0 on success, 2 for invalid inputs, 1 for IO/broken resources."""
     parser = make_parser()
     args = parser.parse_args(argv)
+    if args.command == "manual":
+        try:
+            sys.stdout.buffer.write(method_manual().encode("utf-8"))
+        except (OSError, TypeError, ValueError) as exc:
+            print(f"ffa: failed to write packaged method manual: {exc}", file=sys.stderr)
+            return 1
+        return 0
     if args.command in ("explain", "references"):
         try:
             content = (
@@ -86,7 +94,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 else None
             )
             paths = write_report_bundle(
-                result, args.output, settings=settings, source_inputs=source_inputs, frequency_report=args.frequency_report
+                result,
+                args.output,
+                settings=settings,
+                source_inputs=source_inputs,
+                frequency_report=args.frequency_report,
             )
         except (ValueError, TypeError, OverflowError, FileExistsError) as exc:
             parser.error(str(exc))
