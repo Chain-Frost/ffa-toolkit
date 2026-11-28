@@ -634,9 +634,8 @@ All signed normalization divisions use the interval quotient.
 Supported reference requests are E[mu], E[(mu-c)^2], E[exp(mu)],
 expected F/direct AEP at positive flow, and posterior mean-coordinate
 CDF/direct strict SF at a specified threshold. Return full Decimal
-intervals, not an estimated reference point; the actual flood output
-transforms, certified inverse-Normal thresholds, and their connection
-to the stochastic audit remain separate implementation work.
+intervals. Actual flood output transforms and certified inverse-Normal
+thresholds remain separate implementation work.
 
 `ReferenceControls` requires an explicit standardized extent,
 dyadic level, cell budget, cell-term budget, and normalized log-ratio
@@ -677,12 +676,32 @@ rectangles and dependency-preserving interval arithmetic, not
 convergence extrapolation. They are not necessarily narrow enough
 for a particular stochastic audit's specified tolerance.
 
-Repository endpoint validation and independent functional review
-are still required, including the two additional typed-binding
-tests. The full checkout is not available in the local Linux
-environment used for the standalone tests. The concurrent PR #34
-owns broader scalar moment eligibility and sampler regression tests;
-coordinate registry and method-status updates with that PR rather
-than duplicate them or imply a new precision-pass route. Keep #5
-open. This contribution introduces no installed CLI/schema,
-sampling/proposal change, dependency, native claim or publication.
+### Fixed-budget scalar audit
+
+Set `PrecisionPlan.censored_reference_controls` explicitly for a
+classified fixed-scale censored record. Before drawing, the audit
+reserves the existing stochastic workload and evaluates one deterministic
+partition for the distinct requested scalar integrands. The lower of the
+two configured log-ratio ceilings applies. A rejected ratio gate or an
+exhausted deterministic budget withholds sampling and retains every seed
+slot and its reason. The bound evidence retains the exact model, proposal,
+controls, reserved cell terms and scalar intervals.
+
+The admitted output meanings are mean log-location, expected
+non-exceedance and direct expected AEP. The primary tolerance window and
+each audit stream's simultaneous scalar interval must enclose the **entire**
+deterministic interval. The scalar audit interval and replicate estimate
+must also fit inside the primary tolerance window. Overlap alone leaves
+containment unresolved. For example, applying the one-event check to a
+unit Gaussian prior, unit log-flow SD and a left-censored event at the
+reference discharge gives E[mu] = -1/sqrt(pi), expected F = 2/3 and
+expected AEP = 1/3 at that discharge. The test checks all three identities
+against the retained intervals and executes streams 51, 52 and 53.
+
+PR #34 owns broader moment eligibility and independent sampler regression.
+PR #37 (CLI) and PR #36 (reporting) can continue with their existing
+configuration and schema. Censored precision integration there requires
+an explicit cell budget and serialization of both endpoints, together with
+primary-estimate identity and retained failed attempts. Keep #5 open for
+censored transformed and inverse outputs and the estimated-scale reference
+path. The estimated-scale upper design-flood mean remains undefined.

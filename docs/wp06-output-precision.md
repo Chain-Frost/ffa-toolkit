@@ -9,6 +9,13 @@ This specification is for the existing independent self-normalized importance
 sampler (SNIS), not a different posterior, an adaptive sampler or native
 Flike qualification. Native qualification remains separate.
 
+The internal fixed-budget audit also admits parameter mean and expected
+CDF/direct AEP for classified fixed-scale censored records when explicitly
+configured with [deterministic reference controls](work/wp06-censored-precision-admission.md).
+Each successful check requires both endpoints of the Decimal reference
+enclosure inside the relevant interval. The exact-record route retains
+its conjugate reference and existing criteria.
+
 ## 1. Source and scope
 
 Read the merged [execution contract](wp06-importance-execution.md),

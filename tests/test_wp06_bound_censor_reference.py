@@ -6,10 +6,31 @@ from hashlib import sha256
 
 import pytest
 
-from ffa_methods.censored_reference import CensoredReferenceError, ReferenceControls, ReferenceKind, ReferenceRequest
-from ffa_methods.contracts import AnnualObservation, ExposureKind, ObservationKind, ObservationSeries
+from ffa_methods import importance_precision
+from ffa_methods.censored_reference import (
+    CensoredReferenceError,
+    ReferenceBounds,
+    ReferenceControls,
+    ReferenceKind,
+    ReferenceRequest,
+)
+from ffa_methods.contracts import (
+    AnnualObservation,
+    EvidenceStatus,
+    ExposureKind,
+    ObservationKind,
+    ObservationSeries,
+    ResultMeaning,
+    RunProvenance,
+)
 from ffa_methods.importance_censor_reference import bound_fixed_scale_reference
-from ffa_methods.importance_sampling import ExplicitNormalProposal
+from ffa_methods.importance_precision import Bounds, PrecisionPlan, PrecisionRequest, PrecisionState
+from ffa_methods.importance_sampling import (
+    ExplicitNormalProposal,
+    ExplicitPosteriorTarget,
+    ExplicitSamplingControls,
+    IndependentSamplingResult,
+)
 from ffa_methods.lognormal_posterior import (
     LOG_SD_COORDINATE,
     MEAN_COORDINATE,
@@ -95,3 +116,134 @@ def test_reference_rejects_free_scale_and_mismatched_proposal() -> None:
     )
     with pytest.raises(CensoredReferenceError, match="estimated log-SD"):
         bound_fixed_scale_reference(model=free, proposal=proposal, controls=controls, requests=())
+
+
+def _audit_inputs() -> tuple[ClassifiedLognormalPosterior, ExplicitNormalProposal, RunProvenance, PrecisionPlan]:
+    model = _model()
+    proposal = ExplicitNormalProposal(
+        coordinates=model.coordinates, means=(0.0,), covariance=((1.0,),), source="synthetic prior proposal"
+    )
+    provenance = RunProvenance(
+        compatibility_profile="synthetic fixed-scale left censoring",
+        method_id="importance-sampling-reference",
+        method_version="test",
+        package_version="test",
+        evidence_status=EvidenceStatus.OBSERVED_ARTIFACT,
+        input_sha256=model.source_sha256,
+    )
+    plan = PrecisionPlan(
+        primary=ExplicitSamplingControls(
+            draw_count=1800, random_seed=51, minimum_effective_size=600, maximum_single_weight=0.05
+        ),
+        audit_seeds=(52, 53),
+        maximum_total_draws=5400,
+        maximum_scalar_evaluations=1_500_000,
+        alpha=0.05,
+        minimum_side_count=8,
+        minimum_side_ess=8.0,
+        maximum_log_ratio=1.2,
+        criterion_source="synthetic single-event Beta check",
+        censored_reference_controls=ReferenceControls(
+            extent=8, dyadic_level=8, maximum_cells=4096, maximum_cell_terms=21_000, maximum_log_ratio=2.0
+        ),
+    )
+    return model, proposal, provenance, plan
+
+
+def test_fixed_budget_censored_audit_uses_complete_reference_enclosures() -> None:
+    model, proposal, provenance, plan = _audit_inputs()
+    requests = (
+        PrecisionRequest(meaning="parameter_mean", absolute_tolerance=0.16),
+        PrecisionRequest(
+            meaning=ResultMeaning.EXPECTED_NON_EXCEEDANCE_PROBABILITY, discharge=2.0, absolute_tolerance=0.09
+        ),
+        PrecisionRequest(
+            meaning=ResultMeaning.EXPECTED_ANNUAL_EXCEEDANCE_PROBABILITY, discharge=2.0, absolute_tolerance=0.09
+        ),
+        PrecisionRequest(
+            meaning=ResultMeaning.POSTERIOR_PREDICTIVE_QUANTILE, non_exceedance=0.9, absolute_tolerance=1.0
+        ),
+    )
+    result = importance_precision.audit_lognormal_precision(
+        model=model, proposal=proposal, provenance=provenance, plan=plan, requests=requests
+    )
+    assert result.completed_count == 3
+    assert result.states == (PrecisionState.CONDITIONAL_PASS,) * 3 + (PrecisionState.INDETERMINATE,)
+    assert result.censored_reference is not None
+    assert result.censored_reference.reference.reserved_cell_terms == 5 * 4096 + 19
+    for index, oracle in enumerate((Decimal("-0.56418958354775628695"), Decimal(2) / 3, Decimal(1) / 3)):
+        for attempt in result.attempts:
+            output = attempt.outputs[index]
+            assert output.reference is None
+            reference, window = output.reference_interval, output.window
+            assert reference is not None
+            assert reference.contains(oracle)
+            assert window is not None
+            assert window.lower <= float(reference.lower) <= float(reference.upper) <= window.upper
+            if attempt.seed != plan.primary.random_seed:
+                (check,) = output.scalar_checks
+                assert check.reference == reference
+                assert check.interval is not None
+                assert check.interval.lower <= float(reference.lower)
+                assert float(reference.upper) <= check.interval.upper
+
+
+def test_censored_gate_accounts_for_budget_and_uses_stricter_ratio_ceiling() -> None:
+    model, proposal, provenance, plan = _audit_inputs()
+    controls = plan.censored_reference_controls
+    assert controls is not None
+    request = PrecisionRequest(meaning="parameter_mean", absolute_tolerance=0.16)
+    for variant, expected in (
+        (replace(plan, maximum_log_ratio=0.5), "normalized ratio ceiling exceeded"),
+        (replace(plan, censored_reference_controls=replace(controls, maximum_cell_terms=1)), "cell-term budget"),
+    ):
+        result = importance_precision.audit_lognormal_precision(
+            model=model, proposal=proposal, provenance=provenance, plan=variant, requests=(request,)
+        )
+        assert result.attempted_count == 0
+        assert result.states == (PrecisionState.INDETERMINATE,)
+        assert tuple(attempt.seed for attempt in result.attempts) == plan.seeds
+        assert all(attempt.reason is not None and expected in attempt.reason for attempt in result.attempts)
+
+
+def test_reference_overlap_cannot_pass_on_midpoint_alone() -> None:
+    reference = ReferenceBounds(Decimal("0.2"), Decimal("0.8"))
+    assert (
+        importance_precision._reference_containment(Bounds(0.3, 0.7), reference)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        == PrecisionState.INDETERMINATE
+    )
+
+
+def test_censored_sampler_failure_preserves_schedule_and_unsupported_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    model, proposal, provenance, plan = _audit_inputs()
+    controls = plan.censored_reference_controls
+    assert controls is not None
+    plan = replace(plan, censored_reference_controls=replace(controls, dyadic_level=2))
+    run_sampler = importance_precision.independent_importance_sample
+
+    def fail_one_stream(
+        *,
+        proposal: ExplicitNormalProposal,
+        target: ExplicitPosteriorTarget,
+        controls: ExplicitSamplingControls,
+        provenance: RunProvenance,
+    ) -> IndependentSamplingResult:
+        if controls.random_seed == 52:
+            msg = "synthetic scheduled failure"
+            raise ValueError(msg)
+        return run_sampler(proposal=proposal, target=target, controls=controls, provenance=provenance)
+
+    monkeypatch.setattr(importance_precision, "independent_importance_sample", fail_one_stream)
+    requests = (
+        PrecisionRequest(meaning="parameter_mean", absolute_tolerance=0.16),
+        PrecisionRequest(meaning=ResultMeaning.POSTERIOR_MEAN_QUANTILE, non_exceedance=0.9, absolute_tolerance=6.0),
+    )
+    result = importance_precision.audit_lognormal_precision(
+        model=model, proposal=proposal, provenance=provenance, plan=plan, requests=requests
+    )
+    assert tuple(attempt.seed for attempt in result.attempts) == plan.seeds
+    assert result.attempted_count == 3
+    assert result.completed_count == 2
+    assert result.failed_count == 1
+    assert result.states == (PrecisionState.EXECUTION_FAILED, PrecisionState.INDETERMINATE)
+    assert result.attempts[1].reason == "synthetic scheduled failure"
